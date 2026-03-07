@@ -5,6 +5,8 @@ import ConnectionBar from './components/ConnectionBar/ConnectionBar';
 import TabBar from './components/TabBar/TabBar';
 import RequestPanel from './components/RequestPanel/RequestPanel';
 import ResponsePanel from './components/ResponsePanel/ResponsePanel';
+import ConfirmDialog from './components/ConfirmDialog/ConfirmDialog';
+import SettingsPanel from './components/Settings/SettingsPanel';
 import { useAppStore } from './store/appStore';
 
 function ExportCollectionModal({ onClose }: { onClose: () => void }) {
@@ -144,6 +146,7 @@ export default function App() {
       </div>
 
       {showExportModal && <ExportCollectionModal onClose={() => setShowExportModal(false)} />}
+      <ConfirmDialog />
     </div>
   );
 }

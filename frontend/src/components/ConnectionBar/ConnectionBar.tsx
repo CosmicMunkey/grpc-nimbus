@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { Wifi, WifiOff, ChevronDown, Lock, Unlock, AlertTriangle } from 'lucide-react';
 import EnvSelector from '../Environments/EnvSelector';
+import SettingsPanel from '../Settings/SettingsPanel';
 
 const TLS_OPTIONS = [
   { value: 'none',          label: 'Plaintext (h2c)' },
@@ -108,6 +109,9 @@ export default function ConnectionBar() {
 
       {/* Environment selector */}
       <EnvSelector />
+
+      {/* Settings */}
+      <SettingsPanel />
     </div>
   );
 }
