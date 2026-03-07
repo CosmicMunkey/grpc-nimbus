@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Environment } from '../../types';
 import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings } from 'lucide-react';
+import { usePortalMenu } from '../../hooks/usePortalMenu';
 
 // ─── Environment Editor Modal ────────────────────────────────────────────────
 
@@ -244,7 +246,7 @@ export default function EnvSelector() {
     setActiveEnvironment,
   } = useAppStore();
 
-  const [open, setOpen] = useState(false);
+  const { open, toggle, close, triggerRef, menuStyle } = usePortalMenu('left');
   const [showManager, setShowManager] = useState(false);
 
   useEffect(() => { loadEnvironments(); }, []);
@@ -254,7 +256,8 @@ export default function EnvSelector() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={triggerRef as React.RefObject<HTMLButtonElement>}
+        onClick={toggle}
         className="flex items-center gap-1 px-2 py-1 bg-[#1a1a2e] border border-[#2d3748] rounded text-xs text-[#94a3b8] hover:border-[#4a5568] max-w-[160px]"
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-green-400' : 'bg-[#4a5568]'}`} />
@@ -262,43 +265,40 @@ export default function EnvSelector() {
         <ChevronDown size={11} className="shrink-0" />
       </button>
 
-      {open && (
-        <>
-          {/* Click-outside overlay */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
-            {/* No env option */}
+      {open && createPortal(
+        <div style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
+          {/* No env option */}
+          <button
+            onClick={() => { setActiveEnvironment(''); close(); }}
+            className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-[#1e2132] ${!active ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
+          >
+            {!active && <Check size={11} />}
+            <span className={!active ? '' : 'ml-[15px]'}>No Environment</span>
+          </button>
+
+          {environments.map((env) => (
             <button
-              onClick={() => { setActiveEnvironment(''); setOpen(false); }}
-              className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-[#1e2132] ${!active ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
+              key={env.id}
+              onClick={() => { setActiveEnvironment(env.id); close(); }}
+              className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left hover:bg-[#1e2132] ${
+                activeEnvironmentId === env.id ? 'text-[#e94560]' : 'text-[#e2e8f0]'
+              }`}
             >
-              {!active && <Check size={11} />}
-              <span className={!active ? '' : 'ml-[15px]'}>No Environment</span>
+              {activeEnvironmentId === env.id ? <Check size={11} /> : <span className="w-[11px]" />}
+              <span className="truncate">{env.name}</span>
             </button>
+          ))}
 
-            {environments.map((env) => (
-              <button
-                key={env.id}
-                onClick={() => { setActiveEnvironment(env.id); setOpen(false); }}
-                className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left hover:bg-[#1e2132] ${
-                  activeEnvironmentId === env.id ? 'text-[#e94560]' : 'text-[#e2e8f0]'
-                }`}
-              >
-                {activeEnvironmentId === env.id ? <Check size={11} /> : <span className="w-[11px]" />}
-                <span className="truncate">{env.name}</span>
-              </button>
-            ))}
-
-            <div className="border-t border-[#2d3748] mt-1">
-              <button
-                onClick={() => { setOpen(false); setShowManager(true); }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
-              >
-                <Settings size={11} /> Manage Environments…
-              </button>
-            </div>
+          <div className="border-t border-[#2d3748] mt-1">
+            <button
+              onClick={() => { close(); setShowManager(true); }}
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
+            >
+              <Settings size={11} /> Manage Environments…
+            </button>
           </div>
-        </>
+        </div>,
+        document.body
       )}
 
       {showManager && <EnvManager onClose={() => setShowManager(false)} />}
