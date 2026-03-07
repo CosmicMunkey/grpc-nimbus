@@ -17,7 +17,7 @@ Most gRPC tools (Insomnia, Postman, BloomRPC, grpc-client-cli) focus on loading 
 | Portable export (bundled protosets) | ✅ | ❌ | ❌ | ❌ |
 | Native desktop binary | ✅ | ❌ | ❌ | ✅ |
 | Streaming (client/server/bidi) | ✅ | ✅ | ✅ | ✅ |
-| Environment variables | ✅ | ❌ | ❌ | ✅ |
+| Environment headers (per-env default metadata) | ✅ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -41,6 +41,11 @@ Selecting a method populates a **type-aware form** modelled on grpcui:
 
 Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two editors stay in sync.
 
+### Tabs
+- Each open request lives in its own tab; open as many as needed
+- Tabs can be renamed by double-clicking the tab label
+- Closing the last tab opens a fresh blank tab
+
 ### Collections & history
 - Save any request to a named collection (create new or add to existing)
 - Collections persist across restarts; load a saved request in one click
@@ -48,9 +53,15 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - Per-session request history ring-buffer for quick replay
 
 ### Environments
-- Define named environments with `KEY=value` variables
-- Reference them in request bodies and metadata with `{{VAR_NAME}}`
-- Switch environments from the connection bar
+- Define named environments with default **gRPC metadata headers** (e.g. `Authorization: Bearer <token>`, `x-api-key: …`)
+- Headers are prepended to every request when the environment is active; per-request metadata can still override them
+- Switch environments from the connection bar; the active environment is highlighted in green
+
+### Settings
+- **Confirm before delete** — a toggle (gear icon in the connection bar) controls whether a confirmation dialog appears when deleting requests, collections, or environments; defaults to on
+
+### Connection status
+- The dot next to the Connect button reflects real gRPC connectivity state: gray = disconnected, yellow = connecting/idle, green = ready, red = transient failure
 
 ### Connections
 - Plain-text or TLS connections
@@ -149,7 +160,7 @@ grpc-nimbus/
     │   └── schema.go         # Proto → FieldSchema tree for the form builder
     └── storage/
         ├── collections.go    # Collection CRUD + portable export/import
-        ├── environments.go   # Environment variable CRUD
+        ├── environments.go   # Environment header CRUD
         ├── history.go        # Request history ring-buffer
         └── settings.go       # App settings persistence (last paths, connection)
 ```
