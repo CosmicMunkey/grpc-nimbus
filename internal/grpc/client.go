@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -49,7 +50,31 @@ func NewConnection(ctx context.Context, cfg ConnectionConfig) (*Connection, erro
 	if err != nil {
 		return nil, fmt.Errorf("dialing %s: %w", cfg.Target, err)
 	}
+	// Trigger the actual TCP handshake immediately so state reflects reality.
+	conn.Connect()
 	return &Connection{Config: cfg, conn: conn}, nil
+}
+
+// GetState returns the current connectivity state as a string.
+// Possible values: "idle", "connecting", "ready", "transient_failure", "shutdown".
+func (c *Connection) GetState() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return "shutdown"
+	}
+	switch c.conn.GetState() {
+	case connectivity.Idle:
+		return "idle"
+	case connectivity.Connecting:
+		return "connecting"
+	case connectivity.Ready:
+		return "ready"
+	case connectivity.TransientFailure:
+		return "transient_failure"
+	default:
+		return "shutdown"
+	}
 }
 
 // ClientConn returns the underlying *grpc.ClientConn.

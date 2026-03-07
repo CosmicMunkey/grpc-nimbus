@@ -10,10 +10,31 @@ const TLS_OPTIONS = [
   { value: 'custom_ca',     label: 'TLS (custom CA)' },
 ] as const;
 
+type ConnStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
+
+const STATUS_DOT: Record<ConnStatus, { color: string; title: string; pulse?: boolean }> = {
+  disconnected:      { color: 'bg-[#4a5568]',  title: 'Not connected' },
+  idle:              { color: 'bg-yellow-400',  title: 'Connected (idle)', pulse: true },
+  connecting:        { color: 'bg-yellow-400',  title: 'Connecting…',     pulse: true },
+  ready:             { color: 'bg-green-400',   title: 'Connected and ready' },
+  transient_failure: { color: 'bg-red-400',     title: 'Connection failed — retrying' },
+};
+
+function StatusDot({ status }: { status: ConnStatus }) {
+  const { color, title, pulse } = STATUS_DOT[status] ?? STATUS_DOT.disconnected;
+  return (
+    <div
+      title={title}
+      className={`w-2 h-2 rounded-full ${color} ${pulse ? 'animate-pulse' : ''}`}
+    />
+  );
+}
+
 export default function ConnectionBar() {
   const {
     connectionConfig,
     isConnected,
+    connectionStatus,
     connectionError,
     setConnectionConfig,
     connect,
@@ -76,7 +97,7 @@ export default function ConnectionBar() {
 
       {/* Connection status indicator */}
       <div className="flex items-center gap-1">
-        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-[#4a5568]'}`} />
+        <StatusDot status={connectionStatus} />
         {connectionError && (
           <span title={connectionError} className="text-[#e94560] cursor-help"><AlertTriangle size={14} /></span>
         )}
