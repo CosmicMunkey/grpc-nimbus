@@ -690,14 +690,35 @@ func (a *App) saveSettings(mutate func(*storage.AppSettings)) {
 }
 
 func interpolateRequest(req grpcinternal.InvokeRequest, env *storage.Environment) grpcinternal.InvokeRequest {
-	if env == nil || len(env.Variables) == 0 {
+	if env == nil {
 		return req
 	}
-	req.RequestJSON = storage.Interpolate(req.RequestJSON, env.Variables)
-	for i := range req.Metadata {
-		req.Metadata[i].Key = storage.Interpolate(req.Metadata[i].Key, env.Variables)
-		req.Metadata[i].Value = storage.Interpolate(req.Metadata[i].Value, env.Variables)
+	vars := env.Variables
+
+	// Apply variable substitution to request body and per-request metadata.
+	if len(vars) > 0 {
+		req.RequestJSON = storage.Interpolate(req.RequestJSON, vars)
+		for i := range req.Metadata {
+			req.Metadata[i].Key = storage.Interpolate(req.Metadata[i].Key, vars)
+			req.Metadata[i].Value = storage.Interpolate(req.Metadata[i].Value, vars)
+		}
 	}
+
+	// Prepend environment-level headers so per-request metadata can override.
+	if len(env.Headers) > 0 {
+		envMeta := make([]grpcinternal.MetadataEntry, 0, len(env.Headers))
+		for _, h := range env.Headers {
+			if h.Key == "" {
+				continue
+			}
+			envMeta = append(envMeta, grpcinternal.MetadataEntry{
+				Key:   storage.Interpolate(h.Key, vars),
+				Value: storage.Interpolate(h.Value, vars),
+			})
+		}
+		req.Metadata = append(envMeta, req.Metadata...)
+	}
+
 	return req
 }
 
