@@ -264,6 +264,36 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 	return state, nil
 }
 
+// ─── User settings ────────────────────────────────────────────────────────────
+
+// UserSettings holds user-configurable preferences exposed to the frontend.
+type UserSettings struct {
+	ConfirmDeletes bool `json:"confirmDeletes"`
+}
+
+// GetUserSettings returns the current user preference settings.
+func (a *App) GetUserSettings() UserSettings {
+	defaults := UserSettings{ConfirmDeletes: true}
+	if a.settings == nil {
+		return defaults
+	}
+	saved, err := a.settings.Load()
+	if err != nil || saved == nil {
+		return defaults
+	}
+	if saved.ConfirmDeletes == nil {
+		return defaults
+	}
+	return UserSettings{ConfirmDeletes: *saved.ConfirmDeletes}
+}
+
+// SaveUserSettings persists user preference settings.
+func (a *App) SaveUserSettings(s UserSettings) {
+	go a.saveSettings(func(settings *storage.AppSettings) {
+		settings.ConfirmDeletes = &s.ConfirmDeletes
+	})
+}
+
 // ClearLoadedProtos discards all loaded descriptors and removes saved paths,
 // returning the app to a clean state as if it were freshly installed.
 func (a *App) ClearLoadedProtos() {
