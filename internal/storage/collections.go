@@ -107,6 +107,24 @@ func (s *Store) DeleteCollection(id string) error {
 	return nil
 }
 
+// FilePath returns the on-disk path for the given collection ID.
+func (s *Store) FilePath(id string) string {
+	return s.filePath(id)
+}
+
+// ImportCollection reads a collection JSON from srcPath, assigns a new ID, and saves it.
+func (s *Store) ImportCollection(srcPath string) (*Collection, error) {
+	col, err := s.loadFile(srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading import file: %w", err)
+	}
+	col.ID = col.ID + "_imported_" + fmt.Sprintf("%d", time.Now().UnixNano())
+	if err := s.SaveCollection(*col); err != nil {
+		return nil, err
+	}
+	return col, nil
+}
+
 func (s *Store) filePath(id string) string {
 	// Sanitize: only allow alphanumeric, dash, underscore.
 	safe := filepath.Base(id)
