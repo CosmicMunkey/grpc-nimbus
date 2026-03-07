@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { MethodInfo, MetadataEntry, ServiceInfo } from '../../types';
 import {
@@ -6,6 +7,7 @@ import {
   FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical, X,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
+import { usePortalMenu } from '../../hooks/usePortalMenu';
 
 function StreamBadge({ method }: { method: MethodInfo }) {
   if (method.clientStreaming && method.serverStreaming)
@@ -58,50 +60,42 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
 }
 
 function CollectionMenu({ colId, colName }: { colId: string; colName: string }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { open, toggle, close, triggerRef, menuStyle } = usePortalMenu('right');
   const { exportCollection, importCollection, deleteCollection } = useAppStore();
 
-  React.useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        ref={triggerRef as React.RefObject<HTMLButtonElement>}
+        onClick={(e) => { e.stopPropagation(); toggle(); }}
         className="hover:text-[#e2e8f0] p-0.5 rounded opacity-0 group-hover:opacity-100"
         title="Collection options"
       >
         <MoreVertical size={11} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg w-44">
+      {open && createPortal(
+        <div style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg w-44">
           <button
-            onClick={() => { exportCollection(colId); setOpen(false); }}
+            onClick={() => { exportCollection(colId); close(); }}
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e2e8f0] hover:bg-[#1e2132]"
           >
             <Download size={11} /> Export "{colName}"
           </button>
           <button
-            onClick={() => { importCollection(); setOpen(false); }}
+            onClick={() => { importCollection(); close(); }}
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e2e8f0] hover:bg-[#1e2132]"
           >
             <Upload size={11} /> Import collection
           </button>
           <div className="border-t border-[#2d3748] my-0.5" />
           <button
-            onClick={() => { deleteCollection(colId); setOpen(false); }}
+            onClick={() => { deleteCollection(colId); close(); }}
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e94560] hover:bg-[#1e2132]"
           >
             <Trash2 size={11} /> Delete
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
