@@ -123,3 +123,20 @@ export interface LoadedState {
   lastTarget: string;
   lastTLS: string;
 }
+
+// Represents one open request tab — all per-request state is scoped here.
+export interface Tab {
+  id: string;
+  label: string;
+  selectedMethod: MethodInfo | null;
+  requestJson: string;
+  requestMetadata: MetadataEntry[];
+  requestSchema: FieldSchema[];
+  response: InvokeResponse | null;
+  streamMessages: StreamEvent[];
+  isInvoking: boolean;
+  isStreaming: boolean;
+  invokeError: string | null;
+  history: HistoryEntry[];
+  timeoutSeconds: number;
+}
