@@ -2,15 +2,17 @@ import { create } from 'zustand';
 import {
   Collection,
   ConnectionConfig,
+  Environment,
+  HistoryEntry,
   InvokeRequest,
   InvokeResponse,
   MetadataEntry,
   MethodInfo,
   ServiceInfo,
+  StreamEvent,
 } from '../types';
 
-// We call Wails backend via the global `window.go` object injected at runtime.
-// Type stubs are declared below so TypeScript is happy during development.
+// Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
   interface Window {
     go: {
@@ -19,32 +21,65 @@ declare global {
           Connect(cfg: ConnectionConfig): Promise<void>;
           Disconnect(): Promise<void>;
           LoadProtosets(paths: string[]): Promise<ServiceInfo[]>;
+          LoadProtoFiles(importPaths: string[], protoFiles: string[]): Promise<ServiceInfo[]>;
+          LoadViaReflection(): Promise<ServiceInfo[]>;
           GetServices(): Promise<ServiceInfo[]>;
           InvokeUnary(req: InvokeRequest): Promise<InvokeResponse>;
+          InvokeStream(req: InvokeRequest): Promise<void>;
+          CancelStream(): Promise<void>;
           ListCollections(): Promise<Collection[]>;
           SaveCollection(col: Collection): Promise<void>;
           DeleteCollection(id: string): Promise<void>;
           GetCollection(id: string): Promise<Collection>;
+          ExportCollection(id: string, destPath: string): Promise<void>;
+          ImportCollection(srcPath: string): Promise<Collection>;
+          PickProtosetFiles(): Promise<string[]>;
+          PickProtoFiles(): Promise<string[]>;
+          PickImportFile(): Promise<string>;
+          PickExportPath(defaultName: string): Promise<string>;
+          ListEnvironments(): Promise<Environment[]>;
+          SaveEnvironment(env: Environment): Promise<void>;
+          DeleteEnvironment(id: string): Promise<void>;
+          SetActiveEnvironment(id: string): Promise<void>;
+          GetHistory(methodPath: string): Promise<HistoryEntry[]>;
+          ClearHistory(methodPath: string): Promise<void>;
         };
       };
     };
   }
 }
 
-// Convenience wrappers so components don't reach into window.go directly.
 export const api = {
   connect: (cfg: ConnectionConfig) => window.go.main.App.Connect(cfg),
   disconnect: () => window.go.main.App.Disconnect(),
   loadProtosets: (paths: string[]) => window.go.main.App.LoadProtosets(paths),
+  loadProtoFiles: (importPaths: string[], protoFiles: string[]) =>
+    window.go.main.App.LoadProtoFiles(importPaths, protoFiles),
+  loadViaReflection: () => window.go.main.App.LoadViaReflection(),
   getServices: () => window.go.main.App.GetServices(),
   invokeUnary: (req: InvokeRequest) => window.go.main.App.InvokeUnary(req),
+  invokeStream: (req: InvokeRequest) => window.go.main.App.InvokeStream(req),
+  cancelStream: () => window.go.main.App.CancelStream(),
   listCollections: () => window.go.main.App.ListCollections(),
   saveCollection: (col: Collection) => window.go.main.App.SaveCollection(col),
   deleteCollection: (id: string) => window.go.main.App.DeleteCollection(id),
   getCollection: (id: string) => window.go.main.App.GetCollection(id),
+  exportCollection: (id: string, destPath: string) =>
+    window.go.main.App.ExportCollection(id, destPath),
+  importCollection: (srcPath: string) => window.go.main.App.ImportCollection(srcPath),
+  pickProtosetFiles: () => window.go.main.App.PickProtosetFiles(),
+  pickProtoFiles: () => window.go.main.App.PickProtoFiles(),
+  pickImportFile: () => window.go.main.App.PickImportFile(),
+  pickExportPath: (name: string) => window.go.main.App.PickExportPath(name),
+  listEnvironments: () => window.go.main.App.ListEnvironments(),
+  saveEnvironment: (env: Environment) => window.go.main.App.SaveEnvironment(env),
+  deleteEnvironment: (id: string) => window.go.main.App.DeleteEnvironment(id),
+  setActiveEnvironment: (id: string) => window.go.main.App.SetActiveEnvironment(id),
+  getHistory: (methodPath: string) => window.go.main.App.GetHistory(methodPath),
+  clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
 };
 
-// ─── App State ───────────────────────────────────────────────────────────────
+// ─── App State ────────────────────────────────────────────────────────────────
 
 interface AppState {
   // Connection
@@ -55,14 +90,16 @@ interface AppState {
   connect: () => Promise<void>;
   disconnect: () => void;
 
-  // Protoset / services
+  // Descriptor sources
   services: ServiceInfo[];
   protosetPaths: string[];
   loadProtosets: (paths: string[]) => Promise<void>;
+  loadProtoFiles: (importPaths: string[], protoFiles: string[]) => Promise<void>;
+  loadViaReflection: () => Promise<void>;
 
   // Selected method
   selectedMethod: MethodInfo | null;
-  selectMethod: (method: MethodInfo) => void;
+  selectMethod: (method: MethodInfo | null) => void;
 
   // Request state
   requestJson: string;
@@ -72,21 +109,44 @@ interface AppState {
   setRequestMetadata: (md: MetadataEntry[]) => void;
   setTimeoutSeconds: (t: number) => void;
 
-  // Response state
+  // Response state (unary)
   response: InvokeResponse | null;
   isInvoking: boolean;
   invokeError: string | null;
   invoke: () => Promise<void>;
+
+  // Streaming state
+  streamMessages: StreamEvent[];
+  isStreaming: boolean;
+  appendStreamEvent: (evt: StreamEvent) => void;
+  clearStream: () => void;
+  cancelStream: () => void;
 
   // Collections
   collections: Collection[];
   loadCollections: () => Promise<void>;
   saveToCollection: (collectionId: string, name: string) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
+  exportCollection: (id: string) => Promise<void>;
+  importCollection: () => Promise<void>;
+
+  // Environments
+  environments: Environment[];
+  activeEnvironmentId: string;
+  loadEnvironments: () => Promise<void>;
+  saveEnvironment: (env: Environment) => Promise<void>;
+  deleteEnvironment: (id: string) => Promise<void>;
+  setActiveEnvironment: (id: string) => Promise<void>;
+
+  // History
+  history: HistoryEntry[];
+  loadHistory: (methodPath: string) => Promise<void>;
+  clearHistory: (methodPath: string) => Promise<void>;
+  restoreFromHistory: (entry: HistoryEntry) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  // Connection defaults
+  // ── Connection ──────────────────────────────────────────────────────────────
   connectionConfig: { target: 'localhost:50051', tls: 'none' },
   isConnected: false,
   connectionError: null,
@@ -100,8 +160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.connect(connectionConfig);
       set({ isConnected: true, connectionError: null });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      set({ isConnected: false, connectionError: msg });
+      set({ isConnected: false, connectionError: e instanceof Error ? e.message : String(e) });
     }
   },
 
@@ -110,25 +169,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isConnected: false });
   },
 
-  // Protoset / services
+  // ── Descriptor sources ──────────────────────────────────────────────────────
   services: [],
   protosetPaths: [],
 
   loadProtosets: async (paths) => {
-    try {
-      const services = await api.loadProtosets(paths);
-      set({ services, protosetPaths: paths });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(msg);
-    }
+    const services = await api.loadProtosets(paths);
+    set({ services, protosetPaths: paths });
   },
 
-  // Selected method
-  selectedMethod: null,
-  selectMethod: (method) => set({ selectedMethod: method, response: null, requestJson: '{}' }),
+  loadProtoFiles: async (importPaths, protoFiles) => {
+    const services = await api.loadProtoFiles(importPaths, protoFiles);
+    set({ services, protosetPaths: protoFiles });
+  },
 
-  // Request
+  loadViaReflection: async () => {
+    const services = await api.loadViaReflection();
+    set({ services, protosetPaths: [] });
+  },
+
+  // ── Selected method ─────────────────────────────────────────────────────────
+  selectedMethod: null,
+  selectMethod: (method) =>
+    set({ selectedMethod: method, response: null, requestJson: '{}', streamMessages: [], history: [] }),
+
+  // ── Request ─────────────────────────────────────────────────────────────────
   requestJson: '{}',
   requestMetadata: [],
   timeoutSeconds: 0,
@@ -136,7 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setRequestMetadata: (md) => set({ requestMetadata: md }),
   setTimeoutSeconds: (t) => set({ timeoutSeconds: t }),
 
-  // Response
+  // ── Unary response ──────────────────────────────────────────────────────────
   response: null,
   isInvoking: false,
   invokeError: null,
@@ -144,22 +209,48 @@ export const useAppStore = create<AppState>((set, get) => ({
   invoke: async () => {
     const { selectedMethod, requestJson, requestMetadata, timeoutSeconds } = get();
     if (!selectedMethod) return;
-    set({ isInvoking: true, invokeError: null, response: null });
+    set({ isInvoking: true, invokeError: null, response: null, streamMessages: [] });
     try {
-      const resp = await api.invokeUnary({
-        methodPath: selectedMethod.fullName,
-        requestJson,
-        metadata: requestMetadata,
-        timeoutSeconds,
-      });
-      set({ response: resp, isInvoking: false });
+      if (selectedMethod.serverStreaming) {
+        // Server-streaming: use streaming path via Wails events
+        set({ isStreaming: true, isInvoking: false });
+        await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
+      } else {
+        const resp = await api.invokeUnary({
+          methodPath: selectedMethod.fullName,
+          requestJson,
+          metadata: requestMetadata,
+          timeoutSeconds,
+        });
+        set({ response: resp, isInvoking: false });
+      }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      set({ invokeError: msg, isInvoking: false });
+      set({ invokeError: e instanceof Error ? e.message : String(e), isInvoking: false, isStreaming: false });
     }
   },
 
-  // Collections
+  // ── Streaming ───────────────────────────────────────────────────────────────
+  streamMessages: [],
+  isStreaming: false,
+
+  appendStreamEvent: (evt) => {
+    if (evt.type === 'trailer') {
+      set((s) => ({ streamMessages: [...s.streamMessages, evt], isStreaming: false }));
+    } else if (evt.type === 'error') {
+      set((s) => ({ streamMessages: [...s.streamMessages, evt], isStreaming: false, invokeError: evt.error ?? null }));
+    } else {
+      set((s) => ({ streamMessages: [...s.streamMessages, evt] }));
+    }
+  },
+
+  clearStream: () => set({ streamMessages: [], isStreaming: false }),
+
+  cancelStream: () => {
+    api.cancelStream().catch(() => {});
+    set({ isStreaming: false });
+  },
+
+  // ── Collections ─────────────────────────────────────────────────────────────
   collections: [],
 
   loadCollections: async () => {
@@ -172,9 +263,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   saveToCollection: async (collectionId, name) => {
-    const { selectedMethod, requestJson, requestMetadata, connectionConfig, collections } = get();
+    const { selectedMethod, requestJson, requestMetadata, connectionConfig, collections, protosetPaths } = get();
     if (!selectedMethod) return;
-
     const now = new Date().toISOString();
     const req = {
       id: crypto.randomUUID(),
@@ -187,26 +277,83 @@ export const useAppStore = create<AppState>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     };
-
     let col = collections.find((c) => c.id === collectionId);
     if (!col) {
-      col = {
-        id: collectionId,
-        name: collectionId,
-        description: '',
-        protosetPaths: get().protosetPaths,
-        requests: [],
-        createdAt: now,
-        updatedAt: now,
-      };
+      col = { id: collectionId, name: collectionId, description: '', protosetPaths, requests: [], createdAt: now, updatedAt: now };
     }
-    const updated: Collection = { ...col, requests: [...col.requests, req], updatedAt: now };
-    await api.saveCollection(updated);
+    await api.saveCollection({ ...col, requests: [...(col.requests ?? []), req], updatedAt: now });
     await get().loadCollections();
   },
 
   deleteCollection: async (id) => {
     await api.deleteCollection(id);
     await get().loadCollections();
+  },
+
+  exportCollection: async (id) => {
+    const col = get().collections.find((c) => c.id === id);
+    const defaultName = `${col?.name ?? id}.json`;
+    const destPath = await api.pickExportPath(defaultName);
+    if (destPath) await api.exportCollection(id, destPath);
+  },
+
+  importCollection: async () => {
+    const srcPath = await api.pickImportFile();
+    if (srcPath) {
+      await api.importCollection(srcPath);
+      await get().loadCollections();
+    }
+  },
+
+  // ── Environments ────────────────────────────────────────────────────────────
+  environments: [],
+  activeEnvironmentId: '',
+
+  loadEnvironments: async () => {
+    try {
+      const envs = await api.listEnvironments();
+      set({ environments: envs ?? [] });
+    } catch {
+      set({ environments: [] });
+    }
+  },
+
+  saveEnvironment: async (env) => {
+    await api.saveEnvironment(env);
+    await get().loadEnvironments();
+  },
+
+  deleteEnvironment: async (id) => {
+    await api.deleteEnvironment(id);
+    if (get().activeEnvironmentId === id) {
+      await get().setActiveEnvironment('');
+    }
+    await get().loadEnvironments();
+  },
+
+  setActiveEnvironment: async (id) => {
+    await api.setActiveEnvironment(id);
+    set({ activeEnvironmentId: id });
+  },
+
+  // ── History ─────────────────────────────────────────────────────────────────
+  history: [],
+
+  loadHistory: async (methodPath) => {
+    try {
+      const entries = await api.getHistory(methodPath);
+      set({ history: entries ?? [] });
+    } catch {
+      set({ history: [] });
+    }
+  },
+
+  clearHistory: async (methodPath) => {
+    await api.clearHistory(methodPath);
+    set({ history: [] });
+  },
+
+  restoreFromHistory: (entry) => {
+    set({ requestJson: entry.requestJson, requestMetadata: entry.metadata ?? [] });
   },
 }));

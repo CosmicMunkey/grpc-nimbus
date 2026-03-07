@@ -44,6 +44,16 @@ export interface InvokeResponse {
   headers: MetadataEntry[];
   trailers: MetadataEntry[];
   durationMs: number;
+  streaming?: boolean;
+  error?: string;
+}
+
+export interface StreamEvent {
+  type: 'message' | 'header' | 'trailer' | 'error';
+  json?: string;
+  metadata?: MetadataEntry[];
+  status?: string;
+  statusCode?: number;
   error?: string;
 }
 
@@ -67,4 +77,21 @@ export interface Collection {
   requests: SavedRequest[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  variables: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  methodPath: string;
+  requestJson: string;
+  metadata: MetadataEntry[];
+  response?: InvokeResponse;
+  invokedAt: string;
 }

@@ -1,0 +1,118 @@
+package storage
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+)
+
+// Environment is a named set of key/value variables usable in requests.
+type Environment struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Variables map[string]string `json:"variables"`
+	CreatedAt time.Time         `json:"createdAt"`
+	UpdatedAt time.Time         `json:"updatedAt"`
+}
+
+// EnvStore manages environment persistence.
+type EnvStore struct {
+	dir string
+}
+
+// NewEnvStore creates an EnvStore backed by the OS user config directory.
+func NewEnvStore() (*EnvStore, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("locating config dir: %w", err)
+	}
+	dir := filepath.Join(configDir, appDirName, "environments")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("creating environments dir: %w", err)
+	}
+	return &EnvStore{dir: dir}, nil
+}
+
+// ListEnvironments returns all stored environments.
+func (s *EnvStore) ListEnvironments() ([]Environment, error) {
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading environments dir: %w", err)
+	}
+	var envs []Environment
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		env, err := s.loadEnvFile(filepath.Join(s.dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		envs = append(envs, *env)
+	}
+	return envs, nil
+}
+
+// GetEnvironment returns a single environment by ID.
+func (s *EnvStore) GetEnvironment(id string) (*Environment, error) {
+	return s.loadEnvFile(s.envFilePath(id))
+}
+
+// SaveEnvironment persists an environment to disk.
+func (s *EnvStore) SaveEnvironment(env Environment) error {
+	now := time.Now()
+	if env.CreatedAt.IsZero() {
+		env.CreatedAt = now
+	}
+	env.UpdatedAt = now
+
+	data, err := json.MarshalIndent(env, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling environment: %w", err)
+	}
+	return os.WriteFile(s.envFilePath(env.ID), data, 0o644)
+}
+
+// DeleteEnvironment removes an environment from disk.
+func (s *EnvStore) DeleteEnvironment(id string) error {
+	path := s.envFilePath(id)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing environment file: %w", err)
+	}
+	return nil
+}
+
+func (s *EnvStore) envFilePath(id string) string {
+	return filepath.Join(s.dir, filepath.Base(id)+".json")
+}
+
+func (s *EnvStore) loadEnvFile(path string) (*Environment, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var env Environment
+	if err := json.Unmarshal(data, &env); err != nil {
+		return nil, err
+	}
+	return &env, nil
+}
+
+// varPattern matches {{VAR_NAME}} placeholders in request JSON / metadata.
+var varPattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]+)\}\}`)
+
+// Interpolate replaces all {{VAR}} occurrences in text with values from vars.
+// Unknown variables are left as-is.
+func Interpolate(text string, vars map[string]string) string {
+	return varPattern.ReplaceAllStringFunc(text, func(match string) string {
+		name := strings.TrimSuffix(strings.TrimPrefix(match, "{{"), "}}")
+		if val, ok := vars[name]; ok {
+			return val
+		}
+		return match
+	})
+}
