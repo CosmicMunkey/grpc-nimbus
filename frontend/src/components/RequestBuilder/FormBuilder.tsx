@@ -136,15 +136,41 @@ function BytesEditor({ value, onChange }: { value: unknown; onChange: (v: string
 
 function NumberEditor({ value, onChange, type }: { value: unknown; onChange: (v: number) => void; type: string }) {
   const isFloat = type === 'float' || type === 'double';
-  const num = typeof value === 'number' ? value : 0;
+  const numericValue = typeof value === 'number' ? value : 0;
+
+  // Keep raw string state so the field can be temporarily empty or partial
+  // (e.g., "-" or "1.") while the user is typing without snapping back.
+  const [raw, setRaw] = useState(String(numericValue));
+
+  // Sync display when the value is changed externally (schema reset, JSON tab edit)
+  useEffect(() => {
+    const parsed = isFloat ? parseFloat(raw) : parseInt(raw, 10);
+    if (isNaN(parsed) || parsed !== numericValue) {
+      setRaw(String(numericValue));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericValue]);
+
   return (
     <input
-      type="number"
-      step={isFloat ? 'any' : '1'}
-      value={num}
+      type="text"
+      inputMode={isFloat ? 'decimal' : 'numeric'}
+      value={raw}
       onChange={e => {
-        const n = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-        onChange(isNaN(n) ? 0 : n);
+        const s = e.target.value;
+        // Allow empty, minus sign, or partial decimals while typing
+        if (s === '' || s === '-' || (isFloat && /^-?\d*\.?\d*$/.test(s)) || (!isFloat && /^-?\d*$/.test(s))) {
+          setRaw(s);
+          const n = isFloat ? parseFloat(s) : parseInt(s, 10);
+          if (!isNaN(n)) onChange(n);
+        }
+      }}
+      onBlur={() => {
+        // Normalise on focus-out: empty or invalid → 0
+        const n = isFloat ? parseFloat(raw) : parseInt(raw, 10);
+        const final = isNaN(n) ? 0 : n;
+        setRaw(String(final));
+        onChange(final);
       }}
       className={inputCls}
     />
