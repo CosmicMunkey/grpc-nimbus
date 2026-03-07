@@ -60,7 +60,7 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
 }
 
 function CollectionMenu({ colId, colName }: { colId: string; colName: string }) {
-  const { open, toggle, close, triggerRef, menuStyle } = usePortalMenu('right');
+  const { open, toggle, close, triggerRef, menuRef, menuStyle } = usePortalMenu('right');
   const { exportCollection, importCollection, deleteCollection } = useAppStore();
 
   return (
@@ -74,7 +74,7 @@ function CollectionMenu({ colId, colName }: { colId: string; colName: string }) 
         <MoreVertical size={11} />
       </button>
       {open && createPortal(
-        <div style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg w-44">
+        <div ref={menuRef as React.RefObject<HTMLDivElement>} style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg w-44">
           <button
             onClick={() => { exportCollection(colId); close(); }}
             className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e2e8f0] hover:bg-[#1e2132]"

@@ -246,7 +246,7 @@ export default function EnvSelector() {
     setActiveEnvironment,
   } = useAppStore();
 
-  const { open, toggle, close, triggerRef, menuStyle } = usePortalMenu('left');
+  const { open, toggle, close, triggerRef, menuRef, menuStyle } = usePortalMenu('right');
   const [showManager, setShowManager] = useState(false);
 
   useEffect(() => { loadEnvironments(); }, []);
@@ -266,7 +266,7 @@ export default function EnvSelector() {
       </button>
 
       {open && createPortal(
-        <div style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
+        <div ref={menuRef as React.RefObject<HTMLDivElement>} style={menuStyle} className="bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
           {/* No env option */}
           <button
             onClick={() => { setActiveEnvironment(''); close(); }}
