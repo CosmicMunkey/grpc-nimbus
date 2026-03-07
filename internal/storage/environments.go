@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 )
 
@@ -17,14 +15,13 @@ type EnvHeader struct {
 	Value string `json:"value"`
 }
 
-// Environment is a named set of key/value variables usable in requests.
+// Environment holds a named set of default headers sent on every request.
 type Environment struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Variables map[string]string `json:"variables"`
-	Headers   []EnvHeader       `json:"headers,omitempty"`
-	CreatedAt time.Time         `json:"createdAt"`
-	UpdatedAt time.Time         `json:"updatedAt"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Headers   []EnvHeader `json:"headers,omitempty"`
+	CreatedAt time.Time   `json:"createdAt"`
+	UpdatedAt time.Time   `json:"updatedAt"`
 }
 
 // EnvStore manages environment persistence.
@@ -110,17 +107,4 @@ func (s *EnvStore) loadEnvFile(path string) (*Environment, error) {
 	return &env, nil
 }
 
-// varPattern matches {{VAR_NAME}} placeholders in request JSON / metadata.
-var varPattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]+)\}\}`)
 
-// Interpolate replaces all {{VAR}} occurrences in text with values from vars.
-// Unknown variables are left as-is.
-func Interpolate(text string, vars map[string]string) string {
-	return varPattern.ReplaceAllStringFunc(text, func(match string) string {
-		name := strings.TrimSuffix(strings.TrimPrefix(match, "{{"), "}}")
-		if val, ok := vars[name]; ok {
-			return val
-		}
-		return match
-	})
-}
