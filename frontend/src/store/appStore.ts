@@ -52,6 +52,8 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
+          GetUserSettings(): Promise<{ confirmDeletes: boolean }>;
+          SaveUserSettings(s: { confirmDeletes: boolean }): Promise<void>;
         };
       };
     };
@@ -92,6 +94,8 @@ export const api = {
   removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
+  getUserSettings: (): Promise<{ confirmDeletes: boolean }> => window.go.main.App.GetUserSettings(),
+  saveUserSettings: (s: { confirmDeletes: boolean }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
@@ -218,6 +222,16 @@ interface AppState {
   saveEnvironment: (env: Environment) => Promise<void>;
   deleteEnvironment: (id: string) => Promise<void>;
   setActiveEnvironment: (id: string) => Promise<void>;
+
+  // Settings
+  confirmDeletes: boolean;
+  setConfirmDeletes: (v: boolean) => void;
+  loadUserSettings: () => Promise<void>;
+
+  // Confirm dialog (used by all delete operations)
+  confirmDialog: { message: string; resolve: (yes: boolean) => void } | null;
+  showConfirm: (message: string) => Promise<boolean>;
+  resolveConfirm: (yes: boolean) => void;
 }
 
 // Convenience hook: returns the currently active tab's state.
@@ -270,6 +284,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ services: state.services, protosetPaths: state.loadedPaths ?? [], loadMode: state.loadMode ?? '' });
       }
     } catch { /* non-fatal */ }
+    // Load user preferences in parallel (non-fatal)
+    get().loadUserSettings().catch(() => {});
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────
@@ -585,6 +601,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteRequest: async (collectionId, requestId) => {
+    const confirmed = await get().showConfirm('Delete this saved request? This cannot be undone.');
+    if (!confirmed) return;
     const { collections } = get();
     const col = collections.find((c) => c.id === collectionId);
     if (!col) return;
@@ -634,6 +652,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteCollection: async (id) => {
+    const col = get().collections.find((c) => c.id === id);
+    const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
+    if (!confirmed) return;
     await api.deleteCollection(id);
     await get().loadCollections();
   },
@@ -670,6 +691,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteEnvironment: async (id) => {
+    const confirmed = await get().showConfirm('Delete this environment? This cannot be undone.');
+    if (!confirmed) return;
     await api.deleteEnvironment(id);
     if (get().activeEnvironmentId === id) await get().setActiveEnvironment('');
     await get().loadEnvironments();
@@ -678,5 +701,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveEnvironment: async (id) => {
     await api.setActiveEnvironment(id);
     set({ activeEnvironmentId: id });
+  },
+
+  // ── Settings ─────────────────────────────────────────────────────────────
+  confirmDeletes: true,
+  confirmDialog: null,
+
+  loadUserSettings: async () => {
+    try {
+      const s = await api.getUserSettings();
+      set({ confirmDeletes: s.confirmDeletes });
+    } catch { /* use defaults */ }
+  },
+
+  setConfirmDeletes: (v) => {
+    set({ confirmDeletes: v });
+    api.saveUserSettings({ confirmDeletes: v }).catch(() => {});
+  },
+
+  showConfirm: (message) => {
+    if (!get().confirmDeletes) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      set({ confirmDialog: { message, resolve } });
+    });
+  },
+
+  resolveConfirm: (yes) => {
+    const dialog = get().confirmDialog;
+    set({ confirmDialog: null });
+    dialog?.resolve(yes);
   },
 }));

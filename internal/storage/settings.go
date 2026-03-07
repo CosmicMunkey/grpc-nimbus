@@ -17,6 +17,9 @@ type AppSettings struct {
 	// Last-used connection
 	LastTarget string `json:"lastTarget,omitempty"` // e.g. "localhost:50051"
 	LastTLS    string `json:"lastTLS,omitempty"`    // e.g. "none", "system", "insecure_skip"
+
+	// User preferences
+	ConfirmDeletes *bool `json:"confirmDeletes,omitempty"` // nil → default true
 }
 
 // SettingsStore persists AppSettings as a single JSON file.
