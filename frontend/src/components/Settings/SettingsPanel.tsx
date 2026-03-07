@@ -53,9 +53,9 @@ export default function SettingsPanel() {
 
             {/* Body */}
             <div className="px-4 py-4 space-y-4">
-              {/* Behaviour section */}
+              {/* Behavior section */}
               <div>
-                <p className="text-xs font-medium text-[#4a5568] uppercase tracking-wider mb-3">Behaviour</p>
+                <p className="text-xs font-medium text-[#4a5568] uppercase tracking-wider mb-3">Behavior</p>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-[#e2e8f0]">Confirm before delete</p>
