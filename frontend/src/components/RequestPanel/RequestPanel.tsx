@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { Play, Save, Plus, Trash2, X } from 'lucide-react';
+import { Play, Save, Plus, X, LayoutList, Code } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { MetadataEntry } from '../../types';
+import FormBuilder from '../RequestBuilder/FormBuilder';
 
 function MetadataTable() {
   const { requestMetadata, setRequestMetadata } = useAppStore();
@@ -139,7 +140,7 @@ export default function RequestPanel() {
     isInvoking,
   } = useAppStore();
 
-  const [tab, setTab] = useState<'body' | 'metadata'>('body');
+  const [tab, setTab] = useState<'form' | 'body' | 'metadata'>('form');
   const [showSave, setShowSave] = useState(false);
 
   if (!selectedMethod) {
@@ -191,24 +192,37 @@ export default function RequestPanel() {
 
       {/* Tabs */}
       <div className="flex border-b border-[#2d3748]">
-        {(['body', 'metadata'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-1.5 text-xs capitalize transition-colors border-b-2 ${
-              tab === t
-                ? 'border-[#e94560] text-[#e2e8f0]'
-                : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab('form')}
+          className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
+            tab === 'form' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+          }`}
+        >
+          <LayoutList size={11} /> Form
+        </button>
+        <button
+          onClick={() => setTab('body')}
+          className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
+            tab === 'body' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+          }`}
+        >
+          <Code size={11} /> JSON
+        </button>
+        <button
+          onClick={() => setTab('metadata')}
+          className={`px-4 py-1.5 text-xs capitalize transition-colors border-b-2 ${
+            tab === 'metadata' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+          }`}
+        >
+          Metadata
+        </button>
       </div>
 
       {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        {tab === 'body' ? (
+        {tab === 'form' ? (
+          <FormBuilder />
+        ) : tab === 'body' ? (
           <div className="h-full">
             <CodeMirror
               value={requestJson}

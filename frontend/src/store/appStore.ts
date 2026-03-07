@@ -3,6 +3,7 @@ import {
   Collection,
   ConnectionConfig,
   Environment,
+  FieldSchema,
   HistoryEntry,
   InvokeRequest,
   InvokeResponse,
@@ -43,6 +44,7 @@ declare global {
           SetActiveEnvironment(id: string): Promise<void>;
           GetHistory(methodPath: string): Promise<HistoryEntry[]>;
           ClearHistory(methodPath: string): Promise<void>;
+          GetRequestSchema(methodPath: string): Promise<FieldSchema[]>;
         };
       };
     };
@@ -77,6 +79,7 @@ export const api = {
   setActiveEnvironment: (id: string) => window.go.main.App.SetActiveEnvironment(id),
   getHistory: (methodPath: string) => window.go.main.App.GetHistory(methodPath),
   clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
+  getRequestSchema: (methodPath: string) => window.go.main.App.GetRequestSchema(methodPath),
 };
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -100,6 +103,10 @@ interface AppState {
   // Selected method
   selectedMethod: MethodInfo | null;
   selectMethod: (method: MethodInfo | null) => void;
+
+  // Request schema (for form builder)
+  requestSchema: FieldSchema[];
+  loadRequestSchema: (methodPath: string) => Promise<void>;
 
   // Request state
   requestJson: string;
@@ -190,8 +197,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Selected method ─────────────────────────────────────────────────────────
   selectedMethod: null,
-  selectMethod: (method) =>
-    set({ selectedMethod: method, response: null, requestJson: '{}', streamMessages: [], history: [] }),
+  selectMethod: (method) => {
+    set({ selectedMethod: method, response: null, requestJson: '{}', streamMessages: [], history: [], requestSchema: [] });
+    if (method) {
+      get().loadRequestSchema(method.fullName).catch(() => {});
+    }
+  },
+
+  // ── Request schema ──────────────────────────────────────────────────────────
+  requestSchema: [],
+  loadRequestSchema: async (methodPath) => {
+    try {
+      const schema = await api.getRequestSchema(methodPath);
+      set({ requestSchema: schema ?? [] });
+    } catch {
+      set({ requestSchema: [] });
+    }
+  },
 
   // ── Request ─────────────────────────────────────────────────────────────────
   requestJson: '{}',

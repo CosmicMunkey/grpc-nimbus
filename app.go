@@ -146,6 +146,17 @@ func (a *App) GetServices() ([]grpcinternal.ServiceInfo, error) {
 	return pd.Services(), nil
 }
 
+// GetRequestSchema returns the field schemas for the input message of a method.
+func (a *App) GetRequestSchema(methodPath string) ([]grpcinternal.FieldSchema, error) {
+	a.mu.Lock()
+	pd := a.protoset
+	a.mu.Unlock()
+	if pd == nil {
+		return nil, fmt.Errorf("no descriptor loaded")
+	}
+	return pd.GetRequestSchema(methodPath)
+}
+
 // ─── Invocation ───────────────────────────────────────────────────────────────
 
 // InvokeUnary executes a unary or server-streaming RPC synchronously.

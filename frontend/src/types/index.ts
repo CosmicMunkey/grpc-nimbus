@@ -95,3 +95,23 @@ export interface HistoryEntry {
   response?: InvokeResponse;
   invokedAt: string;
 }
+
+export interface EnumValue {
+  name: string;
+  number: number;
+}
+
+export interface FieldSchema {
+  name: string;
+  jsonName: string;
+  number: number;
+  type: 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double' | 'enum' | 'message' | 'map';
+  isRepeated: boolean;
+  isMap: boolean;
+  oneofName?: string;
+  enumValues?: EnumValue[];
+  fields?: FieldSchema[];
+  mapKeyType?: string;
+  mapValueType?: string;
+  mapValueFields?: FieldSchema[];
+}
