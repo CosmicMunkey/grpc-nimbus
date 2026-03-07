@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { Upload, FileCode, Radio, FileType, RefreshCw } from 'lucide-react';
+import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2 } from 'lucide-react';
 
 type LoadMode = 'protoset' | 'proto' | 'reflection';
 
 export default function ProtosetLoader() {
-  const { protosetPaths, loadProtosets, loadProtoFiles, loadViaReflection, isConnected } = useAppStore();
-  const [mode, setMode] = useState<LoadMode>('protoset');
+  const {
+    protosetPaths, loadMode,
+    loadProtosets, loadProtoFiles, loadViaReflection,
+    clearLoadedProtos, reloadProtos, removeProtoPath,
+    isConnected,
+  } = useAppStore();
+  const [tab, setTab] = useState<LoadMode>('protoset');
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reloading, setReloading] = useState(false);
 
   const withLoading = async (fn: () => Promise<void>) => {
     setError(null);
@@ -19,7 +25,7 @@ export default function ProtosetLoader() {
   };
 
   const handlePickFiles = () => {
-    if (mode === 'protoset') {
+    if (tab === 'protoset') {
       withLoading(async () => {
         const paths = await window.go.main.App.PickProtosetFiles();
         if (paths?.length) await loadProtosets(paths);
@@ -39,9 +45,33 @@ export default function ProtosetLoader() {
       (f) => (f as File & { path?: string }).path ?? f.name
     );
     if (!paths.length) return;
-    if (mode === 'protoset') withLoading(() => loadProtosets(paths));
+    if (tab === 'protoset') withLoading(() => loadProtosets(paths));
     else withLoading(() => loadProtoFiles([], paths));
   };
+
+  const handleReload = async () => {
+    setError(null);
+    setReloading(true);
+    try { await reloadProtos(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setReloading(false); }
+  };
+
+  const handleRemove = async (path: string) => {
+    setError(null);
+    try { await removeProtoPath(path); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const handleClear = async () => {
+    setError(null);
+    try { await clearLoadedProtos(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+
+  // Determine if the active loaded mode matches a reloadable type
+  const canReload = loadMode === 'protoset' || loadMode === 'proto';
+  const hasLoaded = loadMode === 'reflection' || protosetPaths.length > 0;
 
   return (
     <div className="p-3 border-b border-[#2d3748]">
@@ -51,20 +81,20 @@ export default function ProtosetLoader() {
           { id: 'protoset',   label: '.protoset', icon: <FileCode size={10} /> },
           { id: 'proto',      label: '.proto',    icon: <FileType size={10} /> },
           { id: 'reflection', label: 'Reflect',   icon: <Radio size={10} /> },
-        ] as { id: LoadMode; label: string; icon: React.ReactNode }[]).map((tab) => (
+        ] as { id: LoadMode; label: string; icon: React.ReactNode }[]).map((t) => (
           <button
-            key={tab.id}
-            onClick={() => setMode(tab.id)}
+            key={t.id}
+            onClick={() => setTab(t.id)}
             className={`flex-1 flex items-center justify-center gap-1 py-1 text-[10px] transition-colors ${
-              mode === tab.id ? 'bg-[#e94560] text-white' : 'text-[#94a3b8] hover:bg-[#1e2132]'
+              tab === t.id ? 'bg-[#e94560] text-white' : 'text-[#94a3b8] hover:bg-[#1e2132]'
             }`}
           >
-            {tab.icon} {tab.label}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
 
-      {mode === 'reflection' ? (
+      {tab === 'reflection' ? (
         <button
           onClick={() => withLoading(loadViaReflection)}
           disabled={!isConnected || loading}
@@ -87,21 +117,63 @@ export default function ProtosetLoader() {
             ? <RefreshCw size={16} className="text-[#94a3b8] animate-spin" />
             : <Upload size={16} className="text-[#94a3b8]" />}
           <span className="text-xs text-[#94a3b8]">
-            {loading ? 'Loading…' : `Drop ${mode === 'protoset' ? '.protoset' : '.proto'} files or click`}
+            {loading ? 'Loading…' : `Drop ${tab === 'protoset' ? '.protoset' : '.proto'} files or click`}
           </span>
         </div>
       )}
 
       {error && <p className="mt-2 text-xs text-[#e94560]">{error}</p>}
 
-      {protosetPaths.length > 0 && (
-        <div className="mt-2 space-y-0.5">
-          {protosetPaths.map((p) => (
-            <div key={p} className="flex items-center gap-1 text-xs text-[#94a3b8]">
-              <FileCode size={11} className="shrink-0 text-[#e94560]" />
-              <span className="truncate">{p.split(/[/\\]/).pop()}</span>
+      {/* ── Loaded files panel ────────────────────────────────────────────── */}
+      {hasLoaded && (
+        <div className="mt-2 border border-[#2d3748] rounded overflow-hidden">
+          <div className="flex items-center justify-between px-2 py-1 bg-[#1a1a2e]">
+            <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">
+              {loadMode === 'reflection' ? 'Loaded via reflection' : `Loaded (${protosetPaths.length})`}
+            </span>
+            <div className="flex items-center gap-1">
+              {canReload && (
+                <button
+                  onClick={handleReload}
+                  disabled={reloading}
+                  title="Re-read files from disk (picks up regenerated protosets)"
+                  className="flex items-center gap-1 text-[10px] text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#2d3748]"
+                >
+                  <RefreshCw size={10} className={reloading ? 'animate-spin' : ''} />
+                  Reload
+                </button>
+              )}
+              <button
+                onClick={handleClear}
+                title="Clear all loaded files"
+                className="flex items-center gap-1 text-[10px] text-[#e94560]/70 hover:text-[#e94560] px-1.5 py-0.5 rounded hover:bg-[#2d3748]"
+              >
+                <Trash2 size={10} />
+                Clear
+              </button>
             </div>
-          ))}
+          </div>
+
+          {protosetPaths.length > 0 && (
+            <div className="divide-y divide-[#2d3748]">
+              {protosetPaths.map((p) => {
+                const name = p.split(/[/\\]/).pop() ?? p;
+                return (
+                  <div key={p} className="flex items-center gap-1.5 px-2 py-1 group hover:bg-[#1e2132]">
+                    <FileCode size={10} className="shrink-0 text-[#e94560]" />
+                    <span className="flex-1 truncate text-[11px] text-[#94a3b8]" title={p}>{name}</span>
+                    <button
+                      onClick={() => handleRemove(p)}
+                      title="Remove this file"
+                      className="opacity-0 group-hover:opacity-100 text-[#4a5568] hover:text-[#e94560] transition-opacity"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

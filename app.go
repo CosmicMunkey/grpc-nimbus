@@ -252,7 +252,83 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 	return state, nil
 }
 
-// GetServices returns the service/method tree from the currently loaded descriptor.
+// ClearLoadedProtos discards all loaded descriptors and removes saved paths,
+// returning the app to a clean state as if it were freshly installed.
+func (a *App) ClearLoadedProtos() {
+	a.mu.Lock()
+	if a.protoset != nil {
+		a.protoset.Close()
+	}
+	a.protoset = nil
+	a.loadedPaths = nil
+	a.loadMode = ""
+	a.loadImportPaths = nil
+	a.mu.Unlock()
+
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.ProtoLoadMode = ""
+		s.ProtosetPaths = nil
+		s.ProtoFilePaths = nil
+		s.ProtoImportPaths = nil
+	})
+}
+
+// ReloadProtos re-reads all currently saved proto/protoset files from disk.
+// Use this when a .protoset has been regenerated at the same path — the
+// in-memory descriptor is rebuilt from the latest file content.
+func (a *App) ReloadProtos() ([]grpcinternal.ServiceInfo, error) {
+	a.mu.Lock()
+	paths := append([]string(nil), a.loadedPaths...)
+	importPaths := append([]string(nil), a.loadImportPaths...)
+	mode := a.loadMode
+	a.mu.Unlock()
+
+	switch mode {
+	case "protoset":
+		if len(paths) == 0 {
+			return nil, fmt.Errorf("no protoset files to reload")
+		}
+		return a.LoadProtosets(paths)
+	case "proto":
+		if len(paths) == 0 {
+			return nil, fmt.Errorf("no proto files to reload")
+		}
+		return a.LoadProtoFiles(importPaths, paths)
+	default:
+		return nil, fmt.Errorf("nothing to reload (mode: %q)", mode)
+	}
+}
+
+// RemoveProtoPath removes one path from the loaded set and reloads the rest.
+// If the removed path was the only one, this is equivalent to ClearLoadedProtos.
+func (a *App) RemoveProtoPath(path string) ([]grpcinternal.ServiceInfo, error) {
+	a.mu.Lock()
+	var remaining []string
+	for _, p := range a.loadedPaths {
+		if p != path {
+			remaining = append(remaining, p)
+		}
+	}
+	importPaths := append([]string(nil), a.loadImportPaths...)
+	mode := a.loadMode
+	a.mu.Unlock()
+
+	if len(remaining) == 0 {
+		a.ClearLoadedProtos()
+		return []grpcinternal.ServiceInfo{}, nil
+	}
+
+	switch mode {
+	case "protoset":
+		return a.LoadProtosets(remaining)
+	case "proto":
+		return a.LoadProtoFiles(importPaths, remaining)
+	default:
+		return nil, fmt.Errorf("cannot remove path in mode %q", mode)
+	}
+}
+
+
 func (a *App) GetServices() ([]grpcinternal.ServiceInfo, error) {
 	a.mu.Lock()
 	pd := a.protoset

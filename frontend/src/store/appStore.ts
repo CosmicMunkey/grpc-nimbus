@@ -46,6 +46,9 @@ declare global {
           GetHistory(methodPath: string): Promise<HistoryEntry[]>;
           ClearHistory(methodPath: string): Promise<void>;
           GetRequestSchema(methodPath: string): Promise<FieldSchema[]>;
+          ClearLoadedProtos(): Promise<void>;
+          ReloadProtos(): Promise<ServiceInfo[]>;
+          RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
         };
       };
@@ -82,6 +85,9 @@ export const api = {
   getHistory: (methodPath: string) => window.go.main.App.GetHistory(methodPath),
   clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
   getRequestSchema: (methodPath: string) => window.go.main.App.GetRequestSchema(methodPath),
+  clearLoadedProtos: () => window.go.main.App.ClearLoadedProtos(),
+  reloadProtos: () => window.go.main.App.ReloadProtos(),
+  removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
 };
 
@@ -102,9 +108,13 @@ interface AppState {
   // Descriptor sources
   services: ServiceInfo[];
   protosetPaths: string[];
+  loadMode: string; // "protoset", "proto", "reflection", or ""
   loadProtosets: (paths: string[]) => Promise<void>;
   loadProtoFiles: (importPaths: string[], protoFiles: string[]) => Promise<void>;
   loadViaReflection: () => Promise<void>;
+  clearLoadedProtos: () => Promise<void>;
+  reloadProtos: () => Promise<void>;
+  removeProtoPath: (path: string) => Promise<void>;
 
   // Selected method
   selectedMethod: MethodInfo | null;
@@ -204,6 +214,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({
           services: state.services,
           protosetPaths: state.loadedPaths ?? [],
+          loadMode: state.loadMode ?? '',
         });
       }
     } catch {
@@ -214,20 +225,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── Descriptor sources ──────────────────────────────────────────────────────
   services: [],
   protosetPaths: [],
+  loadMode: '',
 
   loadProtosets: async (paths) => {
     const services = await api.loadProtosets(paths);
-    set({ services, protosetPaths: paths });
+    set({ services, protosetPaths: paths, loadMode: 'protoset' });
   },
 
   loadProtoFiles: async (importPaths, protoFiles) => {
     const services = await api.loadProtoFiles(importPaths, protoFiles);
-    set({ services, protosetPaths: protoFiles });
+    set({ services, protosetPaths: protoFiles, loadMode: 'proto' });
   },
 
   loadViaReflection: async () => {
     const services = await api.loadViaReflection();
-    set({ services, protosetPaths: [] });
+    set({ services, protosetPaths: [], loadMode: 'reflection' });
+  },
+
+  clearLoadedProtos: async () => {
+    await api.clearLoadedProtos();
+    set({
+      services: [],
+      protosetPaths: [],
+      loadMode: '',
+      selectedMethod: null,
+      requestSchema: [],
+      requestJson: '{}',
+      streamMessages: [],
+    });
+  },
+
+  reloadProtos: async () => {
+    const services = await api.reloadProtos();
+    if (services?.length) set({ services });
+  },
+
+  removeProtoPath: async (path) => {
+    const services = await api.removeProtoPath(path);
+    const { protosetPaths } = get();
+    const remaining = protosetPaths.filter((p) => p !== path);
+    set({ services: services ?? [], protosetPaths: remaining });
+    if ((services ?? []).length === 0) {
+      set({ selectedMethod: null, requestSchema: [], requestJson: '{}', streamMessages: [], loadMode: '' });
+    }
   },
 
   // ── Selected method ─────────────────────────────────────────────────────────
