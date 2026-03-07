@@ -1,21 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { MethodInfo, ServiceInfo } from '../../types';
 import {
-  ChevronRight,
-  ChevronDown,
-  Zap,
-  ArrowLeftRight,
-  ArrowDown,
-  ArrowUp,
-  FolderOpen,
-  Folder,
-  Trash2,
-  BookOpen,
+  ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
+  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 
-// Badge showing stream type
 function StreamBadge({ method }: { method: MethodInfo }) {
   if (method.clientStreaming && method.serverStreaming)
     return <span title="Bidirectional streaming"><ArrowLeftRight size={11} className="text-purple-400 shrink-0" /></span>;
@@ -29,7 +20,6 @@ function StreamBadge({ method }: { method: MethodInfo }) {
 function ServiceNode({ svc }: { svc: ServiceInfo }) {
   const [expanded, setExpanded] = useState(true);
   const { selectedMethod, selectMethod } = useAppStore();
-
   const shortName = svc.name.split('.').pop() ?? svc.name;
 
   return (
@@ -42,7 +32,6 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
         <span className="font-semibold truncate" title={svc.name}>{shortName}</span>
         <span className="ml-auto text-[#4a5568] text-[10px]">{svc.methods.length}</span>
       </button>
-
       {expanded && (
         <div className="ml-3 space-y-0.5">
           {svc.methods.map((m) => {
@@ -53,9 +42,7 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
                 onClick={() => selectMethod(m)}
                 title={m.fullName}
                 className={`flex items-center gap-1.5 w-full px-2 py-1 text-xs rounded transition-colors text-left ${
-                  active
-                    ? 'bg-[#e94560]/20 text-[#e94560]'
-                    : 'text-[#e2e8f0] hover:bg-[#1e2132]'
+                  active ? 'bg-[#e94560]/20 text-[#e94560]' : 'text-[#e2e8f0] hover:bg-[#1e2132]'
                 }`}
               >
                 <StreamBadge method={m} />
@@ -69,8 +56,58 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
   );
 }
 
+function CollectionMenu({ colId, colName }: { colId: string; colName: string }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { exportCollection, importCollection, deleteCollection } = useAppStore();
+
+  React.useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className="hover:text-[#e2e8f0] p-0.5 rounded opacity-0 group-hover:opacity-100"
+        title="Collection options"
+      >
+        <MoreVertical size={11} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg w-44">
+          <button
+            onClick={() => { exportCollection(colId); setOpen(false); }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e2e8f0] hover:bg-[#1e2132]"
+          >
+            <Download size={11} /> Export "{colName}"
+          </button>
+          <button
+            onClick={() => { importCollection(); setOpen(false); }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e2e8f0] hover:bg-[#1e2132]"
+          >
+            <Upload size={11} /> Import collection
+          </button>
+          <div className="border-t border-[#2d3748] my-0.5" />
+          <button
+            onClick={() => { deleteCollection(colId); setOpen(false); }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#e94560] hover:bg-[#1e2132]"
+          >
+            <Trash2 size={11} /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CollectionsPanel() {
-  const { collections, loadCollections, deleteCollection, selectMethod, services } = useAppStore();
+  const { collections, loadCollections, importCollection, selectMethod, services } = useAppStore();
   const [expanded, setExpanded] = useState(true);
 
   React.useEffect(() => { loadCollections(); }, []);
@@ -101,16 +138,10 @@ function CollectionsPanel() {
           )}
           {collections.map((col) => (
             <div key={col.id} className="px-2">
-              <div className="flex items-center gap-1 text-xs text-[#94a3b8] py-0.5">
+              <div className="flex items-center gap-1 text-xs text-[#94a3b8] py-0.5 group">
                 <BookOpen size={11} />
                 <span className="font-medium truncate flex-1">{col.name}</span>
-                <button
-                  onClick={() => deleteCollection(col.id)}
-                  className="hover:text-[#e94560] p-0.5 rounded"
-                  title="Delete collection"
-                >
-                  <Trash2 size={11} />
-                </button>
+                <CollectionMenu colId={col.id} colName={col.name} />
               </div>
               <div className="ml-3 space-y-0.5">
                 {(col.requests ?? []).map((req) => (
@@ -126,6 +157,14 @@ function CollectionsPanel() {
               </div>
             </div>
           ))}
+
+          {/* Import button at bottom */}
+          <button
+            onClick={() => importCollection()}
+            className="flex items-center gap-1.5 mx-2 mt-1 px-2 py-1 rounded border border-dashed border-[#2d3748] text-xs text-[#4a5568] hover:border-[#4a5568] hover:text-[#94a3b8] w-[calc(100%-16px)]"
+          >
+            <Upload size={11} /> Import collection…
+          </button>
         </div>
       )}
     </div>
@@ -137,16 +176,11 @@ export default function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full bg-[#16213e] border-r border-[#2d3748] w-64 shrink-0 overflow-hidden">
-      {/* Header */}
       <div className="px-3 py-2 border-b border-[#2d3748]">
         <h1 className="text-sm font-bold text-[#e2e8f0] tracking-wide">grpc-nimbus</h1>
         <p className="text-[10px] text-[#4a5568]">gRPC Client</p>
       </div>
-
-      {/* Protoset loader */}
       <ProtosetLoader />
-
-      {/* Service tree */}
       <div className="flex-1 overflow-y-auto py-1 space-y-0.5">
         {services.length === 0 ? (
           <p className="px-3 py-4 text-xs text-[#4a5568] text-center">
@@ -156,8 +190,6 @@ export default function Sidebar() {
           services.map((svc) => <ServiceNode key={svc.name} svc={svc} />)
         )}
       </div>
-
-      {/* Collections panel */}
       <CollectionsPanel />
     </aside>
   );
