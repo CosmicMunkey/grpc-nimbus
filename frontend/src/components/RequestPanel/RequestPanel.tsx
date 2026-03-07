@@ -136,8 +136,10 @@ export default function RequestPanel() {
     requestJson,
     timeoutSeconds,
     isInvoking,
+    savedRequestId,
+    savedRequestName,
   } = useActiveTab();
-  const { setRequestJson, setTimeoutSeconds, invoke } = useAppStore();
+  const { setRequestJson, setTimeoutSeconds, invoke, updateSavedRequest } = useAppStore();
 
   const [tab, setTab] = useState<'form' | 'body' | 'metadata'>('form');
   const [showSave, setShowSave] = useState(false);
@@ -171,13 +173,32 @@ export default function RequestPanel() {
           />
           <span>s</span>
         </div>
-        {/* Save */}
-        <button
-          onClick={() => setShowSave(true)}
-          className="flex items-center gap-1 text-xs px-2 py-1 border border-[#2d3748] rounded text-[#94a3b8] hover:bg-[#1e2132] hover:text-[#e2e8f0]"
-        >
-          <Save size={12} /> Save
-        </button>
+        {/* Save — if tab is linked to a saved request, update in-place; otherwise open dialog */}
+        {savedRequestId ? (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => updateSavedRequest()}
+              title={`Save over "${savedRequestName}"`}
+              className="flex items-center gap-1 text-xs px-2 py-1 border border-[#2d3748] rounded text-[#94a3b8] hover:bg-[#1e2132] hover:text-[#e2e8f0]"
+            >
+              <Save size={12} /> Save
+            </button>
+            <button
+              onClick={() => setShowSave(true)}
+              title="Save as a new request…"
+              className="flex items-center text-xs px-1.5 py-1 border border-[#2d3748] rounded-r text-[#4a5568] hover:bg-[#1e2132] hover:text-[#94a3b8] border-l-0 -ml-px"
+            >
+              <Plus size={11} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSave(true)}
+            className="flex items-center gap-1 text-xs px-2 py-1 border border-[#2d3748] rounded text-[#94a3b8] hover:bg-[#1e2132] hover:text-[#e2e8f0]"
+          >
+            <Save size={12} /> Save
+          </button>
+        )}
         {/* Send */}
         <button
           onClick={invoke}

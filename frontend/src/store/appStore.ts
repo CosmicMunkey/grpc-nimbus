@@ -101,6 +101,8 @@ export function makeTab(overrides: Partial<Tab> = {}): Tab {
   return {
     id: newTabId(),
     label: 'New Request',
+    savedRequestId: null,
+    savedRequestName: null,
     selectedMethod: null,
     requestJson: '{}',
     requestMetadata: [],
@@ -155,7 +157,7 @@ interface AppState {
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   duplicateTab: (id: string) => void;
-  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[]) => void;
+  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[], savedRequestId?: string, savedRequestName?: string) => void;
 
   // Per-tab actions (operate on the active tab)
   selectMethod: (method: MethodInfo | null) => void;
@@ -175,6 +177,7 @@ interface AppState {
   collections: Collection[];
   loadCollections: () => Promise<void>;
   saveToCollection: (collectionId: string, name: string) => Promise<void>;
+  updateSavedRequest: () => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
   exportCollection: (id: string) => Promise<void>;
   importCollection: () => Promise<void>;
@@ -329,26 +332,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  openMethodInNewTab: (method, requestJson = '{}', metadata = []) => {
-    // If the active tab is a pristine "New Request" with no method selected,
-    // reuse it instead of spawning a redundant blank tab.
-    const { activeTabId, tabs } = get();
+  openMethodInNewTab: (method, requestJson = '{}', metadata = [], savedRequestId, savedRequestName) => {
+    const { tabs, activeTabId } = get();
+
+    // If this saved request is already open in a tab, just focus it.
+    if (savedRequestId) {
+      const existing = tabs.find((t) => t.savedRequestId === savedRequestId);
+      if (existing) {
+        set({ activeTabId: existing.id });
+        return;
+      }
+    }
+
+    // Reuse a pristine blank tab rather than opening a redundant one.
     const active = tabs.find((t) => t.id === activeTabId);
+    const label = savedRequestName ?? method.methodName;
+    const patch: Partial<Tab> = {
+      selectedMethod: method, label,
+      savedRequestId: savedRequestId ?? null,
+      savedRequestName: savedRequestName ?? null,
+      requestJson, requestMetadata: metadata,
+      response: null, streamMessages: [], history: [],
+      requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
+    };
     if (active && !active.selectedMethod) {
-      set((s) => ({
-        tabs: patchTab(s.tabs, activeTabId, {
-          selectedMethod: method,
-          label: method.methodName,
-          requestJson,
-          requestMetadata: metadata,
-          response: null, streamMessages: [], history: [],
-          requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
-        }),
-      }));
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, patch) }));
       get().loadRequestSchema(method.fullName).catch(() => {});
       return;
     }
-    const tab = makeTab({ label: method.methodName, selectedMethod: method, requestJson, requestMetadata: metadata });
+    const tab = makeTab(patch);
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
     get().loadRequestSchema(method.fullName).catch(() => {});
   },
@@ -360,6 +372,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, activeTabId, {
         selectedMethod: method,
         label: method?.methodName ?? 'New Request',
+        savedRequestId: null,
+        savedRequestName: null,
         response: null, requestJson: '{}', streamMessages: [], history: [],
         requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
       }),
@@ -499,8 +513,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { selectedMethod, requestJson, requestMetadata } = tab;
     if (!selectedMethod) return;
     const now = new Date().toISOString();
+    const newReqId = crypto.randomUUID();
     const req = {
-      id: crypto.randomUUID(), name, collectionId,
+      id: newReqId, name, collectionId,
       methodPath: selectedMethod.fullName, requestJson,
       metadata: requestMetadata, connection: connectionConfig,
       createdAt: now, updatedAt: now,
@@ -510,6 +525,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       col = { id: collectionId, name: collectionId, description: '', protosetPaths, requests: [], createdAt: now, updatedAt: now };
     }
     await api.saveCollection({ ...col, requests: [...(col.requests ?? []), req], updatedAt: now });
+    await get().loadCollections();
+    // Link this tab to the newly saved request.
+    set((s) => ({
+      tabs: patchTab(s.tabs, activeTabId, { savedRequestId: newReqId, savedRequestName: name, label: name }),
+    }));
+  },
+
+  updateSavedRequest: async () => {
+    const { tabs, activeTabId, collections, connectionConfig } = get();
+    const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+    const { savedRequestId, selectedMethod, requestJson, requestMetadata } = tab;
+    if (!savedRequestId || !selectedMethod) return;
+    const col = collections.find((c) => c.requests?.some((r) => r.id === savedRequestId));
+    if (!col) return;
+    const now = new Date().toISOString();
+    const updatedRequests = col.requests.map((r) =>
+      r.id === savedRequestId
+        ? { ...r, requestJson, metadata: requestMetadata, connection: connectionConfig, updatedAt: now }
+        : r
+    );
+    await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
   },
 
