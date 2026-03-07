@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 interface Coords {
   top?: number;
@@ -10,15 +10,17 @@ interface Coords {
 
 /**
  * Manages open state and fixed-position coordinates for a portal-rendered
- * dropdown menu. Anchors to a trigger element, escapes overflow:hidden ancestors,
- * and flips above the trigger when there isn't enough space below.
+ * dropdown menu. Uses a two-pass render: first pass places the menu below the
+ * trigger (invisible), then measures actual overflow and flips above if needed.
  *
  * @param align - 'left' aligns menu left-edge to trigger left-edge;
  *                'right' aligns menu right-edge to trigger right-edge.
  */
 export function usePortalMenu(align: 'left' | 'right' = 'left') {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<Coords>({ top: 0, left: 0, maxHeight: 400 });
+  const [coords, setCoords] = useState<Coords>({ top: 0, left: 0, maxHeight: 600 });
+  // visible=false during first-pass measurement so we never show wrong position
+  const [visible, setVisible] = useState(false);
   const triggerRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLElement>(null);
 
@@ -26,27 +28,40 @@ export function usePortalMenu(align: 'left' | 'right' = 'left') {
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       const GAP = 4;
-      const MARGIN = 8;
-      const spaceBelow = window.innerHeight - rect.bottom - MARGIN;
-      const spaceAbove = rect.top - MARGIN;
-
-      // Flip above when there's more room above and less than 150px below
-      const flipUp = spaceBelow < 150 && spaceAbove > spaceBelow;
-
       const horizontal = align === 'right'
         ? { right: window.innerWidth - rect.right }
         : { left: rect.left };
-
-      if (flipUp) {
-        setCoords({ bottom: window.innerHeight - rect.top + GAP, maxHeight: spaceAbove, ...horizontal });
-      } else {
-        setCoords({ top: rect.bottom + GAP, maxHeight: Math.max(spaceBelow, 80), ...horizontal });
-      }
+      // First pass: place below with generous height, hidden until measured
+      setCoords({ top: rect.bottom + GAP, maxHeight: 600, ...horizontal });
+      setVisible(false);
     }
     setOpen((v) => !v);
   };
 
   const close = () => setOpen(false);
+
+  // Second pass: after portal renders, measure actual overflow and flip if needed
+  useLayoutEffect(() => {
+    if (!open || visible || !menuRef.current || !triggerRef.current) return;
+    const menu = menuRef.current.getBoundingClientRect();
+    const trig = triggerRef.current.getBoundingClientRect();
+    const GAP = 4;
+    const MARGIN = 8;
+    const horizontal = align === 'right'
+      ? { right: window.innerWidth - trig.right }
+      : { left: trig.left };
+
+    if (menu.bottom > window.innerHeight - MARGIN) {
+      // Menu overflows bottom — flip above trigger
+      const spaceAbove = trig.top - MARGIN;
+      setCoords({ bottom: window.innerHeight - trig.top + GAP, maxHeight: spaceAbove, ...horizontal });
+    } else {
+      // Fits below — just cap height
+      const spaceBelow = window.innerHeight - trig.bottom - MARGIN;
+      setCoords({ top: trig.bottom + GAP, maxHeight: spaceBelow, ...horizontal });
+    }
+    setVisible(true);
+  }, [open, visible, align]);
 
   // Close on click outside — check BOTH trigger and portal content
   useEffect(() => {
@@ -78,6 +93,7 @@ export function usePortalMenu(align: 'left' | 'right' = 'left') {
     maxHeight: coords.maxHeight,
     overflowY: 'auto',
     zIndex: 9999,
+    visibility: visible ? 'visible' : 'hidden',
   };
 
   return { open, toggle, close, triggerRef, menuRef, menuStyle };
