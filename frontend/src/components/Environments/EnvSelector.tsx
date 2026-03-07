@@ -15,17 +15,9 @@ interface EnvEditorProps {
 function EnvEditor({ initial, onClose }: EnvEditorProps) {
   const { saveEnvironment } = useAppStore();
   const [name, setName] = useState(initial?.name ?? '');
-  const [vars, setVars] = useState<{ key: string; value: string }[]>(
-    initial ? Object.entries(initial.variables ?? {}).map(([key, value]) => ({ key, value })) : []
-  );
   const [headers, setHeaders] = useState<{ key: string; value: string }[]>(
     initial?.headers ?? []
   );
-
-  const addVar = () => setVars((v) => [...v, { key: '', value: '' }]);
-  const removeVar = (i: number) => setVars((v) => v.filter((_, idx) => idx !== i));
-  const updateVar = (i: number, field: 'key' | 'value', val: string) =>
-    setVars((v) => v.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
 
   const addHeader = () => setHeaders((h) => [...h, { key: '', value: '' }]);
   const removeHeader = (i: number) => setHeaders((h) => h.filter((_, idx) => idx !== i));
@@ -34,15 +26,10 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    const variables: Record<string, string> = {};
-    for (const { key, value } of vars) {
-      if (key.trim()) variables[key.trim()] = value;
-    }
     const now = new Date().toISOString();
     await saveEnvironment({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      variables,
       headers: headers.filter((h) => h.key.trim()),
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
@@ -71,49 +58,12 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addVar()}
           placeholder="Environment name (e.g. Production)"
           className="bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
         />
 
-        {/* ── Variables ── */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[#94a3b8] font-medium">Variables</span>
-          <button
-            onClick={addVar}
-            className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
-          >
-            <Plus size={11} /> Add
-          </button>
-        </div>
-
-        <div className="overflow-y-auto space-y-1 max-h-36">
-          {vars.length === 0 && (
-            <p className="text-xs text-[#4a5568]">No variables — use {'{{VAR_NAME}}'} in requests</p>
-          )}
-          {vars.map((v, i) => (
-            <div key={i} className="flex gap-1">
-              <input
-                value={v.key}
-                onChange={(e) => updateVar(i, 'key', e.target.value)}
-                placeholder="KEY"
-                className="w-32 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e94560] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
-              />
-              <input
-                value={v.value}
-                onChange={(e) => updateVar(i, 'value', e.target.value)}
-                placeholder="value"
-                className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
-              />
-              <button onClick={() => removeVar(i)} className="text-[#4a5568] hover:text-[#e94560] p-1">
-                <X size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
-
         {/* ── Headers ── */}
-        <div className="flex items-center justify-between pt-1 border-t border-[#2d3748]">
+        <div className="flex items-center justify-between">
           <span className="text-xs text-[#94a3b8] font-medium">Default Headers</span>
           <button
             onClick={addHeader}
@@ -123,7 +73,7 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           </button>
         </div>
 
-        <div className="overflow-y-auto space-y-2 max-h-48">
+        <div className="overflow-y-auto space-y-2 max-h-64">
           {headers.length === 0 && (
             <p className="text-xs text-[#4a5568]">No headers — add Authorization, x-api-key, etc.</p>
           )}
@@ -195,11 +145,10 @@ function EnvManager({ onClose }: EnvManagerProps) {
         <div className="flex-1 overflow-y-auto divide-y divide-[#2d3748]">
           {environments.length === 0 && (
             <p className="px-4 py-6 text-xs text-[#4a5568] text-center">
-              No environments yet. Create one to use variables like {'{{HOST}}'} in your requests.
+              No environments yet. Create one to add default headers like Authorization.
             </p>
           )}
           {environments.map((env) => {
-            const varCount = Object.keys(env.variables ?? {}).length;
             const headerCount = (env.headers ?? []).filter((h) => h.key.trim()).length;
             const isActive = env.id === activeEnvironmentId;
             return (
@@ -213,7 +162,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
                   }`}
                 />
 
-                {/* Name + var count */}
+                {/* Name + header count */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-medium truncate ${isActive ? 'text-green-400' : 'text-[#e2e8f0]'}`}>
@@ -224,8 +173,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
                     )}
                   </div>
                   <p className="text-[10px] text-[#4a5568] mt-0.5">
-                    {varCount === 0 ? 'No variables' : `${varCount} variable${varCount !== 1 ? 's' : ''}`}
-                    {headerCount > 0 && ` · ${headerCount} header${headerCount !== 1 ? 's' : ''}`}
+                    {headerCount === 0 ? 'No headers' : `${headerCount} header${headerCount !== 1 ? 's' : ''}`}
                   </p>
                 </div>
 
@@ -271,7 +219,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-[#2d3748]">
-          <p className="text-[10px] text-[#4a5568]">Click ● to activate · {'{{VAR}}'} in request bodies</p>
+          <p className="text-[10px] text-[#4a5568]">Click ● to activate an environment</p>
           <button
             onClick={() => { setEditing(undefined); setShowEditor(true); }}
             className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-[#e94560] text-white rounded hover:bg-[#c73652]"
