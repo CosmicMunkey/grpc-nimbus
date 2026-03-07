@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Play, Save, Plus, X, LayoutList, Code } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
@@ -8,7 +8,8 @@ import { MetadataEntry } from '../../types';
 import FormBuilder from '../RequestBuilder/FormBuilder';
 
 function MetadataTable() {
-  const { requestMetadata, setRequestMetadata } = useAppStore();
+  const { requestMetadata } = useActiveTab();
+  const { setRequestMetadata } = useAppStore();
 
   const addRow = () => setRequestMetadata([...requestMetadata, { key: '', value: '' }]);
 
@@ -133,12 +134,10 @@ export default function RequestPanel() {
   const {
     selectedMethod,
     requestJson,
-    setRequestJson,
     timeoutSeconds,
-    setTimeoutSeconds,
-    invoke,
     isInvoking,
-  } = useAppStore();
+  } = useActiveTab();
+  const { setRequestJson, setTimeoutSeconds, invoke } = useAppStore();
 
   const [tab, setTab] = useState<'form' | 'body' | 'metadata'>('form');
   const [showSave, setShowSave] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Clock, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Square, History, RotateCcw } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
@@ -51,7 +51,8 @@ function MetadataSection({ title, entries }: { title: string; entries: MetadataE
 }
 
 function StreamPanel() {
-  const { streamMessages, isStreaming, cancelStream, clearStream } = useAppStore();
+  const { streamMessages, isStreaming } = useActiveTab();
+  const { cancelStream, clearStream } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,7 +124,8 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
 }
 
 function HistoryPanel() {
-  const { selectedMethod, history, loadHistory, clearHistory, restoreFromHistory } = useAppStore();
+  const { selectedMethod, history } = useActiveTab();
+  const { loadHistory, clearHistory, restoreFromHistory } = useAppStore();
 
   useEffect(() => {
     if (selectedMethod) loadHistory(selectedMethod.fullName);
@@ -183,7 +185,8 @@ function HistoryPanel() {
 // ─── Main ResponsePanel ──────────────────────────────────────────────────────
 
 export default function ResponsePanel() {
-  const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming, appendStreamEvent } = useAppStore();
+  const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
+  const { appendStreamEvent } = useAppStore();
   const [tab, setTab] = useState<'response' | 'headers' | 'history'>('response');
 
   // Subscribe to Wails stream events
