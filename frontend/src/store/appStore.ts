@@ -51,6 +51,7 @@ declare global {
           ReloadProtos(): Promise<ServiceInfo[]>;
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
+          GetConnectionState(): Promise<string>;
         };
       };
     };
@@ -90,11 +91,35 @@ export const api = {
   reloadProtos: () => window.go.main.App.ReloadProtos(),
   removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
+  getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
 };
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
 
 let _tabSeq = 0;
+
+// Module-level handle so polling survives re-renders
+let _connPollInterval: ReturnType<typeof setInterval> | null = null;
+
+function startConnPoll() {
+  if (_connPollInterval) return;
+  _connPollInterval = setInterval(async () => {
+    try {
+      const raw = await api.getConnectionState();
+      const status = raw as AppState['connectionStatus'];
+      useAppStore.setState({ connectionStatus: status });
+    } catch {
+      // backend unavailable — leave status unchanged
+    }
+  }, 2000);
+}
+
+function stopConnPoll() {
+  if (_connPollInterval) {
+    clearInterval(_connPollInterval);
+    _connPollInterval = null;
+  }
+}
 function newTabId() { return `tab-${Date.now()}-${++_tabSeq}`; }
 
 export function makeTab(overrides: Partial<Tab> = {}): Tab {
@@ -130,6 +155,7 @@ interface AppState {
   // Connection
   connectionConfig: ConnectionConfig;
   isConnected: boolean;
+  connectionStatus: 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
   connectionError: string | null;
   setConnectionConfig: (cfg: Partial<ConnectionConfig>) => void;
   connect: () => Promise<void>;
@@ -203,6 +229,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── Connection ──────────────────────────────────────────────────────────────
   connectionConfig: { target: 'localhost:50051', tls: 'none' },
   isConnected: false,
+  connectionStatus: 'disconnected',
   connectionError: null,
 
   setConnectionConfig: (cfg) =>
@@ -212,15 +239,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { connectionConfig } = get();
     try {
       await api.connect(connectionConfig);
-      set({ isConnected: true, connectionError: null });
+      set({ isConnected: true, connectionStatus: 'connecting', connectionError: null });
+      startConnPoll();
     } catch (e: unknown) {
-      set({ isConnected: false, connectionError: e instanceof Error ? e.message : String(e) });
+      set({ isConnected: false, connectionStatus: 'disconnected', connectionError: e instanceof Error ? e.message : String(e) });
     }
   },
 
   disconnect: () => {
+    stopConnPoll();
     api.disconnect().catch(() => {});
-    set({ isConnected: false });
+    set({ isConnected: false, connectionStatus: 'disconnected' });
   },
 
   // ── Startup restore ─────────────────────────────────────────────────────────
