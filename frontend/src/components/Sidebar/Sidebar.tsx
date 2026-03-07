@@ -177,7 +177,7 @@ export default function Sidebar() {
   return (
     <aside className="flex flex-col h-full bg-[#16213e] border-r border-[#2d3748] w-64 shrink-0 overflow-hidden">
       <div className="px-3 py-2 border-b border-[#2d3748]">
-        <h1 className="text-sm font-bold text-[#e2e8f0] tracking-wide">grpc-nimbus</h1>
+        <h1 className="text-sm font-bold text-[#e2e8f0] tracking-wide">GRPC Nimbus</h1>
         <p className="text-[10px] text-[#4a5568]">gRPC Client</p>
       </div>
       <ProtosetLoader />
