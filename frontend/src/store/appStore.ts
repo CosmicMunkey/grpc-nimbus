@@ -178,6 +178,8 @@ interface AppState {
   loadCollections: () => Promise<void>;
   saveToCollection: (collectionId: string, name: string) => Promise<void>;
   updateSavedRequest: () => Promise<void>;
+  renameRequest: (tabId: string, newName: string) => Promise<void>;
+  renameCollectionRequest: (collectionId: string, requestId: string, newName: string) => Promise<void>;
   deleteRequest: (collectionId: string, requestId: string) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
   exportCollection: (id: string) => Promise<void>;
@@ -558,11 +560,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedRequests = col.requests.filter((r) => r.id !== requestId);
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
-    // If any open tab was linked to this request, clear the link so Save
-    // doesn't try to update a now-deleted entry.
     set((s) => ({
       tabs: s.tabs.map((t) =>
         t.savedRequestId === requestId ? { ...t, savedRequestId: null, savedRequestName: null } : t
+      ),
+    }));
+  },
+
+  renameRequest: async (tabId, newName) => {
+    const name = newName.trim();
+    if (!name) return;
+    const tab = get().tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    set((s) => ({ tabs: patchTab(s.tabs, tabId, { label: name, savedRequestName: name }) }));
+    if (tab.savedRequestId) {
+      await get().renameCollectionRequest('', tab.savedRequestId, name);
+    }
+  },
+
+  renameCollectionRequest: async (collectionId, requestId, newName) => {
+    const name = newName.trim();
+    if (!name) return;
+    const { collections } = get();
+    // collectionId is optional — search all collections if not provided
+    const col = collectionId
+      ? collections.find((c) => c.id === collectionId)
+      : collections.find((c) => c.requests?.some((r) => r.id === requestId));
+    if (!col) return;
+    const now = new Date().toISOString();
+    const updatedRequests = col.requests.map((r) =>
+      r.id === requestId ? { ...r, name, updatedAt: now } : r
+    );
+    await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
+    await get().loadCollections();
+    // Keep any linked open tabs in sync
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.savedRequestId === requestId ? { ...t, savedRequestName: name, label: name } : t
       ),
     }));
   },
