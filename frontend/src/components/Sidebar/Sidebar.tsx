@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, useActiveTab } from '../../store/appStore';
 import { MethodInfo, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
@@ -19,7 +19,8 @@ function StreamBadge({ method }: { method: MethodInfo }) {
 
 function ServiceNode({ svc }: { svc: ServiceInfo }) {
   const [expanded, setExpanded] = useState(true);
-  const { selectedMethod, selectMethod } = useAppStore();
+  const { selectedMethod } = useActiveTab();
+  const { selectMethod } = useAppStore();
   const shortName = svc.name.split('.').pop() ?? svc.name;
 
   return (

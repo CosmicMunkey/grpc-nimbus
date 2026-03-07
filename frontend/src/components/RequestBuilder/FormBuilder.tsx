@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { FieldSchema } from '../../types';
-import { useAppStore } from '../../store/appStore';
+import { useAppStore, useActiveTab } from '../../store/appStore';
 
 // ─── Form value types ────────────────────────────────────────────────────────
 
@@ -640,7 +640,8 @@ function FieldRow({
 // ─── Main FormBuilder component ───────────────────────────────────────────────
 
 export default function FormBuilder() {
-  const { requestSchema, requestJson, setRequestJson } = useAppStore();
+  const { requestSchema, requestJson } = useActiveTab();
+  const { setRequestJson } = useAppStore();
 
   const [formValue, setFormValue] = useState<FormVal>({});
   const lastFormJson = useRef<string>('{}');

@@ -12,6 +12,7 @@ import {
   MethodInfo,
   ServiceInfo,
   StreamEvent,
+  Tab,
 } from '../types';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
@@ -91,6 +92,36 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
 };
 
+// ─── Tab helpers ──────────────────────────────────────────────────────────────
+
+let _tabSeq = 0;
+function newTabId() { return `tab-${Date.now()}-${++_tabSeq}`; }
+
+export function makeTab(overrides: Partial<Tab> = {}): Tab {
+  return {
+    id: newTabId(),
+    label: 'New Request',
+    selectedMethod: null,
+    requestJson: '{}',
+    requestMetadata: [],
+    requestSchema: [],
+    response: null,
+    streamMessages: [],
+    isInvoking: false,
+    isStreaming: false,
+    invokeError: null,
+    history: [],
+    timeoutSeconds: 0,
+    ...overrides,
+  };
+}
+
+function patchTab(tabs: Tab[], id: string, patch: Partial<Tab>): Tab[] {
+  return tabs.map((t) => (t.id === id ? { ...t, ...patch } : t));
+}
+
+const INITIAL_TAB = makeTab();
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 interface AppState {
@@ -108,7 +139,7 @@ interface AppState {
   // Descriptor sources
   services: ServiceInfo[];
   protosetPaths: string[];
-  loadMode: string; // "protoset", "proto", "reflection", or ""
+  loadMode: string;
   loadProtosets: (paths: string[]) => Promise<void>;
   loadProtoFiles: (importPaths: string[], protoFiles: string[]) => Promise<void>;
   loadViaReflection: () => Promise<void>;
@@ -116,34 +147,28 @@ interface AppState {
   reloadProtos: () => Promise<void>;
   removeProtoPath: (path: string) => Promise<void>;
 
-  // Selected method
-  selectedMethod: MethodInfo | null;
+  // Tabs
+  tabs: Tab[];
+  activeTabId: string;
+  streamingTabId: string | null;
+  newTab: () => void;
+  closeTab: (id: string) => void;
+  setActiveTab: (id: string) => void;
+  duplicateTab: (id: string) => void;
+
+  // Per-tab actions (operate on the active tab)
   selectMethod: (method: MethodInfo | null) => void;
-
-  // Request schema (for form builder)
-  requestSchema: FieldSchema[];
-  loadRequestSchema: (methodPath: string) => Promise<void>;
-
-  // Request state
-  requestJson: string;
-  requestMetadata: MetadataEntry[];
-  timeoutSeconds: number;
   setRequestJson: (json: string) => void;
   setRequestMetadata: (md: MetadataEntry[]) => void;
   setTimeoutSeconds: (t: number) => void;
-
-  // Response state (unary)
-  response: InvokeResponse | null;
-  isInvoking: boolean;
-  invokeError: string | null;
+  loadRequestSchema: (methodPath: string) => Promise<void>;
   invoke: () => Promise<void>;
-
-  // Streaming state
-  streamMessages: StreamEvent[];
-  isStreaming: boolean;
   appendStreamEvent: (evt: StreamEvent) => void;
   clearStream: () => void;
   cancelStream: () => void;
+  loadHistory: (methodPath: string) => Promise<void>;
+  clearHistory: (methodPath: string) => Promise<void>;
+  restoreFromHistory: (entry: HistoryEntry) => void;
 
   // Collections
   collections: Collection[];
@@ -160,13 +185,12 @@ interface AppState {
   saveEnvironment: (env: Environment) => Promise<void>;
   deleteEnvironment: (id: string) => Promise<void>;
   setActiveEnvironment: (id: string) => Promise<void>;
-
-  // History
-  history: HistoryEntry[];
-  loadHistory: (methodPath: string) => Promise<void>;
-  clearHistory: (methodPath: string) => Promise<void>;
-  restoreFromHistory: (entry: HistoryEntry) => void;
 }
+
+// Convenience hook: returns the currently active tab's state.
+// Components should use this instead of reading the flat store fields directly.
+export const useActiveTab = (): Tab =>
+  useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? s.tabs[0]);
 
 export const useAppStore = create<AppState>((set, get) => ({
   // ── Connection ──────────────────────────────────────────────────────────────
@@ -197,8 +221,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const state = await api.getLoadedState();
       if (!state) return;
-
-      // Restore connection config if a target was saved
       if (state.lastTarget) {
         set((s) => ({
           connectionConfig: {
@@ -208,18 +230,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
         }));
       }
-
-      // Restore services if the backend auto-loaded protoset/proto files
       if (state.services?.length) {
-        set({
-          services: state.services,
-          protosetPaths: state.loadedPaths ?? [],
-          loadMode: state.loadMode ?? '',
-        });
+        set({ services: state.services, protosetPaths: state.loadedPaths ?? [], loadMode: state.loadMode ?? '' });
       }
-    } catch {
-      // Non-fatal — app works fine without restored state
-    }
+    } catch { /* non-fatal */ }
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────
@@ -244,15 +258,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearLoadedProtos: async () => {
     await api.clearLoadedProtos();
-    set({
-      services: [],
-      protosetPaths: [],
-      loadMode: '',
-      selectedMethod: null,
-      requestSchema: [],
-      requestJson: '{}',
-      streamMessages: [],
-    });
+    const blankTabPatch: Partial<Tab> = {
+      selectedMethod: null, requestSchema: [], requestJson: '{}',
+      response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
+    };
+    set((s) => ({
+      services: [], protosetPaths: [], loadMode: '',
+      tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
+    }));
   },
 
   reloadProtos: async () => {
@@ -262,89 +275,187 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeProtoPath: async (path) => {
     const services = await api.removeProtoPath(path);
-    const { protosetPaths } = get();
-    const remaining = protosetPaths.filter((p) => p !== path);
+    const remaining = get().protosetPaths.filter((p) => p !== path);
     set({ services: services ?? [], protosetPaths: remaining });
-    if ((services ?? []).length === 0) {
-      set({ selectedMethod: null, requestSchema: [], requestJson: '{}', streamMessages: [], loadMode: '' });
+    if (!(services ?? []).length) {
+      const blankTabPatch: Partial<Tab> = {
+        selectedMethod: null, requestSchema: [], requestJson: '{}',
+        response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
+      };
+      set((s) => ({ loadMode: '', tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })) }));
     }
   },
 
-  // ── Selected method ─────────────────────────────────────────────────────────
-  selectedMethod: null,
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  tabs: [INITIAL_TAB],
+  activeTabId: INITIAL_TAB.id,
+  streamingTabId: null,
+
+  newTab: () => {
+    const tab = makeTab();
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+  },
+
+  closeTab: (id) => {
+    set((s) => {
+      if (s.tabs.length <= 1) return {};
+      const remaining = s.tabs.filter((t) => t.id !== id);
+      const newActive = s.activeTabId === id
+        ? (remaining[remaining.length - 1]?.id ?? remaining[0].id)
+        : s.activeTabId;
+      return { tabs: remaining, activeTabId: newActive };
+    });
+  },
+
+  setActiveTab: (id) => set({ activeTabId: id }),
+
+  duplicateTab: (id) => {
+    const src = get().tabs.find((t) => t.id === id);
+    if (!src) return;
+    const dup = makeTab({
+      label: src.label,
+      selectedMethod: src.selectedMethod,
+      requestJson: src.requestJson,
+      requestMetadata: [...src.requestMetadata],
+      requestSchema: src.requestSchema,
+      timeoutSeconds: src.timeoutSeconds,
+    });
+    set((s) => {
+      const idx = s.tabs.findIndex((t) => t.id === id);
+      const tabs = [...s.tabs];
+      tabs.splice(idx + 1, 0, dup);
+      return { tabs, activeTabId: dup.id };
+    });
+  },
+
+  // ── Per-tab actions ──────────────────────────────────────────────────────────
   selectMethod: (method) => {
-    set({ selectedMethod: method, response: null, requestJson: '{}', streamMessages: [], history: [], requestSchema: [] });
-    if (method) {
-      get().loadRequestSchema(method.fullName).catch(() => {});
-    }
+    const { activeTabId } = get();
+    set((s) => ({
+      tabs: patchTab(s.tabs, activeTabId, {
+        selectedMethod: method,
+        label: method?.methodName ?? 'New Request',
+        response: null, requestJson: '{}', streamMessages: [], history: [],
+        requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
+      }),
+    }));
+    if (method) get().loadRequestSchema(method.fullName).catch(() => {});
   },
 
-  // ── Request schema ──────────────────────────────────────────────────────────
-  requestSchema: [],
+  setRequestJson: (json) => {
+    const { activeTabId } = get();
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestJson: json }) }));
+  },
+
+  setRequestMetadata: (md) => {
+    const { activeTabId } = get();
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: md }) }));
+  },
+
+  setTimeoutSeconds: (t) => {
+    const { activeTabId } = get();
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { timeoutSeconds: t }) }));
+  },
+
   loadRequestSchema: async (methodPath) => {
+    const { activeTabId } = get();
     try {
       const schema = await api.getRequestSchema(methodPath);
-      set({ requestSchema: schema ?? [] });
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestSchema: schema ?? [] }) }));
     } catch {
-      set({ requestSchema: [] });
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestSchema: [] }) }));
     }
   },
-
-  // ── Request ─────────────────────────────────────────────────────────────────
-  requestJson: '{}',
-  requestMetadata: [],
-  timeoutSeconds: 0,
-  setRequestJson: (json) => set({ requestJson: json }),
-  setRequestMetadata: (md) => set({ requestMetadata: md }),
-  setTimeoutSeconds: (t) => set({ timeoutSeconds: t }),
-
-  // ── Unary response ──────────────────────────────────────────────────────────
-  response: null,
-  isInvoking: false,
-  invokeError: null,
 
   invoke: async () => {
-    const { selectedMethod, requestJson, requestMetadata, timeoutSeconds } = get();
-    if (!selectedMethod) return;
-    set({ isInvoking: true, invokeError: null, response: null, streamMessages: [] });
+    const { tabs, activeTabId } = get();
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (!tab?.selectedMethod) return;
+    const { selectedMethod, requestJson, requestMetadata, timeoutSeconds } = tab;
+
+    set((s) => ({
+      tabs: patchTab(s.tabs, activeTabId, {
+        isInvoking: true, invokeError: null, response: null, streamMessages: [],
+      }),
+    }));
+
     try {
-      if (selectedMethod.serverStreaming) {
-        // Server-streaming: use streaming path via Wails events
-        set({ isStreaming: true, isInvoking: false });
+      if (selectedMethod.serverStreaming || selectedMethod.clientStreaming) {
+        set((s) => ({
+          tabs: patchTab(s.tabs, activeTabId, { isStreaming: true, isInvoking: false }),
+          streamingTabId: activeTabId,
+        }));
         await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
       } else {
-        const resp = await api.invokeUnary({
-          methodPath: selectedMethod.fullName,
-          requestJson,
-          metadata: requestMetadata,
-          timeoutSeconds,
-        });
-        set({ response: resp, isInvoking: false });
+        const resp = await api.invokeUnary({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
+        set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { response: resp, isInvoking: false }) }));
       }
     } catch (e: unknown) {
-      set({ invokeError: e instanceof Error ? e.message : String(e), isInvoking: false, isStreaming: false });
+      const msg = e instanceof Error ? e.message : String(e);
+      set((s) => ({
+        tabs: patchTab(s.tabs, activeTabId, { invokeError: msg, isInvoking: false, isStreaming: false }),
+        streamingTabId: null,
+      }));
     }
   },
-
-  // ── Streaming ───────────────────────────────────────────────────────────────
-  streamMessages: [],
-  isStreaming: false,
 
   appendStreamEvent: (evt) => {
-    if (evt.type === 'trailer') {
-      set((s) => ({ streamMessages: [...s.streamMessages, evt], isStreaming: false }));
-    } else if (evt.type === 'error') {
-      set((s) => ({ streamMessages: [...s.streamMessages, evt], isStreaming: false, invokeError: evt.error ?? null }));
-    } else {
-      set((s) => ({ streamMessages: [...s.streamMessages, evt] }));
-    }
+    const { streamingTabId } = get();
+    if (!streamingTabId) return;
+    const isDone = evt.type === 'trailer' || evt.type === 'error';
+    set((s) => {
+      const streamTab = s.tabs.find((t) => t.id === streamingTabId);
+      if (!streamTab) return {};
+      const patch: Partial<Tab> = {
+        streamMessages: [...streamTab.streamMessages, evt],
+        isStreaming: !isDone,
+      };
+      if (evt.type === 'error') patch.invokeError = evt.error ?? null;
+      return {
+        tabs: patchTab(s.tabs, streamingTabId, patch),
+        streamingTabId: isDone ? null : streamingTabId,
+      };
+    });
   },
 
-  clearStream: () => set({ streamMessages: [], isStreaming: false }),
+  clearStream: () => {
+    const { activeTabId } = get();
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { streamMessages: [], isStreaming: false }) }));
+  },
 
   cancelStream: () => {
     api.cancelStream().catch(() => {});
-    set({ isStreaming: false });
+    const id = get().streamingTabId ?? get().activeTabId;
+    set((s) => ({
+      tabs: patchTab(s.tabs, id, { isStreaming: false }),
+      streamingTabId: null,
+    }));
+  },
+
+  loadHistory: async (methodPath) => {
+    const { activeTabId } = get();
+    try {
+      const entries = await api.getHistory(methodPath);
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: entries ?? [] }) }));
+    } catch {
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
+    }
+  },
+
+  clearHistory: async (methodPath) => {
+    const { activeTabId } = get();
+    await api.clearHistory(methodPath);
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
+  },
+
+  restoreFromHistory: (entry) => {
+    const { activeTabId } = get();
+    set((s) => ({
+      tabs: patchTab(s.tabs, activeTabId, {
+        requestJson: entry.requestJson,
+        requestMetadata: entry.metadata ?? [],
+      }),
+    }));
   },
 
   // ── Collections ─────────────────────────────────────────────────────────────
@@ -354,25 +465,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const cols = await api.listCollections();
       set({ collections: cols ?? [] });
-    } catch {
-      set({ collections: [] });
-    }
+    } catch { set({ collections: [] }); }
   },
 
   saveToCollection: async (collectionId, name) => {
-    const { selectedMethod, requestJson, requestMetadata, connectionConfig, collections, protosetPaths } = get();
+    const { tabs, activeTabId, connectionConfig, collections, protosetPaths } = get();
+    const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+    const { selectedMethod, requestJson, requestMetadata } = tab;
     if (!selectedMethod) return;
     const now = new Date().toISOString();
     const req = {
-      id: crypto.randomUUID(),
-      name,
-      collectionId,
-      methodPath: selectedMethod.fullName,
-      requestJson,
-      metadata: requestMetadata,
-      connection: connectionConfig,
-      createdAt: now,
-      updatedAt: now,
+      id: crypto.randomUUID(), name, collectionId,
+      methodPath: selectedMethod.fullName, requestJson,
+      metadata: requestMetadata, connection: connectionConfig,
+      createdAt: now, updatedAt: now,
     };
     let col = collections.find((c) => c.id === collectionId);
     if (!col) {
@@ -410,9 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const envs = await api.listEnvironments();
       set({ environments: envs ?? [] });
-    } catch {
-      set({ environments: [] });
-    }
+    } catch { set({ environments: [] }); }
   },
 
   saveEnvironment: async (env) => {
@@ -422,35 +526,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteEnvironment: async (id) => {
     await api.deleteEnvironment(id);
-    if (get().activeEnvironmentId === id) {
-      await get().setActiveEnvironment('');
-    }
+    if (get().activeEnvironmentId === id) await get().setActiveEnvironment('');
     await get().loadEnvironments();
   },
 
   setActiveEnvironment: async (id) => {
     await api.setActiveEnvironment(id);
     set({ activeEnvironmentId: id });
-  },
-
-  // ── History ─────────────────────────────────────────────────────────────────
-  history: [],
-
-  loadHistory: async (methodPath) => {
-    try {
-      const entries = await api.getHistory(methodPath);
-      set({ history: entries ?? [] });
-    } catch {
-      set({ history: [] });
-    }
-  },
-
-  clearHistory: async (methodPath) => {
-    await api.clearHistory(methodPath);
-    set({ history: [] });
-  },
-
-  restoreFromHistory: (entry) => {
-    set({ requestJson: entry.requestJson, requestMetadata: entry.metadata ?? [] });
   },
 }));
