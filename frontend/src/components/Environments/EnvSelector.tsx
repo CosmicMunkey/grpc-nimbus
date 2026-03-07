@@ -18,11 +18,19 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
   const [vars, setVars] = useState<{ key: string; value: string }[]>(
     initial ? Object.entries(initial.variables ?? {}).map(([key, value]) => ({ key, value })) : []
   );
+  const [headers, setHeaders] = useState<{ key: string; value: string }[]>(
+    initial?.headers ?? []
+  );
 
   const addVar = () => setVars((v) => [...v, { key: '', value: '' }]);
   const removeVar = (i: number) => setVars((v) => v.filter((_, idx) => idx !== i));
   const updateVar = (i: number, field: 'key' | 'value', val: string) =>
     setVars((v) => v.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+
+  const addHeader = () => setHeaders((h) => [...h, { key: '', value: '' }]);
+  const removeHeader = (i: number) => setHeaders((h) => h.filter((_, idx) => idx !== i));
+  const updateHeader = (i: number, field: 'key' | 'value', val: string) =>
+    setHeaders((h) => h.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -35,15 +43,21 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
       variables,
+      headers: headers.filter((h) => h.key.trim()),
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     });
     onClose();
   };
 
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg p-4 w-96 shadow-xl flex flex-col gap-3 max-h-[80vh]">
+      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg p-4 w-[28rem] shadow-xl flex flex-col gap-3 max-h-[85vh]">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-[#e2e8f0]">
             {initial ? 'Edit Environment' : 'New Environment'}
@@ -62,6 +76,7 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           className="bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
         />
 
+        {/* ── Variables ── */}
         <div className="flex items-center justify-between">
           <span className="text-xs text-[#94a3b8] font-medium">Variables</span>
           <button
@@ -72,7 +87,7 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           </button>
         </div>
 
-        <div className="overflow-y-auto space-y-1 max-h-64">
+        <div className="overflow-y-auto space-y-1 max-h-36">
           {vars.length === 0 && (
             <p className="text-xs text-[#4a5568]">No variables — use {'{{VAR_NAME}}'} in requests</p>
           )}
@@ -97,7 +112,45 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           ))}
         </div>
 
-        <div className="flex gap-2">
+        {/* ── Headers ── */}
+        <div className="flex items-center justify-between pt-1 border-t border-[#2d3748]">
+          <span className="text-xs text-[#94a3b8] font-medium">Default Headers</span>
+          <button
+            onClick={addHeader}
+            className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+          >
+            <Plus size={11} /> Add
+          </button>
+        </div>
+
+        <div className="overflow-y-auto space-y-2 max-h-48">
+          {headers.length === 0 && (
+            <p className="text-xs text-[#4a5568]">No headers — add Authorization, x-api-key, etc.</p>
+          )}
+          {headers.map((h, i) => (
+            <div key={i} className="flex gap-1 items-start">
+              <input
+                value={h.key}
+                onChange={(e) => updateHeader(i, 'key', e.target.value)}
+                placeholder="header-name"
+                className="w-36 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1 text-xs text-[#e94560] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+              />
+              <textarea
+                value={h.value}
+                onChange={(e) => { updateHeader(i, 'value', e.target.value); autoResize(e.currentTarget); }}
+                onFocus={(e) => autoResize(e.currentTarget)}
+                placeholder="Bearer eyJhbGciOi..."
+                rows={2}
+                className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono resize-none overflow-hidden leading-relaxed"
+              />
+              <button onClick={() => removeHeader(i)} className="text-[#4a5568] hover:text-[#e94560] p-1 mt-0.5">
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="flex-1 py-1.5 text-xs text-[#94a3b8] border border-[#2d3748] rounded hover:bg-[#1e2132]">
             Cancel
           </button>
@@ -147,6 +200,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
           )}
           {environments.map((env) => {
             const varCount = Object.keys(env.variables ?? {}).length;
+            const headerCount = (env.headers ?? []).filter((h) => h.key.trim()).length;
             const isActive = env.id === activeEnvironmentId;
             return (
               <div key={env.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1e2132]">
@@ -171,6 +225,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
                   </div>
                   <p className="text-[10px] text-[#4a5568] mt-0.5">
                     {varCount === 0 ? 'No variables' : `${varCount} variable${varCount !== 1 ? 's' : ''}`}
+                    {headerCount > 0 && ` · ${headerCount} header${headerCount !== 1 ? 's' : ''}`}
                   </p>
                 </div>
 

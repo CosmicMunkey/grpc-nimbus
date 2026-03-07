@@ -10,11 +10,19 @@ import (
 	"time"
 )
 
+// EnvHeader is a gRPC metadata entry that is sent on every request when an
+// environment is active. Keys should be lowercase per gRPC convention.
+type EnvHeader struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // Environment is a named set of key/value variables usable in requests.
 type Environment struct {
 	ID        string            `json:"id"`
 	Name      string            `json:"name"`
 	Variables map[string]string `json:"variables"`
+	Headers   []EnvHeader       `json:"headers,omitempty"`
 	CreatedAt time.Time         `json:"createdAt"`
 	UpdatedAt time.Time         `json:"updatedAt"`
 }
