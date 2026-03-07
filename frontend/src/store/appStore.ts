@@ -155,6 +155,7 @@ interface AppState {
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   duplicateTab: (id: string) => void;
+  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[]) => void;
 
   // Per-tab actions (operate on the active tab)
   selectMethod: (method: MethodInfo | null) => void;
@@ -326,6 +327,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs.splice(idx + 1, 0, dup);
       return { tabs, activeTabId: dup.id };
     });
+  },
+
+  openMethodInNewTab: (method, requestJson = '{}', metadata = []) => {
+    // If the active tab is a pristine "New Request" with no method selected,
+    // reuse it instead of spawning a redundant blank tab.
+    const { activeTabId, tabs } = get();
+    const active = tabs.find((t) => t.id === activeTabId);
+    if (active && !active.selectedMethod) {
+      set((s) => ({
+        tabs: patchTab(s.tabs, activeTabId, {
+          selectedMethod: method,
+          label: method.methodName,
+          requestJson,
+          requestMetadata: metadata,
+          response: null, streamMessages: [], history: [],
+          requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
+        }),
+      }));
+      get().loadRequestSchema(method.fullName).catch(() => {});
+      return;
+    }
+    const tab = makeTab({ label: method.methodName, selectedMethod: method, requestJson, requestMetadata: metadata });
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+    get().loadRequestSchema(method.fullName).catch(() => {});
   },
 
   // ── Per-tab actions ──────────────────────────────────────────────────────────
