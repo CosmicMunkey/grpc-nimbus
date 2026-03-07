@@ -113,10 +113,10 @@ function CollectionsPanel() {
 
   React.useEffect(() => { loadCollections(); }, []);
 
-  const handleLoadRequest = (methodPath: string, requestJson?: string, metadata?: MetadataEntry[]) => {
+  const handleLoadRequest = (methodPath: string, requestJson?: string, metadata?: MetadataEntry[], reqId?: string, reqName?: string) => {
     for (const svc of services) {
       const m = svc.methods.find((m) => m.fullName === methodPath);
-      if (m) { openMethodInNewTab(m, requestJson, metadata); return; }
+      if (m) { openMethodInNewTab(m, requestJson, metadata, reqId, reqName); return; }
     }
   };
 
@@ -148,7 +148,7 @@ function CollectionsPanel() {
                 {(col.requests ?? []).map((req) => (
                   <button
                     key={req.id}
-                    onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata)}
+                    onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata, req.id, req.name)}
                     className="flex items-center gap-1 w-full text-left text-xs text-[#e2e8f0] hover:bg-[#1e2132] px-2 py-0.5 rounded truncate"
                   >
                     <Zap size={10} className="text-yellow-400 shrink-0" />

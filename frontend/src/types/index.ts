@@ -128,6 +128,10 @@ export interface LoadedState {
 export interface Tab {
   id: string;
   label: string;
+  /** ID of the SavedRequest this tab was opened from, or null if unsaved. */
+  savedRequestId: string | null;
+  /** Display name of the linked SavedRequest (used in tab label + save button). */
+  savedRequestName: string | null;
   selectedMethod: MethodInfo | null;
   requestJson: string;
   requestMetadata: MetadataEntry[];
