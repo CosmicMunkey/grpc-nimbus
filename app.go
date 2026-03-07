@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -404,16 +402,14 @@ func (a *App) GetCollection(id string) (*storage.Collection, error) {
 	return a.store.GetCollection(id)
 }
 
-// ExportCollection writes a collection JSON file to the given destination path.
+// ExportCollection writes a portable, self-contained collection bundle to destPath.
+// Protoset files referenced by the collection are embedded in the output so the
+// export can be shared with colleagues on different machines.
 func (a *App) ExportCollection(id, destPath string) error {
 	if a.store == nil {
 		return fmt.Errorf("collection store unavailable")
 	}
-	if _, err := a.store.GetCollection(id); err != nil {
-		return err
-	}
-	src := a.store.FilePath(id)
-	return copyFile(src, destPath)
+	return a.store.ExportPortable(id, destPath)
 }
 
 // ImportCollection reads a collection JSON from srcPath and saves it with a new ID.
@@ -544,6 +540,18 @@ func (a *App) PickExportPath(defaultName string) (string, error) {
 	return path, nil
 }
 
+// TriggerMenuImport emits an event that tells the frontend to start an import flow.
+// Called from the native File menu.
+func (a *App) TriggerMenuImport() {
+	runtime.EventsEmit(a.ctx, "menu:importCollection")
+}
+
+// TriggerMenuExport emits an event that tells the frontend to open the export picker.
+// Called from the native File menu.
+func (a *App) TriggerMenuExport() {
+	runtime.EventsEmit(a.ctx, "menu:exportCollection")
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // saveSettings merges a settings mutation into the persisted settings file.
@@ -573,21 +581,6 @@ func interpolateRequest(req grpcinternal.InvokeRequest, env *storage.Environment
 		req.Metadata[i].Value = storage.Interpolate(req.Metadata[i].Value, env.Variables)
 	}
 	return req
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
 }
 
 
