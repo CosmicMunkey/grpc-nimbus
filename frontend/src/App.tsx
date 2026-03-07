@@ -1,10 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ConnectionBar from './components/ConnectionBar/ConnectionBar';
 import RequestPanel from './components/RequestPanel/RequestPanel';
 import ResponsePanel from './components/ResponsePanel/ResponsePanel';
+import { useAppStore } from './store/appStore';
 
 export default function App() {
+  const { restoreLoadedState } = useAppStore();
+
+  // Restore protoset paths and last-used connection on first load
+  useEffect(() => {
+    restoreLoadedState();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-[#1a1a2e] text-[#e2e8f0] overflow-hidden">
       {/* Top: connection bar */}

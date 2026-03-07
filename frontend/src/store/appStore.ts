@@ -7,6 +7,7 @@ import {
   HistoryEntry,
   InvokeRequest,
   InvokeResponse,
+  LoadedState,
   MetadataEntry,
   MethodInfo,
   ServiceInfo,
@@ -45,6 +46,7 @@ declare global {
           GetHistory(methodPath: string): Promise<HistoryEntry[]>;
           ClearHistory(methodPath: string): Promise<void>;
           GetRequestSchema(methodPath: string): Promise<FieldSchema[]>;
+          GetLoadedState(): Promise<LoadedState>;
         };
       };
     };
@@ -80,6 +82,7 @@ export const api = {
   getHistory: (methodPath: string) => window.go.main.App.GetHistory(methodPath),
   clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
   getRequestSchema: (methodPath: string) => window.go.main.App.GetRequestSchema(methodPath),
+  getLoadedState: () => window.go.main.App.GetLoadedState(),
 };
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -92,6 +95,9 @@ interface AppState {
   setConnectionConfig: (cfg: Partial<ConnectionConfig>) => void;
   connect: () => Promise<void>;
   disconnect: () => void;
+
+  // Startup state restoration
+  restoreLoadedState: () => Promise<void>;
 
   // Descriptor sources
   services: ServiceInfo[];
@@ -174,6 +180,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   disconnect: () => {
     api.disconnect().catch(() => {});
     set({ isConnected: false });
+  },
+
+  // ── Startup restore ─────────────────────────────────────────────────────────
+  restoreLoadedState: async () => {
+    try {
+      const state = await api.getLoadedState();
+      if (!state) return;
+
+      // Restore connection config if a target was saved
+      if (state.lastTarget) {
+        set((s) => ({
+          connectionConfig: {
+            ...s.connectionConfig,
+            target: state.lastTarget,
+            tls: (state.lastTLS as ConnectionConfig['tls']) || 'none',
+          },
+        }));
+      }
+
+      // Restore services if the backend auto-loaded protoset/proto files
+      if (state.services?.length) {
+        set({
+          services: state.services,
+          protosetPaths: state.loadedPaths ?? [],
+        });
+      }
+    } catch {
+      // Non-fatal — app works fine without restored state
+    }
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────

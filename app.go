@@ -24,7 +24,14 @@ type App struct {
 	store      *storage.Store
 	envStore   *storage.EnvStore
 	histStore  *storage.HistoryStore
+	settings   *storage.SettingsStore
 	activeEnv  *storage.Environment
+
+	// loadedPaths and loadMode track the most recently loaded descriptor source
+	// so they can be persisted and restored across restarts.
+	loadedPaths     []string
+	loadMode        string // "protoset", "proto", or "reflection"
+	loadImportPaths []string // only used when loadMode == "proto"
 
 	// streamCancel cancels the active streaming invocation, if any.
 	streamCancel context.CancelFunc
@@ -52,6 +59,46 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		fmt.Printf("warning: history store unavailable: %v\n", err)
 	}
+	a.settings, err = storage.NewSettingsStore()
+	if err != nil {
+		fmt.Printf("warning: settings store unavailable: %v\n", err)
+		return
+	}
+
+	// Auto-restore last loaded proto descriptor source.
+	saved, err := a.settings.Load()
+	if err != nil || saved == nil {
+		return
+	}
+	switch saved.ProtoLoadMode {
+	case "protoset":
+		if len(saved.ProtosetPaths) > 0 {
+			pd, err := grpcinternal.LoadProtosets(saved.ProtosetPaths)
+			if err == nil {
+				a.mu.Lock()
+				a.protoset = pd
+				a.loadedPaths = saved.ProtosetPaths
+				a.loadMode = "protoset"
+				a.mu.Unlock()
+			} else {
+				fmt.Printf("warning: auto-restore protoset failed: %v\n", err)
+			}
+		}
+	case "proto":
+		if len(saved.ProtoFilePaths) > 0 {
+			pd, err := grpcinternal.LoadProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
+			if err == nil {
+				a.mu.Lock()
+				a.protoset = pd
+				a.loadedPaths = saved.ProtoFilePaths
+				a.loadImportPaths = saved.ProtoImportPaths
+				a.loadMode = "proto"
+				a.mu.Unlock()
+			} else {
+				fmt.Printf("warning: auto-restore proto files failed: %v\n", err)
+			}
+		}
+	}
 }
 
 // ─── Connection ──────────────────────────────────────────────────────────────
@@ -69,6 +116,12 @@ func (a *App) Connect(cfg grpcinternal.ConnectionConfig) error {
 		return err
 	}
 	a.conn = conn
+
+	// Persist the connection target for next launch.
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.LastTarget = cfg.Target
+		s.LastTLS = string(cfg.TLS)
+	})
 	return nil
 }
 
@@ -95,7 +148,17 @@ func (a *App) LoadProtosets(paths []string) ([]grpcinternal.ServiceInfo, error) 
 		a.protoset.Close()
 	}
 	a.protoset = pd
+	a.loadedPaths = paths
+	a.loadMode = "protoset"
+	a.loadImportPaths = nil
 	a.mu.Unlock()
+
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.ProtoLoadMode = "protoset"
+		s.ProtosetPaths = paths
+		s.ProtoFilePaths = nil
+		s.ProtoImportPaths = nil
+	})
 	return pd.Services(), nil
 }
 
@@ -110,11 +173,23 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]grpcinternal.S
 		a.protoset.Close()
 	}
 	a.protoset = pd
+	a.loadedPaths = protoFiles
+	a.loadImportPaths = importPaths
+	a.loadMode = "proto"
 	a.mu.Unlock()
+
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.ProtoLoadMode = "proto"
+		s.ProtoFilePaths = protoFiles
+		s.ProtoImportPaths = importPaths
+		s.ProtosetPaths = nil
+	})
 	return pd.Services(), nil
 }
 
 // LoadViaReflection queries the connected server's reflection API.
+// Note: reflection-loaded descriptors are NOT persisted since they require a
+// live server connection which may not be available at next startup.
 func (a *App) LoadViaReflection() ([]grpcinternal.ServiceInfo, error) {
 	a.mu.Lock()
 	conn := a.conn
@@ -131,8 +206,52 @@ func (a *App) LoadViaReflection() ([]grpcinternal.ServiceInfo, error) {
 		a.protoset.Close()
 	}
 	a.protoset = pd
+	a.loadedPaths = nil
+	a.loadMode = "reflection"
+	a.loadImportPaths = nil
 	a.mu.Unlock()
+
+	// Clear any previously saved proto paths since reflection doesn't persist.
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.ProtoLoadMode = ""
+		s.ProtosetPaths = nil
+		s.ProtoFilePaths = nil
+		s.ProtoImportPaths = nil
+	})
 	return pd.Services(), nil
+}
+
+// LoadedState bundles the currently loaded descriptor info for frontend restoration.
+type LoadedState struct {
+	Services    []grpcinternal.ServiceInfo `json:"services"`
+	LoadedPaths []string                   `json:"loadedPaths"`
+	LoadMode    string                     `json:"loadMode"`   // "protoset", "proto", "reflection", or ""
+	LastTarget  string                     `json:"lastTarget"` // last-used connection target
+	LastTLS     string                     `json:"lastTLS"`
+}
+
+// GetLoadedState returns the currently loaded descriptor state plus saved connection
+// settings so the frontend can restore UI state on startup.
+func (a *App) GetLoadedState() (*LoadedState, error) {
+	a.mu.Lock()
+	pd := a.protoset
+	paths := a.loadedPaths
+	mode := a.loadMode
+	a.mu.Unlock()
+
+	state := &LoadedState{LoadMode: mode, LoadedPaths: paths}
+
+	if pd != nil {
+		state.Services = pd.Services()
+	}
+
+	if a.settings != nil {
+		if saved, err := a.settings.Load(); err == nil && saved != nil {
+			state.LastTarget = saved.LastTarget
+			state.LastTLS = saved.LastTLS
+		}
+	}
+	return state, nil
 }
 
 // GetServices returns the service/method tree from the currently loaded descriptor.
@@ -426,6 +545,23 @@ func (a *App) PickExportPath(defaultName string) (string, error) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// saveSettings merges a settings mutation into the persisted settings file.
+// Safe to call from goroutines (goroutine-level serialization is acceptable
+// since saves are infrequent and SettingsStore.Save is atomic via rename).
+func (a *App) saveSettings(mutate func(*storage.AppSettings)) {
+	if a.settings == nil {
+		return
+	}
+	current, err := a.settings.Load()
+	if err != nil || current == nil {
+		current = &storage.AppSettings{}
+	}
+	mutate(current)
+	if err := a.settings.Save(current); err != nil {
+		fmt.Printf("warning: could not save settings: %v\n", err)
+	}
+}
 
 func interpolateRequest(req grpcinternal.InvokeRequest, env *storage.Environment) grpcinternal.InvokeRequest {
 	if env == nil || len(env.Variables) == 0 {

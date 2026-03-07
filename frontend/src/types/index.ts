@@ -115,3 +115,11 @@ export interface FieldSchema {
   mapValueType?: string;
   mapValueFields?: FieldSchema[];
 }
+
+export interface LoadedState {
+  services: ServiceInfo[];
+  loadedPaths: string[];
+  loadMode: 'protoset' | 'proto' | 'reflection' | '';
+  lastTarget: string;
+  lastTLS: string;
+}
