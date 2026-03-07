@@ -133,6 +133,18 @@ func (a *App) Disconnect() {
 	}
 }
 
+// GetConnectionState returns the live gRPC connectivity state.
+// Returns "disconnected" when no connection has been established, otherwise
+// one of: "idle", "connecting", "ready", "transient_failure", "shutdown".
+func (a *App) GetConnectionState() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.conn == nil {
+		return "disconnected"
+	}
+	return a.conn.GetState()
+}
+
 // ─── Descriptor Sources ───────────────────────────────────────────────────────
 
 // LoadProtosets parses the given protoset file paths and returns the service tree.
