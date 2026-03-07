@@ -75,15 +75,13 @@ export default function TabBar() {
                 >
                   <Copy size={9} />
                 </button>
-                {tabs.length > 1 && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                    title="Close tab"
-                    className="text-[#4a5568] hover:text-[#e94560] rounded p-0.5"
-                  >
-                    <X size={10} />
-                  </button>
-                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                  title="Close tab"
+                  className="text-[#4a5568] hover:text-[#e94560] rounded p-0.5"
+                >
+                  <X size={10} />
+                </button>
               </div>
             )}
           </div>
