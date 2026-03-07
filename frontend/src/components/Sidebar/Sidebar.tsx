@@ -3,7 +3,7 @@ import { useAppStore, useActiveTab } from '../../store/appStore';
 import { MethodInfo, MetadataEntry, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
-  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical,
+  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical, X,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 
@@ -108,7 +108,7 @@ function CollectionMenu({ colId, colName }: { colId: string; colName: string }) 
 }
 
 function CollectionsPanel() {
-  const { collections, loadCollections, importCollection, services, openMethodInNewTab } = useAppStore();
+  const { collections, loadCollections, importCollection, services, openMethodInNewTab, deleteRequest } = useAppStore();
   const [expanded, setExpanded] = useState(true);
 
   React.useEffect(() => { loadCollections(); }, []);
@@ -146,14 +146,22 @@ function CollectionsPanel() {
               </div>
               <div className="ml-3 space-y-0.5">
                 {(col.requests ?? []).map((req) => (
-                  <button
-                    key={req.id}
-                    onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata, req.id, req.name)}
-                    className="flex items-center gap-1 w-full text-left text-xs text-[#e2e8f0] hover:bg-[#1e2132] px-2 py-0.5 rounded truncate"
-                  >
-                    <Zap size={10} className="text-yellow-400 shrink-0" />
-                    {req.name}
-                  </button>
+                  <div key={req.id} className="group flex items-center rounded hover:bg-[#1e2132]">
+                    <button
+                      onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata, req.id, req.name)}
+                      className="flex items-center gap-1 flex-1 min-w-0 text-left text-xs text-[#e2e8f0] px-2 py-0.5 truncate"
+                    >
+                      <Zap size={10} className="text-yellow-400 shrink-0" />
+                      <span className="truncate">{req.name}</span>
+                    </button>
+                    <button
+                      onClick={() => deleteRequest(col.id, req.id)}
+                      title="Delete request"
+                      className="opacity-0 group-hover:opacity-100 shrink-0 px-1.5 py-0.5 text-[#4a5568] hover:text-[#e94560] transition-opacity"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
