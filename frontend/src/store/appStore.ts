@@ -178,6 +178,7 @@ interface AppState {
   loadCollections: () => Promise<void>;
   saveToCollection: (collectionId: string, name: string) => Promise<void>;
   updateSavedRequest: () => Promise<void>;
+  deleteRequest: (collectionId: string, requestId: string) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
   exportCollection: (id: string) => Promise<void>;
   importCollection: () => Promise<void>;
@@ -547,6 +548,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
+  },
+
+  deleteRequest: async (collectionId, requestId) => {
+    const { collections } = get();
+    const col = collections.find((c) => c.id === collectionId);
+    if (!col) return;
+    const now = new Date().toISOString();
+    const updatedRequests = col.requests.filter((r) => r.id !== requestId);
+    await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
+    await get().loadCollections();
+    // If any open tab was linked to this request, clear the link so Save
+    // doesn't try to update a now-deleted entry.
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.savedRequestId === requestId ? { ...t, savedRequestId: null, savedRequestName: null } : t
+      ),
+    }));
   },
 
   deleteCollection: async (id) => {
