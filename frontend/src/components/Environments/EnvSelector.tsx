@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { Environment } from '../../types';
-import { Plus, Trash2, X, Check, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings } from 'lucide-react';
 
 // ─── Environment Editor Modal ────────────────────────────────────────────────
 
@@ -55,6 +55,7 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addVar()}
           placeholder="Environment name (e.g. Production)"
           className="bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
         />
@@ -107,83 +108,121 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
   );
 }
 
-// ─── Environment Selector Dropdown ───────────────────────────────────────────
+// ─── Environments Manager Modal ───────────────────────────────────────────────
 
-export default function EnvSelector() {
-  const {
-    environments,
-    activeEnvironmentId,
-    loadEnvironments,
-    setActiveEnvironment,
-    deleteEnvironment,
-  } = useAppStore();
+interface EnvManagerProps {
+  onClose: () => void;
+}
 
-  const [open, setOpen] = useState(false);
+function EnvManager({ onClose }: EnvManagerProps) {
+  const { environments, activeEnvironmentId, setActiveEnvironment, deleteEnvironment } = useAppStore();
   const [editing, setEditing] = useState<Environment | undefined>(undefined);
   const [showEditor, setShowEditor] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  useEffect(() => { loadEnvironments(); }, []);
-
-  const active = environments.find((e) => e.id === activeEnvironmentId);
+  const handleDelete = async (id: string) => {
+    await deleteEnvironment(id);
+    setConfirmDeleteId(null);
+  };
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 px-2 py-1 bg-[#1a1a2e] border border-[#2d3748] rounded text-xs text-[#94a3b8] hover:border-[#4a5568] max-w-[140px]"
-      >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-green-400' : 'bg-[#4a5568]'}`} />
-        <span className="truncate">{active ? active.name : 'No Environment'}</span>
-        <ChevronDown size={11} className="shrink-0" />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
-          {/* No env option */}
-          <button
-            onClick={() => { setActiveEnvironment(''); setOpen(false); }}
-            className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-[#1e2132] ${!active ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
-          >
-            {!active && <Check size={11} />}
-            <span>No Environment</span>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg shadow-xl w-[480px] max-h-[70vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2d3748]">
+          <h3 className="text-sm font-semibold text-[#e2e8f0]">Environments</h3>
+          <button onClick={onClose} className="text-[#4a5568] hover:text-[#e2e8f0]">
+            <X size={14} />
           </button>
-
-          {environments.map((env) => (
-            <div key={env.id} className="flex items-center group">
-              <button
-                onClick={() => { setActiveEnvironment(env.id); setOpen(false); }}
-                className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-[#1e2132] ${activeEnvironmentId === env.id ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
-              >
-                {activeEnvironmentId === env.id && <Check size={11} />}
-                <span className="truncate">{env.name}</span>
-              </button>
-              <button
-                onClick={() => { setEditing(env); setShowEditor(true); setOpen(false); }}
-                className="px-1 py-1.5 text-[#4a5568] hover:text-[#e2e8f0] opacity-0 group-hover:opacity-100"
-                title="Edit"
-              >
-                ✎
-              </button>
-              <button
-                onClick={() => { deleteEnvironment(env.id); }}
-                className="px-2 py-1.5 text-[#4a5568] hover:text-[#e94560] opacity-0 group-hover:opacity-100"
-                title="Delete"
-              >
-                <Trash2 size={11} />
-              </button>
-            </div>
-          ))}
-
-          <div className="border-t border-[#2d3748] mt-1 pt-1">
-            <button
-              onClick={() => { setEditing(undefined); setShowEditor(true); setOpen(false); }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
-            >
-              <Plus size={11} /> New Environment
-            </button>
-          </div>
         </div>
-      )}
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto divide-y divide-[#2d3748]">
+          {environments.length === 0 && (
+            <p className="px-4 py-6 text-xs text-[#4a5568] text-center">
+              No environments yet. Create one to use variables like {'{{HOST}}'} in your requests.
+            </p>
+          )}
+          {environments.map((env) => {
+            const varCount = Object.keys(env.variables ?? {}).length;
+            const isActive = env.id === activeEnvironmentId;
+            return (
+              <div key={env.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1e2132]">
+                {/* Active indicator + select */}
+                <button
+                  onClick={() => setActiveEnvironment(isActive ? '' : env.id)}
+                  title={isActive ? 'Deactivate' : 'Set active'}
+                  className={`w-3 h-3 rounded-full border-2 shrink-0 transition-colors ${
+                    isActive ? 'bg-green-400 border-green-400' : 'border-[#4a5568] hover:border-green-400'
+                  }`}
+                />
+
+                {/* Name + var count */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium truncate ${isActive ? 'text-green-400' : 'text-[#e2e8f0]'}`}>
+                      {env.name}
+                    </span>
+                    {isActive && (
+                      <span className="text-[10px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">active</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-[#4a5568] mt-0.5">
+                    {varCount === 0 ? 'No variables' : `${varCount} variable${varCount !== 1 ? 's' : ''}`}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                {confirmDeleteId === env.id ? (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-[#94a3b8]">Delete?</span>
+                    <button
+                      onClick={() => handleDelete(env.id)}
+                      className="px-2 py-0.5 bg-[#e94560] text-white rounded text-[11px] hover:bg-[#c73652]"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-2 py-0.5 border border-[#2d3748] text-[#94a3b8] rounded text-[11px] hover:bg-[#1e2132]"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { setEditing(env); setShowEditor(true); }}
+                      title="Edit"
+                      className="p-1.5 text-[#4a5568] hover:text-[#e2e8f0] hover:bg-[#2d3748] rounded"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(env.id)}
+                      title="Delete"
+                      className="p-1.5 text-[#4a5568] hover:text-[#e94560] hover:bg-[#2d3748] rounded"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[#2d3748]">
+          <p className="text-[10px] text-[#4a5568]">Click ● to activate · {'{{VAR}}'} in request bodies</p>
+          <button
+            onClick={() => { setEditing(undefined); setShowEditor(true); }}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-[#e94560] text-white rounded hover:bg-[#c73652]"
+          >
+            <Plus size={11} /> New Environment
+          </button>
+        </div>
+      </div>
 
       {showEditor && (
         <EnvEditor
@@ -194,3 +233,76 @@ export default function EnvSelector() {
     </div>
   );
 }
+
+// ─── Environment Selector Dropdown ───────────────────────────────────────────
+
+export default function EnvSelector() {
+  const {
+    environments,
+    activeEnvironmentId,
+    loadEnvironments,
+    setActiveEnvironment,
+  } = useAppStore();
+
+  const [open, setOpen] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+
+  useEffect(() => { loadEnvironments(); }, []);
+
+  const active = environments.find((e) => e.id === activeEnvironmentId);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 px-2 py-1 bg-[#1a1a2e] border border-[#2d3748] rounded text-xs text-[#94a3b8] hover:border-[#4a5568] max-w-[160px]"
+      >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-green-400' : 'bg-[#4a5568]'}`} />
+        <span className="truncate flex-1">{active ? active.name : 'No Environment'}</span>
+        <ChevronDown size={11} className="shrink-0" />
+      </button>
+
+      {open && (
+        <>
+          {/* Click-outside overlay */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[200px]">
+            {/* No env option */}
+            <button
+              onClick={() => { setActiveEnvironment(''); setOpen(false); }}
+              className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-[#1e2132] ${!active ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
+            >
+              {!active && <Check size={11} />}
+              <span className={!active ? '' : 'ml-[15px]'}>No Environment</span>
+            </button>
+
+            {environments.map((env) => (
+              <button
+                key={env.id}
+                onClick={() => { setActiveEnvironment(env.id); setOpen(false); }}
+                className={`flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left hover:bg-[#1e2132] ${
+                  activeEnvironmentId === env.id ? 'text-[#e94560]' : 'text-[#e2e8f0]'
+                }`}
+              >
+                {activeEnvironmentId === env.id ? <Check size={11} /> : <span className="w-[11px]" />}
+                <span className="truncate">{env.name}</span>
+              </button>
+            ))}
+
+            <div className="border-t border-[#2d3748] mt-1">
+              <button
+                onClick={() => { setOpen(false); setShowManager(true); }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
+              >
+                <Settings size={11} /> Manage Environments…
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showManager && <EnvManager onClose={() => setShowManager(false)} />}
+    </div>
+  );
+}
+
