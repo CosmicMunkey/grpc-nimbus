@@ -305,8 +305,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeTab: (id) => {
     set((s) => {
-      if (s.tabs.length <= 1) return {};
       const remaining = s.tabs.filter((t) => t.id !== id);
+      if (remaining.length === 0) {
+        const fresh = makeTab();
+        return { tabs: [fresh], activeTabId: fresh.id };
+      }
       const newActive = s.activeTabId === id
         ? (remaining[remaining.length - 1]?.id ?? remaining[0].id)
         : s.activeTabId;
