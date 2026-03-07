@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2 } from 'lucide-react';
+import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 type LoadMode = 'protoset' | 'proto' | 'reflection';
 
@@ -9,13 +9,14 @@ export default function ProtosetLoader() {
     protosetPaths, loadMode,
     loadProtosets, loadProtoFiles, loadViaReflection,
     clearLoadedProtos, reloadProtos, removeProtoPath,
-    isConnected,
+    isConnected, showConfirm,
   } = useAppStore();
   const [tab, setTab] = useState<LoadMode>('protoset');
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   const withLoading = async (fn: () => Promise<void>) => {
     setError(null);
@@ -58,12 +59,17 @@ export default function ProtosetLoader() {
   };
 
   const handleRemove = async (path: string) => {
+    const name = path.split(/[/\\]/).pop() ?? path;
+    const confirmed = await showConfirm(`Remove "${name}" from loaded files?`);
+    if (!confirmed) return;
     setError(null);
     try { await removeProtoPath(path); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
   };
 
   const handleClear = async () => {
+    const confirmed = await showConfirm('Clear all loaded files? The service list will be reset.');
+    if (!confirmed) return;
     setError(null);
     try { await clearLoadedProtos(); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
@@ -127,11 +133,20 @@ export default function ProtosetLoader() {
       {/* ── Loaded files panel ────────────────────────────────────────────── */}
       {hasLoaded && (
         <div className="mt-2 border border-[#2d3748] rounded overflow-hidden">
-          <div className="flex items-center justify-between px-2 py-1 bg-[#1a1a2e]">
-            <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">
-              {loadMode === 'reflection' ? 'Loaded via reflection' : `Loaded (${protosetPaths.length})`}
-            </span>
-            <div className="flex items-center gap-1">
+          {/* Header row — click to collapse/expand */}
+          <div
+            className="flex items-center justify-between px-2 py-1 bg-[#1a1a2e] cursor-pointer select-none"
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            <div className="flex items-center gap-1 text-[#4a5568]">
+              {collapsed
+                ? <ChevronRight size={11} />
+                : <ChevronDown size={11} />}
+              <span className="text-[10px] font-medium uppercase tracking-wide">
+                {loadMode === 'reflection' ? 'Loaded via reflection' : `Loaded (${protosetPaths.length})`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {canReload && (
                 <button
                   onClick={handleReload}
@@ -154,7 +169,7 @@ export default function ProtosetLoader() {
             </div>
           </div>
 
-          {protosetPaths.length > 0 && (
+          {!collapsed && protosetPaths.length > 0 && (
             <div className="divide-y divide-[#2d3748]">
               {protosetPaths.map((p) => {
                 const name = p.split(/[/\\]/).pop() ?? p;
