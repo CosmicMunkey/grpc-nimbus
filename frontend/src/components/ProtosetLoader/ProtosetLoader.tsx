@@ -128,7 +128,18 @@ export default function ProtosetLoader() {
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-[#e94560]">{error}</p>}
+      {error && (
+        <div className="mt-2 flex items-start gap-2 bg-[#2d1a1a] border border-[#e94560]/40 rounded px-3 py-2">
+          <p className="flex-1 text-xs text-[#e94560] leading-relaxed">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="shrink-0 text-[#e94560]/60 hover:text-[#e94560] mt-0.5"
+            title="Dismiss"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       {/* ── Loaded files panel ────────────────────────────────────────────── */}
       {hasLoaded && (
