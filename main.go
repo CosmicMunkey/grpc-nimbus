@@ -63,11 +63,6 @@ func buildAppMenu(app *App) *menu.Menu {
 
 	viewMenu := m.AddSubmenu("View")
 
-	// Full screen
-	viewMenu.AddText("Enter Full Screen", keys.Combo("f", keys.CmdOrCtrlKey, keys.ControlKey), func(_ *menu.CallbackData) {
-		app.TriggerMenuToggleFullscreen()
-	})
-
 	viewMenu.AddSeparator()
 
 	// Text zoom
