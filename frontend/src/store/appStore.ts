@@ -691,8 +691,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteEnvironment: async (id) => {
-    const confirmed = await get().showConfirm('Delete this environment? This cannot be undone.');
-    if (!confirmed) return;
     await api.deleteEnvironment(id);
     if (get().activeEnvironmentId === id) await get().setActiveEnvironment('');
     await get().loadEnvironments();
