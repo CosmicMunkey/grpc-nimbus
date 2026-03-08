@@ -670,6 +670,36 @@ func (a *App) TriggerMenuExport() {
 	runtime.EventsEmit(a.ctx, "menu:exportCollection")
 }
 
+// TriggerMenuToggleFullscreen toggles the window between fullscreen and normal.
+func (a *App) TriggerMenuToggleFullscreen() {
+	if runtime.WindowIsFullscreen(a.ctx) {
+		runtime.WindowUnfullscreen(a.ctx)
+	} else {
+		runtime.WindowFullscreen(a.ctx)
+	}
+}
+
+// TriggerMenuZoomIn tells the frontend to increase the UI text size.
+func (a *App) TriggerMenuZoomIn() { runtime.EventsEmit(a.ctx, "menu:zoomIn") }
+
+// TriggerMenuZoomOut tells the frontend to decrease the UI text size.
+func (a *App) TriggerMenuZoomOut() { runtime.EventsEmit(a.ctx, "menu:zoomOut") }
+
+// TriggerMenuZoomReset tells the frontend to restore the default text size.
+func (a *App) TriggerMenuZoomReset() { runtime.EventsEmit(a.ctx, "menu:zoomReset") }
+
+// TriggerMenuNewTab tells the frontend to open a new request tab.
+func (a *App) TriggerMenuNewTab() { runtime.EventsEmit(a.ctx, "menu:newTab") }
+
+// TriggerMenuCloseTab tells the frontend to close the active tab.
+func (a *App) TriggerMenuCloseTab() { runtime.EventsEmit(a.ctx, "menu:closeTab") }
+
+// TriggerMenuNextTab tells the frontend to switch to the next tab.
+func (a *App) TriggerMenuNextTab() { runtime.EventsEmit(a.ctx, "menu:nextTab") }
+
+// TriggerMenuPrevTab tells the frontend to switch to the previous tab.
+func (a *App) TriggerMenuPrevTab() { runtime.EventsEmit(a.ctx, "menu:prevTab") }
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // saveSettings merges a settings mutation into the persisted settings file.

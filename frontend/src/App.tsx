@@ -104,17 +104,51 @@ export default function App() {
   useEffect(() => {
     restoreLoadedState();
 
-    // Listen for native File menu events (window.runtime is injected by Wails)
     const rt = window.runtime;
     if (!rt) return;
-    const offImport = rt.EventsOn('menu:importCollection', () => {
-      importCollection();
+
+    const offImport = rt.EventsOn('menu:importCollection', () => importCollection());
+    const offExport = rt.EventsOn('menu:exportCollection', () => setShowExportModal(true));
+
+    // Zoom — adjust root font size in 10% increments
+    const STEP = 0.1;
+    const getZoom = () => parseFloat(document.documentElement.style.fontSize || '100') / 100;
+    const offZoomIn    = rt.EventsOn('menu:zoomIn',    () => {
+      const next = Math.min(2.0, getZoom() + STEP);
+      document.documentElement.style.fontSize = `${Math.round(next * 100)}%`;
     });
-    const offExport = rt.EventsOn('menu:exportCollection', () => {
-      setShowExportModal(true);
+    const offZoomOut   = rt.EventsOn('menu:zoomOut',   () => {
+      const next = Math.max(0.5, getZoom() - STEP);
+      document.documentElement.style.fontSize = `${Math.round(next * 100)}%`;
+    });
+    const offZoomReset = rt.EventsOn('menu:zoomReset', () => {
+      document.documentElement.style.fontSize = '';
     });
 
-    return () => { offImport(); offExport(); };
+    // Tab management — read latest tabs/activeTabId via store getState() to avoid stale closure
+    const { getState } = useAppStore;
+    const offNewTab   = rt.EventsOn('menu:newTab',   () => getState().newTab());
+    const offCloseTab = rt.EventsOn('menu:closeTab', () => {
+      const { tabs: t, activeTabId: aid } = getState();
+      const idx = t.findIndex((tab) => tab.id === aid);
+      if (idx !== -1) getState().closeTab(t[idx].id);
+    });
+    const offNextTab  = rt.EventsOn('menu:nextTab',  () => {
+      const { tabs: t, activeTabId: aid, setActiveTab: sat } = getState();
+      const idx = t.findIndex((tab) => tab.id === aid);
+      sat(t[(idx + 1) % t.length].id);
+    });
+    const offPrevTab  = rt.EventsOn('menu:prevTab',  () => {
+      const { tabs: t, activeTabId: aid, setActiveTab: sat } = getState();
+      const idx = t.findIndex((tab) => tab.id === aid);
+      sat(t[(idx - 1 + t.length) % t.length].id);
+    });
+
+    return () => {
+      offImport(); offExport();
+      offZoomIn(); offZoomOut(); offZoomReset();
+      offNewTab(); offCloseTab(); offNextTab(); offPrevTab();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
