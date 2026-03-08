@@ -43,6 +43,11 @@ func NewApp() *App {
 // startup is called by Wails when the application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Enable the green traffic-light fullscreen button on macOS.
+	// Must be called after startup so the window handle exists.
+	EnableWindowFullscreenButton()
+
 	var err error
 
 	a.store, err = storage.NewStore()
