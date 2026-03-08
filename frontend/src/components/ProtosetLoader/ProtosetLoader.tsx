@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
-import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
 
 type LoadMode = 'protoset' | 'proto' | 'reflection';
 
@@ -128,17 +129,25 @@ export default function ProtosetLoader() {
         </div>
       )}
 
-      {error && (
-        <div className="mt-2 flex items-start gap-2 bg-[#2d1a1a] border border-[#e94560]/40 rounded px-3 py-2">
-          <p className="flex-1 text-xs text-[#e94560] leading-relaxed">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="shrink-0 text-[#e94560]/60 hover:text-[#e94560] mt-0.5"
-            title="Dismiss"
-          >
-            <X size={12} />
-          </button>
-        </div>
+      {error && createPortal(
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#16213e] border border-[#e94560]/50 rounded-lg p-5 w-[22rem] shadow-xl flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={18} className="text-[#e94560] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-[#e2e8f0] mb-1">Failed to load</p>
+                <p className="text-xs text-[#94a3b8] leading-relaxed break-words">{error}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="self-end px-4 py-1.5 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652]"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Loaded files panel ────────────────────────────────────────────── */}
