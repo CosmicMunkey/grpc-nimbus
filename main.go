@@ -61,5 +61,41 @@ func buildAppMenu(app *App) *menu.Menu {
 		m.Append(menu.EditMenu())
 	}
 
+	viewMenu := m.AddSubmenu("View")
+
+	// Full screen
+	viewMenu.AddText("Enter Full Screen", keys.Combo("f", keys.CmdOrCtrlKey, keys.ControlKey), func(_ *menu.CallbackData) {
+		app.TriggerMenuToggleFullscreen()
+	})
+
+	viewMenu.AddSeparator()
+
+	// Text zoom
+	viewMenu.AddText("Zoom In", keys.CmdOrCtrl("="), func(_ *menu.CallbackData) {
+		app.TriggerMenuZoomIn()
+	})
+	viewMenu.AddText("Zoom Out", keys.CmdOrCtrl("-"), func(_ *menu.CallbackData) {
+		app.TriggerMenuZoomOut()
+	})
+	viewMenu.AddText("Reset Zoom", keys.CmdOrCtrl("0"), func(_ *menu.CallbackData) {
+		app.TriggerMenuZoomReset()
+	})
+
+	viewMenu.AddSeparator()
+
+	// Tab management
+	viewMenu.AddText("New Tab", keys.CmdOrCtrl("t"), func(_ *menu.CallbackData) {
+		app.TriggerMenuNewTab()
+	})
+	viewMenu.AddText("Close Tab", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+		app.TriggerMenuCloseTab()
+	})
+	viewMenu.AddText("Next Tab", keys.Combo("Tab", keys.ControlKey, keys.OptionOrAltKey), func(_ *menu.CallbackData) {
+		app.TriggerMenuNextTab()
+	})
+	viewMenu.AddText("Previous Tab", keys.Combo("Tab", keys.ControlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		app.TriggerMenuPrevTab()
+	})
+
 	return m
 }
