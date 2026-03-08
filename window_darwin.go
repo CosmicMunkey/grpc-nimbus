@@ -13,29 +13,32 @@ void disableAutomaticWindowTabbing() {
     }
 }
 
-// Called after the Wails window is ready to enable the green traffic-light
-// button for native fullscreen. Uses dispatch_after so the window exists.
+// Registers a one-shot observer that sets NSWindowCollectionBehaviorFullScreenPrimary
+// the first time the main window becomes key (guaranteed before user can click traffic lights).
 void enableWindowFullscreenButton() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        NSWindow *win = [[NSApplication sharedApplication] mainWindow];
-        if (win != nil) {
-            [win setCollectionBehavior:
-                [win collectionBehavior] |
-                NSWindowCollectionBehaviorFullScreenPrimary |
-                NSWindowCollectionBehaviorManaged];
-        }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        id __block token;
+        token = [[NSNotificationCenter defaultCenter]
+            addObserverForName:NSWindowDidBecomeKeyNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification *note) {
+            NSWindow *win = (NSWindow *)note.object;
+            NSWindowCollectionBehavior b = [win collectionBehavior];
+            b |= NSWindowCollectionBehaviorFullScreenPrimary;
+            b |= NSWindowCollectionBehaviorManaged;
+            [win setCollectionBehavior:b];
+            [[NSNotificationCenter defaultCenter] removeObserver:token];
+        }];
     });
 }
 */
 import "C"
 
 func init() {
-	C.disableAutomaticWindowTabbing()
+C.disableAutomaticWindowTabbing()
+C.enableWindowFullscreenButton()
 }
 
-// EnableWindowFullscreenButton is called from app.startup (after ctx is set)
-// so the window exists by the time the ObjC runs.
-func EnableWindowFullscreenButton() {
-	C.enableWindowFullscreenButton()
-}
+// EnableWindowFullscreenButton is a no-op; work happens in init() via notification observer.
+func EnableWindowFullscreenButton() {}
