@@ -25,16 +25,17 @@ type MethodInfo struct {
 
 // ServiceInfo groups methods under a service.
 type ServiceInfo struct {
-	Name    string       `json:"name"`
-	Methods []MethodInfo `json:"methods"`
+	Name       string       `json:"name"`
+	Methods    []MethodInfo `json:"methods"`
+	SourceFile string       `json:"sourceFile,omitempty"` // set when loaded from a protoset file
 }
 
 // ProtosetDescriptor holds the parsed descriptor source from any loading strategy.
 type ProtosetDescriptor struct {
-	source  grpcurl.DescriptorSource
-	methods []*desc.MethodDescriptor
-	// reflClient is set when loaded via server reflection; must be Reset on cleanup.
-	reflClient *grpcreflect.Client
+	source     grpcurl.DescriptorSource
+	methods    []*desc.MethodDescriptor
+	svcFiles   map[string]string    // service full name → source file path (protoset only)
+	reflClient *grpcreflect.Client  // non-nil when loaded via server reflection
 }
 
 // LoadProtosets parses the given protoset (FileDescriptorSet) file paths.
@@ -46,7 +47,28 @@ func LoadProtosets(paths []string) (*ProtosetDescriptor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading protoset files: %w", err)
 	}
-	return newDescriptor(src, nil)
+	pd, err := newDescriptor(src, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Build service → source file mapping by probing each path individually.
+	pd.svcFiles = make(map[string]string)
+	for _, path := range paths {
+		singleSrc, err := grpcurl.DescriptorSourceFromProtoSets(path)
+		if err != nil {
+			continue
+		}
+		svcNames, err := singleSrc.ListServices()
+		if err != nil {
+			continue
+		}
+		for _, svcName := range svcNames {
+			if _, exists := pd.svcFiles[svcName]; !exists {
+				pd.svcFiles[svcName] = path
+			}
+		}
+	}
+	return pd, nil
 }
 
 // LoadProtoFiles parses proto source files, resolving imports from importPaths.
@@ -132,7 +154,11 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 
 	result := make([]ServiceInfo, 0, len(order))
 	for _, name := range order {
-		result = append(result, *byService[name])
+		svc := *byService[name]
+		if pd.svcFiles != nil {
+			svc.SourceFile = pd.svcFiles[name]
+		}
+		result = append(result, svc)
 	}
 	return result
 }

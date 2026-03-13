@@ -3,9 +3,7 @@ package grpc
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"os"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -21,16 +19,14 @@ const (
 	TLSModeNone           TLSMode = "none"           // plaintext (h2c)
 	TLSModeSystem         TLSMode = "system"         // TLS with system cert pool
 	TLSModeInsecureSkip   TLSMode = "insecure_skip"  // TLS, skip cert verification
-	TLSModeCustomCA       TLSMode = "custom_ca"      // TLS with provided CA cert file
 )
 
 // ConnectionConfig holds the parameters to connect to a gRPC server.
 type ConnectionConfig struct {
-	Target   string  `json:"target"`   // host:port
-	TLS      TLSMode `json:"tls"`
-	CACert   string  `json:"caCert"`   // path to CA cert (TLSModeCustomCA)
-	ClientCert string `json:"clientCert"` // path to client cert (mTLS)
-	ClientKey  string `json:"clientKey"`  // path to client key (mTLS)
+	Target     string  `json:"target"`     // host:port
+	TLS        TLSMode `json:"tls"`
+	ClientCert string  `json:"clientCert"` // path to client cert (mTLS)
+	ClientKey  string  `json:"clientKey"`  // path to client key (mTLS)
 }
 
 // Connection wraps a grpc.ClientConn with its config for reuse.
@@ -108,24 +104,6 @@ func buildDialOptions(cfg ConnectionConfig) ([]grpc.DialOption, error) {
 
 	case TLSModeSystem:
 		tlsCfg := &tls.Config{}
-		if err := applyClientCert(cfg, tlsCfg); err != nil {
-			return nil, err
-		}
-		return []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg))}, nil
-
-	case TLSModeCustomCA:
-		if cfg.CACert == "" {
-			return nil, fmt.Errorf("TLS mode %q requires a CA cert path", cfg.TLS)
-		}
-		caPEM, err := os.ReadFile(cfg.CACert)
-		if err != nil {
-			return nil, fmt.Errorf("reading CA cert: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(caPEM) {
-			return nil, fmt.Errorf("failed to parse CA cert")
-		}
-		tlsCfg := &tls.Config{RootCAs: pool}
 		if err := applyClientCert(cfg, tlsCfg); err != nil {
 			return nil, err
 		}

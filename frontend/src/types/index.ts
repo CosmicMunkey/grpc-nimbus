@@ -7,8 +7,7 @@ export interface MetadataEntry {
 
 export interface ConnectionConfig {
   target: string;
-  tls: 'none' | 'system' | 'insecure_skip' | 'custom_ca';
-  caCert?: string;
+  tls: 'none' | 'system' | 'insecure_skip';
   clientCert?: string;
   clientKey?: string;
 }
@@ -27,6 +26,7 @@ export interface MethodInfo {
 export interface ServiceInfo {
   name: string;
   methods: MethodInfo[];
+  sourceFile?: string;
 }
 
 export interface InvokeRequest {

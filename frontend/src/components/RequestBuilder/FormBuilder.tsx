@@ -498,6 +498,14 @@ function InlineMessageEditor({
   const isIncluded = value !== null && value !== undefined;
   const [expanded, setExpanded] = useState(isIncluded);
 
+  // Auto-expand when an external source (e.g. loading a saved request) populates
+  // a field that was previously absent — without overriding the user's manual toggle.
+  const prevIncludedRef = useRef(isIncluded);
+  useEffect(() => {
+    if (!prevIncludedRef.current && isIncluded) setExpanded(true);
+    prevIncludedRef.current = isIncluded;
+  }, [isIncluded]);
+
   const include = () => {
     const defaults = initForm(schema.fields ?? [], {});
     onChange(defaults);
@@ -643,7 +651,12 @@ export default function FormBuilder() {
   const { requestSchema, requestJson } = useActiveTab();
   const { setRequestJson } = useAppStore();
 
-  const [formValue, setFormValue] = useState<FormVal>({});
+  // Initialize eagerly from requestJson so that the form→JSON sync effect
+  // (which fires on every mount) sees the correct formValue instead of the
+  // empty {} default and incorrectly writes '{}' back to the store.
+  const [formValue, setFormValue] = useState<FormVal>(() =>
+    requestSchema.length > 0 ? initForm(requestSchema, fromJson(requestJson)) : {}
+  );
   const lastFormJson = useRef<string>('{}');
 
   // Re-initialize when schema changes (method switch)

@@ -294,13 +294,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadMode: '',
 
   loadProtosets: async (paths) => {
-    const services = await api.loadProtosets(paths);
-    set({ services, protosetPaths: paths, loadMode: 'protoset' });
+    const { protosetPaths, loadMode } = get();
+    const allPaths = loadMode === 'protoset'
+      ? [...new Set([...protosetPaths, ...paths])]
+      : paths;
+    const services = await api.loadProtosets(allPaths);
+    set({ services, protosetPaths: allPaths, loadMode: 'protoset' });
   },
 
   loadProtoFiles: async (importPaths, protoFiles) => {
-    const services = await api.loadProtoFiles(importPaths, protoFiles);
-    set({ services, protosetPaths: protoFiles, loadMode: 'proto' });
+    const { protosetPaths, loadMode } = get();
+    const allFiles = loadMode === 'proto'
+      ? [...new Set([...protosetPaths, ...protoFiles])]
+      : protoFiles;
+    const services = await api.loadProtoFiles(importPaths, allFiles);
+    set({ services, protosetPaths: allFiles, loadMode: 'proto' });
   },
 
   loadViaReflection: async () => {
@@ -544,6 +552,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: patchTab(s.tabs, activeTabId, {
         requestJson: entry.requestJson,
         requestMetadata: entry.metadata ?? [],
+        response: entry.response ?? null,
+        invokeError: null,
       }),
     }));
   },
