@@ -43,6 +43,7 @@ frontend/node_modules/
 # Wails dev bindings (auto-generated)
 frontend/wailsjs/
 .gitnexus
-.github
+.github/copilot-instructions.md
+.github/project-context.md
 
 .DS_Store
