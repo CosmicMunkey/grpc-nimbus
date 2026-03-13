@@ -42,3 +42,5 @@ frontend/node_modules/
 
 # Wails dev bindings (auto-generated)
 frontend/wailsjs/
+.gitnexus
+.github
