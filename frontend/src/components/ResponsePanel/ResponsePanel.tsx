@@ -233,32 +233,27 @@ export default function ResponsePanel() {
     );
   }
 
-  if (invokeError && !response) {
-    return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex border-b border-[#2d3748]">
-          {(['response', 'history'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t as typeof tab)}
-              className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === t ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'}`}>
-              {t} {t === 'history' && <History size={10} className="inline ml-0.5" />}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1 min-h-0 overflow-auto">
-          {tab === 'response' ? (
-            <div className="p-4">
-              <div className="flex items-start gap-2 p-3 bg-red-900/20 border border-red-900/40 rounded text-xs text-[#e94560]">
-                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                <span className="break-all">{invokeError}</span>
-              </div>
-            </div>
-          ) : <HistoryPanel />}
-        </div>
-      </div>
-    );
-  }
-
   if (!response) {
+    if (invokeError) {
+      return (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="flex border-b border-[#2d3748]">
+            {(['response', 'history'] as const).map((t) => (
+              <button key={t} onClick={() => setTab(t as typeof tab)}
+                className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === t ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto">
+            {tab === 'history' ? <HistoryPanel /> : (
+              <div className="p-3 text-xs text-[#e94560] font-mono break-all">{invokeError}</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex border-b border-[#2d3748]">
@@ -288,9 +283,6 @@ export default function ResponsePanel() {
       {/* Status bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#2d3748] bg-[#16213e]">
         <StatusBadge code={response.statusCode} text={response.status} />
-        {response.statusMessage && (
-          <span className="text-xs text-[#94a3b8] truncate">{response.statusMessage}</span>
-        )}
         <div className="ml-auto flex items-center gap-1 text-xs text-[#4a5568]">
           <Clock size={11} />
           {response.durationMs}ms
@@ -309,9 +301,14 @@ export default function ResponsePanel() {
 
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === 'response' ? (
-          <div className="h-full">
-            {response.error ? (
-              <div className="p-3 text-xs text-[#e94560] font-mono break-all">{response.error}</div>
+          <div className="h-full overflow-auto">
+            {response.statusCode !== 0 ? (
+              <div className="p-3 text-xs text-[#e94560] font-mono break-all space-y-1">
+                {response.statusMessage && <div>{response.statusMessage}</div>}
+                {response.error && response.error !== response.statusMessage && (
+                  <div className="text-[#94a3b8]">{response.error}</div>
+                )}
+              </div>
             ) : (
               <CodeMirror value={prettyJson} theme={oneDark} extensions={[json()]} readOnly className="h-full"
                 basicSetup={{ lineNumbers: true, foldGutter: true }} />

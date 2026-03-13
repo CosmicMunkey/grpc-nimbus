@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { Play, Save, Plus, X, LayoutList, Code } from 'lucide-react';
+import { Play, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -9,7 +9,10 @@ import FormBuilder from '../RequestBuilder/FormBuilder';
 
 function MetadataTable() {
   const { requestMetadata } = useActiveTab();
-  const { setRequestMetadata } = useAppStore();
+  const { setRequestMetadata, environments, activeEnvironmentId } = useAppStore();
+
+  const activeEnv = environments.find((e) => e.id === activeEnvironmentId);
+  const envHeaders = (activeEnv?.headers ?? []).filter((h) => h.key.trim());
 
   const addRow = () => setRequestMetadata([...requestMetadata, { key: '', value: '' }]);
 
@@ -21,45 +24,70 @@ function MetadataTable() {
   const removeRow = (i: number) => setRequestMetadata(requestMetadata.filter((_, idx) => idx !== i));
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-[#94a3b8] font-medium">Metadata / Headers</span>
-        <button
-          onClick={addRow}
-          className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
-        >
-          <Plus size={11} /> Add
-        </button>
-      </div>
-
-      {requestMetadata.length === 0 ? (
-        <p className="text-xs text-[#4a5568]">No metadata — click Add to set headers</p>
-      ) : (
-        <div className="space-y-1">
-          {requestMetadata.map((row, i) => (
-            <div key={i} className="flex gap-1">
-              <input
-                value={row.key}
-                onChange={(e) => updateRow(i, 'key', e.target.value)}
-                placeholder="key"
-                className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
-              />
-              <input
-                value={row.value}
-                onChange={(e) => updateRow(i, 'value', e.target.value)}
-                placeholder="value"
-                className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
-              />
-              <button
-                onClick={() => removeRow(i)}
-                className="text-[#4a5568] hover:text-[#e94560] p-1"
-              >
-                <X size={11} />
-              </button>
-            </div>
-          ))}
+    <div className="flex flex-col gap-3">
+      {/* Environment headers (read-only) */}
+      {envHeaders.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">
+            From environment · {activeEnv?.name}
+          </span>
+          <div className="space-y-1">
+            {envHeaders.map((h, i) => (
+              <div key={i} className="flex gap-1 opacity-60">
+                <div className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e94560] font-mono truncate">
+                  {h.key}
+                </div>
+                <div className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#94a3b8] font-mono truncate">
+                  {h.value}
+                </div>
+                <div className="w-5" /> {/* spacer to align with editable rows */}
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Per-request metadata (editable) */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">Request metadata</span>
+          <button
+            onClick={addRow}
+            className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+          >
+            <Plus size={11} /> Add
+          </button>
+        </div>
+
+        {requestMetadata.length === 0 ? (
+          <p className="text-xs text-[#4a5568]">No request metadata — click Add to set entries</p>
+        ) : (
+          <div className="space-y-1">
+            {requestMetadata.map((row, i) => (
+              <div key={i} className="flex gap-1">
+                <input
+                  value={row.key}
+                  onChange={(e) => updateRow(i, 'key', e.target.value)}
+                  placeholder="key"
+                  className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+                />
+                <input
+                  value={row.value}
+                  onChange={(e) => updateRow(i, 'value', e.target.value)}
+                  placeholder="value"
+                  className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+                />
+                <button
+                  onClick={() => removeRow(i)}
+                  className="text-[#4a5568] hover:text-[#e94560] p-1"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -130,6 +158,100 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function shellQuote(s: string): string {
+  // Wrap in single quotes, escaping any embedded single quotes.
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+function buildGrpcurlCommand(opts: {
+  target: string;
+  tls: string;
+  protosetPath: string | undefined;
+  loadMode: string;
+  envHeaders: { key: string; value: string }[];
+  metadata: MetadataEntry[];
+  requestJson: string;
+  methodPath: string;
+}): string {
+  const { target, tls, protosetPath, loadMode, envHeaders, metadata, requestJson, methodPath } = opts;
+  const args: string[] = ['grpcurl'];
+
+  if (tls === 'none') args.push('-plaintext');
+  else if (tls === 'insecure_skip') args.push('-insecure');
+
+  if (loadMode === 'protoset' && protosetPath) {
+    args.push(`-protoset ${shellQuote(protosetPath)}`);
+  }
+
+  for (const h of [...envHeaders, ...metadata]) {
+    if (h.key.trim()) args.push(`-H ${shellQuote(`${h.key}: ${h.value}`)}`);
+  }
+
+  // Omit -d when body is empty or an empty object.
+  const body = requestJson?.trim() || '{}';
+  const isEmpty = (() => { try { const p = JSON.parse(body); return typeof p === 'object' && p !== null && Object.keys(p).length === 0; } catch { return false; } })();
+  if (!isEmpty) args.push(`-d ${shellQuote(body)}`);
+
+  args.push(shellQuote(target || 'localhost:50051'));
+  args.push(shellQuote(methodPath));
+
+  return args.join(' \\\n  ');
+}
+
+function GrpcurlTab() {
+  const { services, connectionConfig, loadMode, environments, activeEnvironmentId } = useAppStore();
+  const { requestJson, requestMetadata, selectedMethod } = useActiveTab();
+  const [copied, setCopied] = useState(false);
+
+  const activeEnv = environments.find((e) => e.id === activeEnvironmentId);
+  const sourceFile = services.find((s) => s.name === selectedMethod?.serviceName)?.sourceFile;
+
+  const command = buildGrpcurlCommand({
+    target: connectionConfig.target,
+    tls: connectionConfig.tls,
+    protosetPath: sourceFile,
+    loadMode,
+    envHeaders: activeEnv?.headers ?? [],
+    metadata: requestMetadata,
+    requestJson,
+    methodPath: selectedMethod?.fullName ?? '',
+  });
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="h-full flex flex-col p-3 gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-[#4a5568] font-mono">grpcurl command</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-[#2d3748] text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
+        >
+          {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      <pre className="flex-1 overflow-auto bg-[#1a1a2e] border border-[#2d3748] rounded p-3 text-xs font-mono text-[#e2e8f0] leading-relaxed whitespace-pre select-all">
+        {command}
+      </pre>
+      {loadMode === 'proto' && (
+        <p className="text-[10px] text-[#4a5568]">
+          Note: Proto file import paths may need <span className="font-mono text-[#94a3b8]">-import-path</span> and <span className="font-mono text-[#94a3b8]">-proto</span> flags added manually.
+        </p>
+      )}
+      {loadMode === 'reflection' && (
+        <p className="text-[10px] text-[#4a5568]">
+          Using server reflection — no <span className="font-mono text-[#94a3b8]">-protoset</span> flag needed.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function RequestPanel() {
   const {
     selectedMethod,
@@ -141,7 +263,7 @@ export default function RequestPanel() {
   } = useActiveTab();
   const { setRequestJson, setTimeoutSeconds, invoke, updateSavedRequest } = useAppStore();
 
-  const [tab, setTab] = useState<'form' | 'body' | 'metadata'>('form');
+  const [tab, setTab] = useState<'form' | 'body' | 'metadata' | 'grpcurl'>('form');
   const [showSave, setShowSave] = useState(false);
 
   if (!selectedMethod) {
@@ -236,6 +358,14 @@ export default function RequestPanel() {
         >
           Metadata
         </button>
+        <button
+          onClick={() => setTab('grpcurl')}
+          className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
+            tab === 'grpcurl' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+          }`}
+        >
+          <Terminal size={11} /> grpcurl
+        </button>
       </div>
 
       {/* Tab content */}
@@ -257,6 +387,8 @@ export default function RequestPanel() {
               }}
             />
           </div>
+        ) : tab === 'grpcurl' ? (
+          <GrpcurlTab />
         ) : (
           <div className="p-3 overflow-y-auto h-full">
             <MetadataTable />

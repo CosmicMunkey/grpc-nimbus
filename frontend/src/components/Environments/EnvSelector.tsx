@@ -15,14 +15,25 @@ interface EnvEditorProps {
 function EnvEditor({ initial, onClose }: EnvEditorProps) {
   const { saveEnvironment } = useAppStore();
   const [name, setName] = useState(initial?.name ?? '');
-  const [headers, setHeaders] = useState<{ key: string; value: string }[]>(
-    initial?.headers ?? []
+  const [rows, setRows] = useState<string[]>(
+    initial?.headers?.length
+      ? initial.headers.map((h) => `${h.key}: ${h.value}`)
+      : ['']
   );
 
-  const addHeader = () => setHeaders((h) => [...h, { key: '', value: '' }]);
-  const removeHeader = (i: number) => setHeaders((h) => h.filter((_, idx) => idx !== i));
-  const updateHeader = (i: number, field: 'key' | 'value', val: string) =>
-    setHeaders((h) => h.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+  const updateRow = (i: number, val: string) =>
+    setRows((r) => r.map((v, idx) => (idx === i ? val : v)));
+  const addRow = () => setRows((r) => [...r, '']);
+  const removeRow = (i: number) =>
+    setRows((r) => r.length > 1 ? r.filter((_, idx) => idx !== i) : ['']);
+
+  const parseRow = (line: string): { key: string; value: string } | null => {
+    const idx = line.indexOf(':');
+    if (idx < 1) return null;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    return key ? { key, value } : null;
+  };
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -30,21 +41,16 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
     await saveEnvironment({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
-      headers: headers.filter((h) => h.key.trim()),
+      headers: rows.map(parseRow).filter((h): h is { key: string; value: string } => h !== null),
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     });
     onClose();
   };
 
-  const autoResize = (el: HTMLTextAreaElement) => {
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg p-4 w-[28rem] shadow-xl flex flex-col gap-3 max-h-[85vh]">
+      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg p-5 w-[36rem] shadow-xl flex flex-col gap-4 max-h-[85vh]">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-[#e2e8f0]">
             {initial ? 'Edit Environment' : 'New Environment'}
@@ -59,52 +65,45 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Environment name (e.g. Production)"
-          className="bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
+          className="bg-[#1a1a2e] border border-[#2d3748] rounded px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
         />
 
-        {/* ── Headers ── */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[#94a3b8] font-medium">Default Headers</span>
+        <div className="flex flex-col gap-2 min-h-0">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#94a3b8] font-medium">Default Headers</span>
+            <span className="text-[10px] text-[#4a5568] font-mono">Header-Name: value</span>
+          </div>
+          <div className="overflow-y-auto space-y-2 max-h-72">
+            {rows.map((row, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={row}
+                  onChange={(e) => updateRow(i, e.target.value)}
+                  placeholder="Authorization: Bearer eyJhbGci..."
+                  className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+                />
+                <button
+                  onClick={() => removeRow(i)}
+                  className="shrink-0 text-[#4a5568] hover:text-[#e94560] p-1 rounded hover:bg-[#1e2132]"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
           <button
-            onClick={addHeader}
-            className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+            onClick={addRow}
+            className="flex items-center gap-1.5 self-start text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-2 py-1 rounded hover:bg-[#1e2132]"
           >
-            <Plus size={11} /> Add
+            <Plus size={11} /> Add header
           </button>
-        </div>
-
-        <div className="overflow-y-auto space-y-2 max-h-64">
-          {headers.length === 0 && (
-            <p className="text-xs text-[#4a5568]">No headers — add Authorization, x-api-key, etc.</p>
-          )}
-          {headers.map((h, i) => (
-            <div key={i} className="flex gap-1 items-start">
-              <input
-                value={h.key}
-                onChange={(e) => updateHeader(i, 'key', e.target.value)}
-                placeholder="header-name"
-                className="w-36 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1 text-xs text-[#e94560] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
-              />
-              <textarea
-                value={h.value}
-                onChange={(e) => { updateHeader(i, 'value', e.target.value); autoResize(e.currentTarget); }}
-                onFocus={(e) => autoResize(e.currentTarget)}
-                placeholder="Bearer eyJhbGciOi..."
-                rows={2}
-                className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono resize-none overflow-hidden leading-relaxed"
-              />
-              <button onClick={() => removeHeader(i)} className="text-[#4a5568] hover:text-[#e94560] p-1 mt-0.5">
-                <X size={11} />
-              </button>
-            </div>
-          ))}
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-1.5 text-xs text-[#94a3b8] border border-[#2d3748] rounded hover:bg-[#1e2132]">
+          <button onClick={onClose} className="flex-1 py-2 text-xs text-[#94a3b8] border border-[#2d3748] rounded hover:bg-[#1e2132]">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-1.5 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652] disabled:opacity-40">
+          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-2 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652] disabled:opacity-40">
             Save
           </button>
         </div>

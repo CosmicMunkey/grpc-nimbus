@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { Wifi, WifiOff, ChevronDown, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { Wifi, WifiOff, ChevronDown, Lock, Unlock, AlertTriangle, X } from 'lucide-react';
 import EnvSelector from '../Environments/EnvSelector';
 import SettingsPanel from '../Settings/SettingsPanel';
 
@@ -8,7 +8,6 @@ const TLS_OPTIONS = [
   { value: 'none',          label: 'Plaintext (h2c)' },
   { value: 'system',        label: 'TLS (system CA)' },
   { value: 'insecure_skip', label: 'TLS (skip verify)' },
-  { value: 'custom_ca',     label: 'TLS (custom CA)' },
 ] as const;
 
 type ConnStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
@@ -43,7 +42,20 @@ export default function ConnectionBar() {
   } = useAppStore();
 
   const [tlsOpen, setTlsOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
   const selectedTls = TLS_OPTIONS.find((o) => o.value === connectionConfig.tls) ?? TLS_OPTIONS[0];
+
+  useEffect(() => {
+    if (!errorOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (errorRef.current && !errorRef.current.contains(e.target as Node)) {
+        setErrorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [errorOpen]);
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-[#16213e] border-b border-[#2d3748]">
@@ -97,10 +109,34 @@ export default function ConnectionBar() {
       </button>
 
       {/* Connection status indicator */}
-      <div className="flex items-center gap-1">
+      <div ref={errorRef} className="relative flex items-center gap-1">
         <StatusDot status={connectionStatus} />
         {connectionError && (
-          <span title={connectionError} className="text-[#e94560] cursor-help"><AlertTriangle size={14} /></span>
+          <>
+            <button
+              onClick={() => setErrorOpen((v) => !v)}
+              className="text-[#e94560] hover:text-red-400 focus:outline-none"
+              title="Click to see error details"
+            >
+              <AlertTriangle size={14} />
+            </button>
+            {errorOpen && (
+              <div className="absolute top-full right-0 mt-2 z-50 w-96 max-w-[90vw] bg-[#16213e] border border-red-900/60 rounded shadow-xl">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-red-900/40">
+                  <span className="text-xs font-medium text-[#e94560]">Connection Error</span>
+                  <button
+                    onClick={() => setErrorOpen(false)}
+                    className="text-[#4a5568] hover:text-[#e2e8f0]"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <pre className="p-3 text-xs text-[#e94560] font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                  {connectionError}
+                </pre>
+              </div>
+            )}
+          </>
         )}
       </div>
 
