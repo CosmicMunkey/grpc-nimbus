@@ -1,6 +1,21 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* ── Tailwind theme tokens ─────────────────────────────────────────────────── */
+/* Maps Tailwind color utilities (bg-c-bg, text-c-text, etc.) to CSS custom   */
+/* properties so applyTheme() in themes.ts can hot-swap the palette at runtime */
+/* without a rebuild.                                                           */
+@theme inline {
+  --color-c-bg:      var(--c-bg);
+  --color-c-panel:   var(--c-panel);
+  --color-c-input:   var(--c-input);
+  --color-c-hover:   var(--c-hover);
+  --color-c-border:  var(--c-border);
+  --color-c-text:    var(--c-text);
+  --color-c-text2:   var(--c-text2);
+  --color-c-text3:   var(--c-text3);
+  --color-c-accent:  var(--c-accent);
+  --color-c-accent2: var(--c-accent2);
+}
 
 /* ── Theme tokens (Nimbus default) ────────────────────────────────────────── */
 /* applyTheme() in themes.ts overwrites these at runtime when the user        */
@@ -18,24 +33,26 @@
   --c-accent2: #c73652;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-body {
-  background-color: var(--c-bg);
-  color: var(--c-text);
-  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px;
-  overflow: hidden;
-}
+  body {
+    background-color: var(--c-bg);
+    color: var(--c-text);
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--c-bg); }
-::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--c-text3); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--c-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--c-text3); }
+}
 
 .cm-editor { height: 100%; border-radius: 6px; overflow: hidden; }
 .cm-scroller {
