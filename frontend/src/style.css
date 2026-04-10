@@ -44,7 +44,7 @@
     background-color: var(--c-bg);
     color: var(--c-text);
     font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
+    font-size: 0.875rem; /* 14px at default 16px root; scales with html font-size */
     overflow: hidden;
   }
 
@@ -57,7 +57,7 @@
 .cm-editor { height: 100%; border-radius: 6px; overflow: hidden; }
 .cm-scroller {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 13px;
+  font-size: 0.8125rem; /* 13px at default 16px root; scales with html font-size */
 }
 
 /* ── Select dropdowns ──────────────────────────────────────────────────────── */

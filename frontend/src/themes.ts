@@ -61,6 +61,19 @@ export function resolveTheme(id: ThemeId, custom?: Partial<ThemeTokens>): ThemeT
   return THEMES[id];
 }
 
+// Sets the base font size by scaling the html root element.
+// All Tailwind rem-based utilities (text-xs, text-sm, spacing, etc.)
+// scale proportionally because rem is always relative to the html element.
+export function applyFontSize(size: number): void {
+  document.documentElement.style.fontSize = `${size}px`;
+}
+
+export const FONT_SIZE_PRESETS = [
+  { label: 'Small',  value: 14 },
+  { label: 'Medium', value: 16 },
+  { label: 'Large',  value: 18 },
+] as const;
+
 // Writes CSS custom properties to :root and updates derived globals.
 export function applyTheme(tokens: ThemeTokens): void {
   const root = document.documentElement;

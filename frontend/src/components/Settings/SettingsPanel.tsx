@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings, X } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
-import { ThemeId, ThemeTokens, THEMES, DEFAULT_CUSTOM_THEME } from '../../themes';
+import { ThemeId, ThemeTokens, THEMES, DEFAULT_CUSTOM_THEME, FONT_SIZE_PRESETS } from '../../themes';
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ function CustomEditor({
 
 export default function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const { confirmDeletes, setConfirmDeletes, theme, customTheme, setTheme } = useAppStore();
+  const { confirmDeletes, setConfirmDeletes, theme, customTheme, setTheme, fontSize, setFontSize } = useAppStore();
 
   // Local draft so colour picker changes apply live while custom is active
   const [draftCustom, setDraftCustom] = useState<Partial<ThemeTokens>>(customTheme);
@@ -165,6 +165,27 @@ export default function SettingsPanel() {
                 {theme === 'custom' && (
                   <CustomEditor tokens={draftCustom} onChange={handleCustomChange} />
                 )}
+                <div className="flex items-center justify-between mt-4">
+                  <div>
+                    <p className="text-sm text-c-text">Font size</p>
+                    <p className="text-xs text-c-text3 mt-0.5">Controls the base text size throughout the app.</p>
+                  </div>
+                  <div className="flex gap-1">
+                    {FONT_SIZE_PRESETS.map(({ label, value }) => (
+                      <button
+                        key={value}
+                        onClick={() => setFontSize(value)}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          fontSize === value
+                            ? 'bg-c-accent text-white'
+                            : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Behavior section */}

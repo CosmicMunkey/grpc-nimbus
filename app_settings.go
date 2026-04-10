@@ -11,11 +11,12 @@ type UserSettings struct {
 	ConfirmDeletes bool              `json:"confirmDeletes"`
 	Theme          string            `json:"theme"`
 	CustomTheme    map[string]string `json:"customTheme,omitempty"`
+	FontSize       int               `json:"fontSize"`
 }
 
 // GetUserSettings returns the current user preference settings.
 func (a *App) GetUserSettings() UserSettings {
-	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus"}
+	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus", FontSize: 16}
 	if a.settings == nil {
 		return defaults
 	}
@@ -33,6 +34,9 @@ func (a *App) GetUserSettings() UserSettings {
 	if saved.CustomTheme != nil {
 		result.CustomTheme = saved.CustomTheme
 	}
+	if saved.FontSize != nil {
+		result.FontSize = *saved.FontSize
+	}
 	return result
 }
 
@@ -42,6 +46,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.ConfirmDeletes = &s.ConfirmDeletes
 		settings.Theme = s.Theme
 		settings.CustomTheme = s.CustomTheme
+		settings.FontSize = &s.FontSize
 	})
 }
 

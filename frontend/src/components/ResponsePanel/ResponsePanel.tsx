@@ -27,7 +27,7 @@ function StatusBadge({ code, text }: { code: number; text: string }) {
 }
 
 function MetadataSection({ title, entries }: { title: string; entries: MetadataEntry[] }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!entries?.length);
   if (!entries?.length) return null;
   return (
     <div className="border border-c-border rounded">
@@ -171,7 +171,7 @@ function HistoryPanel() {
                   {entry.response.statusCode} {entry.response.status} · {entry.response.durationMs}ms
                 </span>
               )}
-              <pre className="text-[10px] text-c-text2 truncate mt-0.5 font-mono">
+              <pre className="text-[10px] text-c-text2 truncate mt-0.5 font-mono" title={entry.requestJson ?? undefined}>
                 {entry.requestJson?.slice(0, 80)}
               </pre>
             </div>
@@ -316,8 +316,8 @@ export default function ResponsePanel() {
           </div>
         ) : tab === 'headers' ? (
           <div className="p-3 space-y-2 overflow-y-auto h-full">
-            <MetadataSection title="Response Headers" entries={response.headers} />
-            <MetadataSection title="Trailers" entries={response.trailers} />
+            <MetadataSection key={`headers-${response.durationMs}`} title="Response Headers" entries={response.headers} />
+            <MetadataSection key={`trailers-${response.durationMs}`} title="Trailers" entries={response.trailers} />
           </div>
         ) : (
           <HistoryPanel />

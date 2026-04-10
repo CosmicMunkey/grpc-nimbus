@@ -148,7 +148,7 @@ function CollectionsPanel() {
             <div key={col.id} className="px-2">
               <div className="flex items-center gap-1 text-xs text-c-text2 py-0.5 group">
                 <BookOpen size={11} />
-                <span className="font-medium truncate flex-1">{col.name}</span>
+                <span className="font-medium truncate flex-1" title={col.name}>{col.name}</span>
                 <CollectionMenu colId={col.id} colName={col.name} />
               </div>
               <div className="ml-3 space-y-0.5">
@@ -172,7 +172,7 @@ function CollectionsPanel() {
                         onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata, req.id, req.name)}
                         onDoubleClick={(e) => startRename(req.id, req.name, e)}
                         className="flex items-center gap-1 flex-1 min-w-0 text-left text-xs text-c-text px-2 py-0.5 truncate"
-                        title="Click to open · Double-click to rename"
+                        title={req.name}
                       >
                         <Zap size={10} className="text-yellow-400 shrink-0" />
                         <span className="truncate">{req.name}</span>

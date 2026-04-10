@@ -24,6 +24,7 @@ type AppSettings struct {
 	// Appearance
 	Theme       string            `json:"theme,omitempty"`       // "nimbus" | "dracula" | "light" | "custom"; nil → "nimbus"
 	CustomTheme map[string]string `json:"customTheme,omitempty"` // token→hex map when theme=="custom"
+	FontSize    *int              `json:"fontSize,omitempty"`    // body font size in px; nil → 14
 }
 
 // SettingsStore persists AppSettings as a single JSON file.

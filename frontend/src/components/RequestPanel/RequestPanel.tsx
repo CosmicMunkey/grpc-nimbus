@@ -278,7 +278,7 @@ export default function RequestPanel() {
     <div className="flex flex-col h-full min-h-0">
       {/* Method header bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-c-border bg-c-panel">
-        <span className="text-xs font-mono text-c-accent truncate flex-1">
+        <span className="text-xs font-mono text-c-accent truncate flex-1" title={selectedMethod.fullName}>
           {selectedMethod.fullName}
         </span>
         {/* Timeout */}

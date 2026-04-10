@@ -636,7 +636,7 @@ function FieldRow({
     <div className="flex items-center gap-2 py-0.5 min-h-[28px]">
       {!hideLabel && (
         <div className="flex items-center gap-1.5 w-40 shrink-0">
-          <span className="text-xs font-mono text-c-text truncate">{schema.name}</span>
+          <span className="text-xs font-mono text-c-text truncate" title={schema.name}>{schema.name}</span>
           <TypeBadge schema={schema} />
         </div>
       )}

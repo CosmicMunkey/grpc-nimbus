@@ -164,7 +164,7 @@ function EnvManager({ onClose }: EnvManagerProps) {
                 {/* Name + header count */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium truncate ${isActive ? 'text-green-400' : 'text-c-text'}`}>
+                    <span className={`text-xs font-medium truncate ${isActive ? 'text-green-400' : 'text-c-text'}`} title={env.name}>
                       {env.name}
                     </span>
                     {isActive && (
@@ -263,7 +263,7 @@ export default function EnvSelector() {
         className="flex items-center gap-1 px-2 py-1 bg-c-bg border border-c-border rounded text-xs text-c-text2 hover:border-c-text3 max-w-[160px]"
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-green-400' : 'bg-c-text3'}`} />
-        <span className="truncate flex-1">{active ? active.name : 'No Environment'}</span>
+        <span className="truncate flex-1" title={active ? active.name : 'No Environment'}>{active ? active.name : 'No Environment'}</span>
         <ChevronDown size={11} className="shrink-0" />
       </button>
 
@@ -287,7 +287,7 @@ export default function EnvSelector() {
               }`}
             >
               {activeEnvironmentId === env.id ? <Check size={11} /> : <span className="w-[11px]" />}
-              <span className="truncate">{env.name}</span>
+              <span className="truncate" title={env.name}>{env.name}</span>
             </button>
           ))}
 

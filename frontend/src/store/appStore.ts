@@ -14,7 +14,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
-import { ThemeId, ThemeTokens, applyTheme, resolveTheme } from '../themes';
+import { ThemeId, ThemeTokens, applyTheme, applyFontSize, resolveTheme } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -54,8 +54,8 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }>;
-          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }): Promise<void>;
+          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number }>;
+          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number }): Promise<void>;
         };
       };
     };
@@ -98,7 +98,7 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
   getUserSettings: () => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
@@ -233,6 +233,8 @@ interface AppState {
   theme: ThemeId;
   customTheme: Partial<ThemeTokens>;
   setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
+  fontSize: number;
+  setFontSize: (size: number) => void;
   loadUserSettings: () => Promise<void>;
 
   // Confirm dialog (used by all delete operations)
@@ -643,11 +645,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedRequests = col.requests.filter((r) => r.id !== requestId);
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
-    set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.savedRequestId === requestId ? { ...t, savedRequestId: null, savedRequestName: null } : t
-      ),
-    }));
+    const linkedTab = get().tabs.find((t) => t.savedRequestId === requestId);
+    if (linkedTab) get().closeTab(linkedTab.id);
   },
 
   renameRequest: async (tabId, newName) => {
@@ -688,8 +687,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const col = get().collections.find((c) => c.id === id);
     const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
     if (!confirmed) return;
+    const requestIds = new Set((col?.requests ?? []).map((r) => r.id));
     await api.deleteCollection(id);
     await get().loadCollections();
+    get().tabs
+      .filter((t) => t.savedRequestId && requestIds.has(t.savedRequestId))
+      .forEach((t) => get().closeTab(t.id));
   },
 
   exportCollection: async (id) => {
@@ -738,6 +741,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   confirmDeletes: true,
   theme: 'nimbus' as ThemeId,
   customTheme: {},
+  fontSize: 16,
   confirmDialog: null,
 
   loadUserSettings: async () => {
@@ -745,15 +749,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const s = await api.getUserSettings();
       const themeId = (s.theme as ThemeId) || 'nimbus';
       const custom = (s.customTheme as Partial<ThemeTokens>) ?? {};
-      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom });
+      const fontSize = s.fontSize ?? 14;
+      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom, fontSize });
       applyTheme(resolveTheme(themeId, custom));
+      applyFontSize(fontSize);
     } catch { /* use defaults */ }
   },
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
-    const { theme, customTheme } = get();
-    api.saveUserSettings({ confirmDeletes: v, theme, customTheme: customTheme as Record<string, string> }).catch(() => {});
+    const { theme, customTheme, fontSize } = get();
+    api.saveUserSettings({ confirmDeletes: v, theme, customTheme: customTheme as Record<string, string>, fontSize }).catch(() => {});
   },
 
   setTheme: (id, custom) => {
@@ -761,8 +767,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const customTheme = id === 'custom' ? (custom ?? {}) : {};
     set({ theme: id, customTheme });
     applyTheme(resolved);
-    const { confirmDeletes } = get();
-    api.saveUserSettings({ confirmDeletes, theme: id, customTheme: customTheme as Record<string, string> }).catch(() => {});
+    const { confirmDeletes, fontSize } = get();
+    api.saveUserSettings({ confirmDeletes, theme: id, customTheme: customTheme as Record<string, string>, fontSize }).catch(() => {});
+  },
+
+  setFontSize: (size) => {
+    set({ fontSize: size });
+    applyFontSize(size);
+    const { confirmDeletes, theme, customTheme } = get();
+    api.saveUserSettings({ confirmDeletes, theme, customTheme: customTheme as Record<string, string>, fontSize: size }).catch(() => {});
   },
 
   showConfirm: (message) => {
