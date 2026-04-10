@@ -81,9 +81,9 @@ export default function ProtosetLoader() {
   const hasLoaded = loadMode === 'reflection' || protosetPaths.length > 0;
 
   return (
-    <div className="p-3 border-b border-[#2d3748]">
+    <div className="p-3 border-b border-c-border">
       {/* Mode tabs */}
-      <div className="flex mb-2 rounded overflow-hidden border border-[#2d3748]">
+      <div className="flex mb-2 rounded overflow-hidden border border-c-border">
         {([
           { id: 'protoset',   label: '.protoset', icon: <FileCode size={10} /> },
           { id: 'proto',      label: '.proto',    icon: <FileType size={10} /> },
@@ -93,7 +93,7 @@ export default function ProtosetLoader() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 flex items-center justify-center gap-1 py-1 text-[10px] transition-colors ${
-              tab === t.id ? 'bg-[#e94560] text-white' : 'text-[#94a3b8] hover:bg-[#1e2132]'
+              tab === t.id ? 'bg-c-accent text-white' : 'text-c-text2 hover:bg-c-hover'
             }`}
           >
             {t.icon} {t.label}
@@ -105,7 +105,7 @@ export default function ProtosetLoader() {
         <button
           onClick={() => withLoading(loadViaReflection)}
           disabled={!isConnected || loading}
-          className="flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed border-[#2d3748] text-xs text-[#94a3b8] hover:border-[#e94560] hover:text-[#e2e8f0] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-accent hover:text-c-text disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           {loading ? 'Loading…' : isConnected ? 'Load from server reflection' : 'Connect first'}
@@ -117,13 +117,13 @@ export default function ProtosetLoader() {
           onDrop={handleDrop}
           onClick={handlePickFiles}
           className={`flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed cursor-pointer py-3 transition-colors ${
-            dragging ? 'border-[#e94560] bg-[#e94560]/10' : 'border-[#2d3748] hover:border-[#4a5568] hover:bg-[#1e2132]'
+            dragging ? 'border-c-accent bg-c-accent/10' : 'border-c-border hover:border-c-text3 hover:bg-c-hover'
           }`}
         >
           {loading
-            ? <RefreshCw size={16} className="text-[#94a3b8] animate-spin" />
-            : <Upload size={16} className="text-[#94a3b8]" />}
-          <span className="text-xs text-[#94a3b8]">
+            ? <RefreshCw size={16} className="text-c-text2 animate-spin" />
+            : <Upload size={16} className="text-c-text2" />}
+          <span className="text-xs text-c-text2">
             {loading ? 'Loading…' : `Drop ${tab === 'protoset' ? '.protoset' : '.proto'} files or click`}
           </span>
         </div>
@@ -131,17 +131,17 @@ export default function ProtosetLoader() {
 
       {error && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-[#16213e] border border-[#e94560]/50 rounded-lg p-5 w-[22rem] shadow-xl flex flex-col gap-4">
+          <div className="bg-c-panel border border-c-accent/50 rounded-lg p-5 w-[22rem] shadow-xl flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <AlertCircle size={18} className="text-[#e94560] shrink-0 mt-0.5" />
+              <AlertCircle size={18} className="text-c-accent shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-[#e2e8f0] mb-1">Failed to load</p>
-                <p className="text-xs text-[#94a3b8] leading-relaxed break-words">{error}</p>
+                <p className="text-sm font-semibold text-c-text mb-1">Failed to load</p>
+                <p className="text-xs text-c-text2 leading-relaxed break-words">{error}</p>
               </div>
             </div>
             <button
               onClick={() => setError(null)}
-              className="self-end px-4 py-1.5 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652]"
+              className="self-end px-4 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2"
             >
               Dismiss
             </button>
@@ -152,13 +152,13 @@ export default function ProtosetLoader() {
 
       {/* ── Loaded files panel ────────────────────────────────────────────── */}
       {hasLoaded && (
-        <div className="mt-2 border border-[#2d3748] rounded overflow-hidden">
+        <div className="mt-2 border border-c-border rounded overflow-hidden">
           {/* Header row — click to collapse/expand */}
           <div
-            className="flex items-center justify-between px-2 py-1 bg-[#1a1a2e] cursor-pointer select-none"
+            className="flex items-center justify-between px-2 py-1 bg-c-bg cursor-pointer select-none"
             onClick={() => setCollapsed((v) => !v)}
           >
-            <div className="flex items-center gap-1 text-[#4a5568]">
+            <div className="flex items-center gap-1 text-c-text3">
               {collapsed
                 ? <ChevronRight size={11} />
                 : <ChevronDown size={11} />}
@@ -172,7 +172,7 @@ export default function ProtosetLoader() {
                   onClick={handleReload}
                   disabled={reloading}
                   title="Re-read files from disk (picks up regenerated protosets)"
-                  className="flex items-center gap-1 text-[10px] text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#2d3748]"
+                  className="flex items-center gap-1 text-[10px] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
                 >
                   <RefreshCw size={10} className={reloading ? 'animate-spin' : ''} />
                   Reload
@@ -181,7 +181,7 @@ export default function ProtosetLoader() {
               <button
                 onClick={handleClear}
                 title="Clear all loaded files"
-                className="flex items-center gap-1 text-[10px] text-[#e94560]/70 hover:text-[#e94560] px-1.5 py-0.5 rounded hover:bg-[#2d3748]"
+                className="flex items-center gap-1 text-[10px] text-c-accent/70 hover:text-c-accent px-1.5 py-0.5 rounded hover:bg-c-border"
               >
                 <Trash2 size={10} />
                 Clear
@@ -190,17 +190,17 @@ export default function ProtosetLoader() {
           </div>
 
           {!collapsed && protosetPaths.length > 0 && (
-            <div className="divide-y divide-[#2d3748]">
+            <div className="divide-y divide-c-border">
               {protosetPaths.map((p) => {
                 const name = p.split(/[/\\]/).pop() ?? p;
                 return (
-                  <div key={p} className="flex items-center gap-1.5 px-2 py-1 group hover:bg-[#1e2132]">
-                    <FileCode size={10} className="shrink-0 text-[#e94560]" />
-                    <span className="flex-1 truncate text-[11px] text-[#94a3b8]" title={p}>{name}</span>
+                  <div key={p} className="flex items-center gap-1.5 px-2 py-1 group hover:bg-c-hover">
+                    <FileCode size={10} className="shrink-0 text-c-accent" />
+                    <span className="flex-1 truncate text-[11px] text-c-text2" title={p}>{name}</span>
                     <button
                       onClick={() => handleRemove(p)}
                       title="Remove this file"
-                      className="opacity-0 group-hover:opacity-100 text-[#4a5568] hover:text-[#e94560] transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 text-c-text3 hover:text-c-accent transition-opacity"
                     >
                       <X size={10} />
                     </button>

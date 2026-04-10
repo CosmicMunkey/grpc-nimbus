@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 	"time"
 
-	grpcinternal "grpc-nimbus/internal/grpc"
+	"grpc-nimbus/internal/rpc"
 )
 
 const appDirName = "grpc-nimbus"
 
 // SavedRequest is a named gRPC request stored in a collection.
 type SavedRequest struct {
-	ID          string                      `json:"id"`
-	Name        string                      `json:"name"`
-	CollectionID string                     `json:"collectionId"`
-	MethodPath  string                      `json:"methodPath"`
-	RequestJSON string                      `json:"requestJson"`
-	Metadata    []grpcinternal.MetadataEntry `json:"metadata"`
-	Connection  grpcinternal.ConnectionConfig `json:"connection"`
-	CreatedAt   time.Time                   `json:"createdAt"`
-	UpdatedAt   time.Time                   `json:"updatedAt"`
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	CollectionID string               `json:"collectionId"`
+	MethodPath   string               `json:"methodPath"`
+	RequestJSON  string               `json:"requestJson"`
+	Metadata     []rpc.MetadataEntry  `json:"metadata"`
+	Connection   rpc.ConnectionConfig `json:"connection"`
+	CreatedAt    time.Time            `json:"createdAt"`
+	UpdatedAt    time.Time            `json:"updatedAt"`
 }
 
 // Collection is a named group of saved requests.

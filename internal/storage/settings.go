@@ -20,6 +20,10 @@ type AppSettings struct {
 
 	// User preferences
 	ConfirmDeletes *bool `json:"confirmDeletes,omitempty"` // nil → default true
+
+	// Appearance
+	Theme       string            `json:"theme,omitempty"`       // "nimbus" | "dracula" | "light" | "custom"; nil → "nimbus"
+	CustomTheme map[string]string `json:"customTheme,omitempty"` // token→hex map when theme=="custom"
 }
 
 // SettingsStore persists AppSettings as a single JSON file.

@@ -7,17 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Bruno-like dark palette
-        'bg-primary':   '#1a1a2e',
-        'bg-secondary': '#16213e',
-        'bg-tertiary':  '#0f3460',
-        'accent':       '#e94560',
-        'accent-hover': '#c73652',
-        'text-primary': '#e2e8f0',
-        'text-muted':   '#94a3b8',
-        'border':       '#2d3748',
-        'surface':      '#1e2132',
-        'surface-hover':'#262b40',
+        // Theme tokens — all values are driven by CSS custom properties so
+        // the entire palette can be switched at runtime without a rebuild.
+        'c-bg':      'var(--c-bg)',
+        'c-panel':   'var(--c-panel)',
+        'c-input':   'var(--c-input)',
+        'c-hover':   'var(--c-hover)',
+        'c-border':  'var(--c-border)',
+        'c-text':    'var(--c-text)',
+        'c-text2':   'var(--c-text2)',
+        'c-text3':   'var(--c-text3)',
+        'c-accent':  'var(--c-accent)',
+        'c-accent2': 'var(--c-accent2)',
       },
     },
   },

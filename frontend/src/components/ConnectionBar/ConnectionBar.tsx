@@ -13,7 +13,7 @@ const TLS_OPTIONS = [
 type ConnStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
 
 const STATUS_DOT: Record<ConnStatus, { color: string; title: string; pulse?: boolean }> = {
-  disconnected:      { color: 'bg-[#4a5568]',  title: 'Not connected' },
+  disconnected:      { color: 'bg-c-text3',  title: 'Not connected' },
   idle:              { color: 'bg-yellow-400',  title: 'Connected (idle)', pulse: true },
   connecting:        { color: 'bg-yellow-400',  title: 'Connecting…',     pulse: true },
   ready:             { color: 'bg-green-400',   title: 'Connected and ready' },
@@ -58,16 +58,16 @@ export default function ConnectionBar() {
   }, [errorOpen]);
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-[#16213e] border-b border-[#2d3748]">
+    <div className="flex items-center gap-2 px-3 py-2 bg-c-panel border-b border-c-border">
       {/* Target input */}
-      <div className="flex items-center flex-1 min-w-0 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1 focus-within:border-[#e94560]">
+      <div className="flex items-center flex-1 min-w-0 bg-c-bg border border-c-border rounded px-2 py-1 focus-within:border-c-accent">
         <input
           type="text"
           value={connectionConfig.target}
           onChange={(e) => setConnectionConfig({ target: e.target.value })}
           onKeyDown={(e) => e.key === 'Enter' && !isConnected && connect()}
           placeholder="host:port"
-          className="flex-1 bg-transparent text-[#e2e8f0] placeholder-[#4a5568] text-sm outline-none font-mono"
+          className="flex-1 bg-transparent text-c-text placeholder-c-text3 text-sm outline-none font-mono"
           spellCheck={false}
         />
       </div>
@@ -76,19 +76,19 @@ export default function ConnectionBar() {
       <div className="relative">
         <button
           onClick={() => setTlsOpen((v) => !v)}
-          className="flex items-center gap-1 px-2 py-1 bg-[#1a1a2e] border border-[#2d3748] rounded text-xs text-[#94a3b8] hover:border-[#4a5568] whitespace-nowrap"
+          className="flex items-center gap-1 px-2 py-1 bg-c-bg border border-c-border rounded text-xs text-c-text2 hover:border-c-text3 whitespace-nowrap"
         >
           {connectionConfig.tls === 'none' ? <Unlock size={12} /> : <Lock size={12} />}
           {selectedTls.label}
           <ChevronDown size={12} />
         </button>
         {tlsOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-[#16213e] border border-[#2d3748] rounded shadow-lg min-w-[170px]">
+          <div className="absolute top-full left-0 mt-1 z-50 bg-c-panel border border-c-border rounded shadow-lg min-w-[170px]">
             {TLS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => { setConnectionConfig({ tls: opt.value }); setTlsOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#1e2132] ${connectionConfig.tls === opt.value ? 'text-[#e94560]' : 'text-[#e2e8f0]'}`}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-c-hover ${connectionConfig.tls === opt.value ? 'text-c-accent' : 'text-c-text'}`}
               >
                 {opt.label}
               </button>
@@ -101,7 +101,7 @@ export default function ConnectionBar() {
       <button
         onClick={() => isConnected ? disconnect() : connect()}
         className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-          isConnected ? 'bg-[#2d3748] text-[#e2e8f0] hover:bg-[#374151]' : 'bg-[#e94560] text-white hover:bg-[#c73652]'
+          isConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
         }`}
       >
         {isConnected ? <WifiOff size={13} /> : <Wifi size={13} />}
@@ -115,23 +115,23 @@ export default function ConnectionBar() {
           <>
             <button
               onClick={() => setErrorOpen((v) => !v)}
-              className="text-[#e94560] hover:text-red-400 focus:outline-none"
+              className="text-c-accent hover:text-red-400 focus:outline-none"
               title="Click to see error details"
             >
               <AlertTriangle size={14} />
             </button>
             {errorOpen && (
-              <div className="absolute top-full right-0 mt-2 z-50 w-96 max-w-[90vw] bg-[#16213e] border border-red-900/60 rounded shadow-xl">
+              <div className="absolute top-full right-0 mt-2 z-50 w-96 max-w-[90vw] bg-c-panel border border-red-900/60 rounded shadow-xl">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-red-900/40">
-                  <span className="text-xs font-medium text-[#e94560]">Connection Error</span>
+                  <span className="text-xs font-medium text-c-accent">Connection Error</span>
                   <button
                     onClick={() => setErrorOpen(false)}
-                    className="text-[#4a5568] hover:text-[#e2e8f0]"
+                    className="text-c-text3 hover:text-c-text"
                   >
                     <X size={12} />
                   </button>
                 </div>
-                <pre className="p-3 text-xs text-[#e94560] font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                <pre className="p-3 text-xs text-c-accent font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
                   {connectionError}
                 </pre>
               </div>
@@ -141,7 +141,7 @@ export default function ConnectionBar() {
       </div>
 
       {/* Divider */}
-      <div className="w-px h-5 bg-[#2d3748]" />
+      <div className="w-px h-5 bg-c-border" />
 
       {/* Environment selector */}
       <EnvSelector />

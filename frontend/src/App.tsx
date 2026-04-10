@@ -29,36 +29,36 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg w-80 shadow-2xl p-4">
+      <div className="bg-c-panel border border-c-border rounded-lg w-80 shadow-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-[#e2e8f0]">Export Collection</h3>
-          <button onClick={onClose} className="text-[#4a5568] hover:text-[#e2e8f0]">
+          <h3 className="text-sm font-semibold text-c-text">Export Collection</h3>
+          <button onClick={onClose} className="text-c-text3 hover:text-c-text">
             <X size={14} />
           </button>
         </div>
 
         {collections.length === 0 ? (
           <div>
-            <p className="text-xs text-[#94a3b8] mb-4">
+            <p className="text-xs text-c-text2 mb-4">
               No collections to export. Save some requests first using the <strong>Save</strong> button in the request panel.
             </p>
             <button
               onClick={onClose}
-              className="w-full px-3 py-1.5 text-xs bg-[#1a1a2e] border border-[#2d3748] text-[#94a3b8] rounded hover:bg-[#2d3748]"
+              className="w-full px-3 py-1.5 text-xs bg-c-bg border border-c-border text-c-text2 rounded hover:bg-c-border"
             >
               Close
             </button>
           </div>
         ) : (
           <div>
-            <p className="text-xs text-[#94a3b8] mb-3">
+            <p className="text-xs text-c-text2 mb-3">
               Protoset files are bundled into the export — recipients can import and use it without needing the original files.
             </p>
             <div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
               {collections.map((col) => (
                 <label
                   key={col.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-[#1e2132]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-c-hover"
                 >
                   <input
                     type="radio"
@@ -66,10 +66,10 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
                     value={col.id}
                     checked={selectedId === col.id}
                     onChange={() => setSelectedId(col.id)}
-                    className="accent-[#e94560]"
+                    className="accent-c-accent"
                   />
-                  <span className="text-xs text-[#e2e8f0] flex-1 truncate">{col.name}</span>
-                  <span className="text-[10px] text-[#4a5568] shrink-0">
+                  <span className="text-xs text-c-text flex-1 truncate">{col.name}</span>
+                  <span className="text-[10px] text-c-text3 shrink-0">
                     {col.requests?.length ?? 0} req{(col.requests?.length ?? 0) !== 1 ? 's' : ''}
                   </span>
                 </label>
@@ -78,14 +78,14 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="flex-1 px-3 py-1.5 text-xs bg-[#1a1a2e] border border-[#2d3748] text-[#94a3b8] rounded hover:bg-[#2d3748]"
+                className="flex-1 px-3 py-1.5 text-xs bg-c-bg border border-c-border text-c-text2 rounded hover:bg-c-border"
               >
                 Cancel
               </button>
               <button
                 onClick={handleExport}
                 disabled={!selectedId}
-                className="flex-1 px-3 py-1.5 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652] disabled:opacity-40"
+                className="flex-1 px-3 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
               >
                 Export…
               </button>
@@ -153,7 +153,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-[#1a1a2e] text-[#e2e8f0] overflow-hidden">
+    <div className="flex flex-col h-screen bg-c-bg text-c-text overflow-hidden">
       {/* Top: connection bar */}
       <ConnectionBar />
 
@@ -165,7 +165,7 @@ export default function App() {
         {/* Right: tab bar + request/response split pane */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           <TabBar />
-          <div className="flex flex-1 min-h-0 divide-x divide-[#2d3748]">
+          <div className="flex flex-1 min-h-0 divide-x divide-c-border">
             {/* Request panel (left half) */}
             <div className="flex flex-col flex-1 min-w-0">
               <RequestPanel />

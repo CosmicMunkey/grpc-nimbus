@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { Play, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
+import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -28,16 +28,16 @@ function MetadataTable() {
       {/* Environment headers (read-only) */}
       {envHeaders.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">
+          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">
             From environment · {activeEnv?.name}
           </span>
           <div className="space-y-1">
             {envHeaders.map((h, i) => (
               <div key={i} className="flex gap-1 opacity-60">
-                <div className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e94560] font-mono truncate">
+                <div className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-accent font-mono truncate">
                   {h.key}
                 </div>
-                <div className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#94a3b8] font-mono truncate">
+                <div className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text2 font-mono truncate">
                   {h.value}
                 </div>
                 <div className="w-5" /> {/* spacer to align with editable rows */}
@@ -50,17 +50,17 @@ function MetadataTable() {
       {/* Per-request metadata (editable) */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-[#4a5568] font-medium uppercase tracking-wide">Request metadata</span>
+          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">Request metadata</span>
           <button
             onClick={addRow}
-            className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+            className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-hover"
           >
             <Plus size={11} /> Add
           </button>
         </div>
 
         {requestMetadata.length === 0 ? (
-          <p className="text-xs text-[#4a5568]">No request metadata — click Add to set entries</p>
+          <p className="text-xs text-c-text3">No request metadata — click Add to set entries</p>
         ) : (
           <div className="space-y-1">
             {requestMetadata.map((row, i) => (
@@ -69,17 +69,17 @@ function MetadataTable() {
                   value={row.key}
                   onChange={(e) => updateRow(i, 'key', e.target.value)}
                   placeholder="key"
-                  className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+                  className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
                 />
                 <input
                   value={row.value}
                   onChange={(e) => updateRow(i, 'value', e.target.value)}
                   placeholder="value"
-                  className="flex-1 bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono"
+                  className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
                 />
                 <button
                   onClick={() => removeRow(i)}
-                  className="text-[#4a5568] hover:text-[#e94560] p-1"
+                  className="text-c-text3 hover:text-c-accent p-1"
                 >
                   <X size={11} />
                 </button>
@@ -108,8 +108,8 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#16213e] border border-[#2d3748] rounded-lg p-4 w-72 shadow-xl">
-        <h3 className="text-sm font-semibold text-[#e2e8f0] mb-3">Save Request</h3>
+      <div className="bg-c-panel border border-c-border rounded-lg p-4 w-72 shadow-xl">
+        <h3 className="text-sm font-semibold text-c-text mb-3">Save Request</h3>
         <div className="space-y-2">
           <input
             autoFocus
@@ -117,13 +117,13 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             placeholder="Request name"
-            className="w-full bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
+            className="w-full bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
           />
           {collections.length > 0 ? (
             <select
               value={colId}
               onChange={(e) => setColId(e.target.value)}
-              className="w-full bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] outline-none focus:border-[#e94560]"
+              className="w-full bg-c-bg border border-c-border rounded pl-2 pr-6 py-1.5 text-xs text-c-text outline-none focus:border-c-accent"
             >
               {collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               <option value="">+ New collection…</option>
@@ -134,21 +134,21 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
               value={newColName}
               onChange={(e) => setNewColName(e.target.value)}
               placeholder="New collection name"
-              className="w-full bg-[#1a1a2e] border border-[#2d3748] rounded px-2 py-1.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
+              className="w-full bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
             />
           )}
         </div>
         <div className="flex gap-2 mt-4">
           <button
             onClick={onClose}
-            className="flex-1 py-1.5 text-xs text-[#94a3b8] border border-[#2d3748] rounded hover:bg-[#1e2132]"
+            className="flex-1 py-1.5 text-xs text-c-text2 border border-c-border rounded hover:bg-c-hover"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!name}
-            className="flex-1 py-1.5 text-xs bg-[#e94560] text-white rounded hover:bg-[#c73652] disabled:opacity-40"
+            className="flex-1 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
           >
             Save
           </button>
@@ -226,26 +226,26 @@ function GrpcurlTab() {
   return (
     <div className="h-full flex flex-col p-3 gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-[#4a5568] font-mono">grpcurl command</span>
+        <span className="text-[10px] text-c-text3 font-mono">grpcurl command</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-[#2d3748] text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2132]"
+          className="flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-c-border text-c-text2 hover:text-c-text hover:bg-c-hover"
         >
           {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
-      <pre className="flex-1 overflow-auto bg-[#1a1a2e] border border-[#2d3748] rounded p-3 text-xs font-mono text-[#e2e8f0] leading-relaxed whitespace-pre select-all">
+      <pre className="flex-1 overflow-auto bg-c-bg border border-c-border rounded p-3 text-xs font-mono text-c-text leading-relaxed whitespace-pre select-all">
         {command}
       </pre>
       {loadMode === 'proto' && (
-        <p className="text-[10px] text-[#4a5568]">
-          Note: Proto file import paths may need <span className="font-mono text-[#94a3b8]">-import-path</span> and <span className="font-mono text-[#94a3b8]">-proto</span> flags added manually.
+        <p className="text-[10px] text-c-text3">
+          Note: Proto file import paths may need <span className="font-mono text-c-text2">-import-path</span> and <span className="font-mono text-c-text2">-proto</span> flags added manually.
         </p>
       )}
       {loadMode === 'reflection' && (
-        <p className="text-[10px] text-[#4a5568]">
-          Using server reflection — no <span className="font-mono text-[#94a3b8]">-protoset</span> flag needed.
+        <p className="text-[10px] text-c-text3">
+          Using server reflection — no <span className="font-mono text-c-text2">-protoset</span> flag needed.
         </p>
       )}
     </div>
@@ -261,14 +261,14 @@ export default function RequestPanel() {
     savedRequestId,
     savedRequestName,
   } = useActiveTab();
-  const { setRequestJson, setTimeoutSeconds, invoke, updateSavedRequest } = useAppStore();
+  const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest } = useAppStore();
 
   const [tab, setTab] = useState<'form' | 'body' | 'metadata' | 'grpcurl'>('form');
   const [showSave, setShowSave] = useState(false);
 
   if (!selectedMethod) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[#4a5568] text-sm select-none">
+      <div className="flex-1 flex items-center justify-center text-c-text3 text-sm select-none">
         Select a method from the sidebar
       </div>
     );
@@ -277,12 +277,12 @@ export default function RequestPanel() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Method header bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#2d3748] bg-[#16213e]">
-        <span className="text-xs font-mono text-[#e94560] truncate flex-1">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-c-border bg-c-panel">
+        <span className="text-xs font-mono text-c-accent truncate flex-1">
           {selectedMethod.fullName}
         </span>
         {/* Timeout */}
-        <div className="flex items-center gap-1 text-xs text-[#94a3b8]">
+        <div className="flex items-center gap-1 text-xs text-c-text2">
           <span>Timeout</span>
           <input
             type="number"
@@ -291,7 +291,7 @@ export default function RequestPanel() {
             value={timeoutSeconds || ''}
             onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
             placeholder="∞"
-            className="w-12 bg-[#1a1a2e] border border-[#2d3748] rounded px-1 py-0.5 text-xs text-center text-[#e2e8f0] outline-none focus:border-[#e94560]"
+            className="w-16 bg-c-bg border border-c-border rounded pl-1.5 pr-0.5 py-0.5 text-xs text-c-text outline-none focus:border-c-accent"
           />
           <span>s</span>
         </div>
@@ -301,14 +301,14 @@ export default function RequestPanel() {
             <button
               onClick={() => updateSavedRequest()}
               title={`Save over "${savedRequestName}"`}
-              className="flex items-center gap-1 text-xs px-2 py-1 border border-[#2d3748] rounded text-[#94a3b8] hover:bg-[#1e2132] hover:text-[#e2e8f0]"
+              className="flex items-center gap-1 text-xs px-2 py-1 border border-c-border rounded text-c-text2 hover:bg-c-hover hover:text-c-text"
             >
               <Save size={12} /> Save
             </button>
             <button
               onClick={() => setShowSave(true)}
               title="Save as a new request…"
-              className="flex items-center text-xs px-1.5 py-1 border border-[#2d3748] rounded-r text-[#4a5568] hover:bg-[#1e2132] hover:text-[#94a3b8] border-l-0 -ml-px"
+              className="flex items-center text-xs px-1.5 py-1 border border-c-border rounded-r text-c-text3 hover:bg-c-hover hover:text-c-text2 border-l-0 -ml-px"
             >
               <Plus size={11} />
             </button>
@@ -316,28 +316,31 @@ export default function RequestPanel() {
         ) : (
           <button
             onClick={() => setShowSave(true)}
-            className="flex items-center gap-1 text-xs px-2 py-1 border border-[#2d3748] rounded text-[#94a3b8] hover:bg-[#1e2132] hover:text-[#e2e8f0]"
+            className="flex items-center gap-1 text-xs px-2 py-1 border border-c-border rounded text-c-text2 hover:bg-c-hover hover:text-c-text"
           >
             <Save size={12} /> Save
           </button>
         )}
-        {/* Send */}
+        {/* Send / Cancel */}
         <button
-          onClick={invoke}
-          disabled={isInvoking}
-          className="flex items-center gap-1 text-xs px-3 py-1 bg-[#e94560] text-white rounded hover:bg-[#c73652] disabled:opacity-50 font-medium"
+          onClick={isInvoking ? cancelInvoke : invoke}
+          className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${
+            isInvoking
+              ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-white'
+              : 'bg-c-accent text-white hover:bg-c-accent2'
+          }`}
         >
-          <Play size={12} />
-          {isInvoking ? 'Sending…' : 'Send'}
+          {isInvoking ? <Square size={11} /> : <Play size={12} />}
+          {isInvoking ? 'Cancel' : 'Send'}
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[#2d3748]">
+      <div className="flex border-b border-c-border">
         <button
           onClick={() => setTab('form')}
           className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
-            tab === 'form' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+            tab === 'form' ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'
           }`}
         >
           <LayoutList size={11} /> Form
@@ -345,7 +348,7 @@ export default function RequestPanel() {
         <button
           onClick={() => setTab('body')}
           className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
-            tab === 'body' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+            tab === 'body' ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'
           }`}
         >
           <Code size={11} /> JSON
@@ -353,7 +356,7 @@ export default function RequestPanel() {
         <button
           onClick={() => setTab('metadata')}
           className={`px-4 py-1.5 text-xs capitalize transition-colors border-b-2 ${
-            tab === 'metadata' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+            tab === 'metadata' ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'
           }`}
         >
           Metadata
@@ -361,7 +364,7 @@ export default function RequestPanel() {
         <button
           onClick={() => setTab('grpcurl')}
           className={`flex items-center gap-1 px-4 py-1.5 text-xs transition-colors border-b-2 ${
-            tab === 'grpcurl' ? 'border-[#e94560] text-[#e2e8f0]' : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'
+            tab === 'grpcurl' ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'
           }`}
         >
           <Terminal size={11} /> grpcurl

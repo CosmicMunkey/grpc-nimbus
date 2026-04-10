@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"context"
@@ -16,9 +16,9 @@ import (
 type TLSMode string
 
 const (
-	TLSModeNone           TLSMode = "none"           // plaintext (h2c)
-	TLSModeSystem         TLSMode = "system"         // TLS with system cert pool
-	TLSModeInsecureSkip   TLSMode = "insecure_skip"  // TLS, skip cert verification
+	TLSModeNone         TLSMode = "none"          // plaintext (h2c)
+	TLSModeSystem       TLSMode = "system"         // TLS with system cert pool
+	TLSModeInsecureSkip TLSMode = "insecure_skip"  // TLS, skip cert verification
 )
 
 // ConnectionConfig holds the parameters to connect to a gRPC server.

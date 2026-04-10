@@ -14,6 +14,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
+import { ThemeId, ThemeTokens, applyTheme, resolveTheme } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -29,6 +30,7 @@ declare global {
           GetServices(): Promise<ServiceInfo[]>;
           InvokeUnary(req: InvokeRequest): Promise<InvokeResponse>;
           InvokeStream(req: InvokeRequest): Promise<void>;
+          CancelUnary(): Promise<void>;
           CancelStream(): Promise<void>;
           ListCollections(): Promise<Collection[]>;
           SaveCollection(col: Collection): Promise<void>;
@@ -52,8 +54,8 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean }>;
-          SaveUserSettings(s: { confirmDeletes: boolean }): Promise<void>;
+          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }>;
+          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }): Promise<void>;
         };
       };
     };
@@ -70,6 +72,7 @@ export const api = {
   getServices: () => window.go.main.App.GetServices(),
   invokeUnary: (req: InvokeRequest) => window.go.main.App.InvokeUnary(req),
   invokeStream: (req: InvokeRequest) => window.go.main.App.InvokeStream(req),
+  cancelUnary: () => window.go.main.App.CancelUnary(),
   cancelStream: () => window.go.main.App.CancelStream(),
   listCollections: () => window.go.main.App.ListCollections(),
   saveCollection: (col: Collection) => window.go.main.App.SaveCollection(col),
@@ -94,8 +97,8 @@ export const api = {
   removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
-  getUserSettings: (): Promise<{ confirmDeletes: boolean }> => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  getUserSettings: () => window.go.main.App.GetUserSettings(),
+  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string> }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
@@ -196,6 +199,7 @@ interface AppState {
   setTimeoutSeconds: (t: number) => void;
   loadRequestSchema: (methodPath: string) => Promise<void>;
   invoke: () => Promise<void>;
+  cancelInvoke: () => void;
   appendStreamEvent: (evt: StreamEvent) => void;
   clearStream: () => void;
   cancelStream: () => void;
@@ -226,6 +230,9 @@ interface AppState {
   // Settings
   confirmDeletes: boolean;
   setConfirmDeletes: (v: boolean) => void;
+  theme: ThemeId;
+  customTheme: Partial<ThemeTokens>;
+  setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
   loadUserSettings: () => Promise<void>;
 
   // Confirm dialog (used by all delete operations)
@@ -530,6 +537,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
+  cancelInvoke: () => {
+    const { tabs, activeTabId, streamingTabId } = get();
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (tab?.isInvoking) {
+      api.cancelUnary().catch(() => {});
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { isInvoking: false }) }));
+    } else if (streamingTabId) {
+      api.cancelStream().catch(() => {});
+      const id = streamingTabId;
+      set((s) => ({
+        tabs: patchTab(s.tabs, id, { isStreaming: false }),
+        streamingTabId: null,
+      }));
+    }
+  },
+
   loadHistory: async (methodPath) => {
     const { activeTabId } = get();
     try {
@@ -713,18 +736,33 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Settings ─────────────────────────────────────────────────────────────
   confirmDeletes: true,
+  theme: 'nimbus' as ThemeId,
+  customTheme: {},
   confirmDialog: null,
 
   loadUserSettings: async () => {
     try {
       const s = await api.getUserSettings();
-      set({ confirmDeletes: s.confirmDeletes });
+      const themeId = (s.theme as ThemeId) || 'nimbus';
+      const custom = (s.customTheme as Partial<ThemeTokens>) ?? {};
+      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom });
+      applyTheme(resolveTheme(themeId, custom));
     } catch { /* use defaults */ }
   },
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
-    api.saveUserSettings({ confirmDeletes: v }).catch(() => {});
+    const { theme, customTheme } = get();
+    api.saveUserSettings({ confirmDeletes: v, theme, customTheme: customTheme as Record<string, string> }).catch(() => {});
+  },
+
+  setTheme: (id, custom) => {
+    const resolved = resolveTheme(id, custom);
+    const customTheme = id === 'custom' ? (custom ?? {}) : {};
+    set({ theme: id, customTheme });
+    applyTheme(resolved);
+    const { confirmDeletes } = get();
+    api.saveUserSettings({ confirmDeletes, theme: id, customTheme: customTheme as Record<string, string> }).catch(() => {});
   },
 
   showConfirm: (message) => {
