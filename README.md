@@ -1,5 +1,7 @@
 # GRPC Nimbus
 
+> ⚠️ **This repository is not currently accepting pull requests.** Feel free to open an issue for bug reports or feature suggestions.
+
 A cross-platform desktop gRPC client with first-class support for **protoset files**, built on [Wails v2](https://wails.io) (Go + React). Ships as a single native binary for macOS, Windows, and Linux.
 
 ---
@@ -58,7 +60,9 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - Switch environments from the connection bar; the active environment is highlighted in green
 
 ### Settings
-- **Confirm before delete** — a toggle (gear icon in the connection bar) controls whether a confirmation dialog appears when deleting requests, collections, or environments; defaults to on
+- **Theme** — choose from a set of built-in color themes (accessible via the gear icon in the connection bar)
+- **Font size** — Small (14 px), Medium (16 px), or Large (18 px); scales all UI text proportionally
+- **Confirm before delete** — toggle whether a confirmation dialog appears when deleting requests, collections, or environments; defaults to on
 
 ### Connection status
 - The dot next to the Connect button reflects real gRPC connectivity state: gray = disconnected, yellow = connecting/idle, green = ready, red = transient failure
@@ -74,7 +78,23 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 
 ---
 
-## Building from source
+## macOS: allowing the app to run
+
+macOS Gatekeeper will block GRPC Nimbus from launching because the app is not notarized with an Apple Developer certificate. You'll see a message like *"GRPC Nimbus.app cannot be opened because the developer cannot be verified."*
+
+To clear the quarantine flag, run this once in Terminal after installing the app:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/GRPC Nimbus.app"
+```
+
+Then double-click the app as normal. You only need to do this once per installation.
+
+> **Why does this happen?** Apple's Gatekeeper quarantines any app downloaded from the internet that isn't signed and notarized through Apple's paid Developer Program. This is a distribution-time restriction, not a security flaw in the app itself. The command above removes that quarantine attribute.
+
+---
+
+
 
 ### Prerequisites
 | Tool | Version |
@@ -84,13 +104,13 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 | Wails CLI | v2.x (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`) |
 
 On macOS you also need Xcode Command Line Tools (`xcode-select --install`).  
-On Linux you need `libgtk-3-dev`, `libwebkit2gtk-4.0-dev`, and `pkg-config`.  
+On Linux you need `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (Ubuntu 22.04 / Debian 11 or earlier), and `pkg-config`.  
 On Windows you need the WebView2 runtime (ships with Windows 11; downloadable for Windows 10).
 
 ### Build
 
 ```bash
-git clone https://github.com/your-org/grpc-nimbus
+git clone https://github.com/CosmicMunkey/grpc-nimbus
 cd grpc-nimbus
 wails build
 ```
@@ -139,21 +159,31 @@ Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify
 ```
 grpc-nimbus/
 ├── main.go                   # Wails entry point, app menu
-├── app.go                    # All backend methods bound to the frontend
+├── app.go                    # App struct, startup/shutdown
+├── app_invoke.go             # Invoke / streaming backend methods
+├── app_proto.go              # Protoset / proto / reflection loading
+├── app_collections.go        # Collection CRUD backend methods
+├── app_environments.go       # Environment CRUD backend methods
+├── app_history.go            # Request history backend methods
+├── app_settings.go           # Settings load/save backend methods
+├── app_ui.go                 # Dialog / file-picker helpers
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx           # Root layout, menu event listeners
 │   │   ├── components/
 │   │   │   ├── ConnectionBar/    # Host, TLS, environment selector
+│   │   │   ├── Environments/     # Environment manager + selector
 │   │   │   ├── ProtosetLoader/   # Protoset / proto / reflection loader
 │   │   │   ├── RequestBuilder/   # FormBuilder (type-aware field editors)
 │   │   │   ├── RequestPanel/     # Form + JSON + Metadata tabs, Send button
 │   │   │   ├── ResponsePanel/    # Response viewer, streaming log, history
-│   │   │   └── Sidebar/          # Service tree, collections panel
+│   │   │   ├── Settings/         # Theme, font size, preferences panel
+│   │   │   ├── Sidebar/          # Service tree, collections panel
+│   │   │   └── TabBar/           # Tab strip
 │   │   └── store/
 │   │       └── appStore.ts       # Zustand store, all frontend state
 └── internal/
-    ├── grpc/
+    ├── rpc/
     │   ├── protoset.go       # Descriptor loading (.protoset, .proto, reflection)
     │   ├── invoker.go        # Unary and streaming invocation
     │   ├── client.go         # gRPC connection management
