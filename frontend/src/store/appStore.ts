@@ -40,6 +40,7 @@ declare global {
           ImportCollection(srcPath: string): Promise<Collection>;
           PickProtosetFiles(): Promise<string[]>;
           PickProtoFiles(): Promise<string[]>;
+          PickDirectory(): Promise<string>;
           PickImportFile(): Promise<string>;
           PickExportPath(defaultName: string): Promise<string>;
           ListEnvironments(): Promise<Environment[]>;

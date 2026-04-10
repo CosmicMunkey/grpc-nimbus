@@ -254,6 +254,7 @@ function GrpcurlTab() {
 
 export default function RequestPanel() {
   const {
+    id: tabId,
     selectedMethod,
     requestJson,
     timeoutSeconds,
@@ -374,7 +375,7 @@ export default function RequestPanel() {
       {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {tab === 'form' ? (
-          <FormBuilder />
+          <FormBuilder key={tabId} />
         ) : tab === 'body' ? (
           <div className="h-full">
             <CodeMirror

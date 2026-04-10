@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
-import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle, FolderOpen } from 'lucide-react';
 
 type LoadMode = 'protoset' | 'proto' | 'reflection';
 
@@ -18,6 +18,8 @@ export default function ProtosetLoader() {
   const [loading, setLoading] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  // Extra import paths the user has added for multi-root proto setups.
+  const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
 
   const withLoading = async (fn: () => Promise<void>) => {
     setError(null);
@@ -35,7 +37,7 @@ export default function ProtosetLoader() {
     } else {
       withLoading(async () => {
         const paths = await window.go.main.App.PickProtoFiles();
-        if (paths?.length) await loadProtoFiles([], paths);
+        if (paths?.length) await loadProtoFiles(extraImportPaths, paths);
       });
     }
   };
@@ -48,7 +50,18 @@ export default function ProtosetLoader() {
     );
     if (!paths.length) return;
     if (tab === 'protoset') withLoading(() => loadProtosets(paths));
-    else withLoading(() => loadProtoFiles([], paths));
+    else withLoading(() => loadProtoFiles(extraImportPaths, paths));
+  };
+
+  const handleAddImportPath = async () => {
+    const dir = await window.go.main.App.PickDirectory();
+    if (dir && !extraImportPaths.includes(dir)) {
+      setExtraImportPaths((prev) => [...prev, dir]);
+    }
+  };
+
+  const handleRemoveImportPath = (dir: string) => {
+    setExtraImportPaths((prev) => prev.filter((p) => p !== dir));
   };
 
   const handleReload = async () => {
@@ -111,22 +124,63 @@ export default function ProtosetLoader() {
           {loading ? 'Loading…' : isConnected ? 'Load from server reflection' : 'Connect first'}
         </button>
       ) : (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={handlePickFiles}
-          className={`flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed cursor-pointer py-3 transition-colors ${
-            dragging ? 'border-c-accent bg-c-accent/10' : 'border-c-border hover:border-c-text3 hover:bg-c-hover'
-          }`}
-        >
-          {loading
-            ? <RefreshCw size={16} className="text-c-text2 animate-spin" />
-            : <Upload size={16} className="text-c-text2" />}
-          <span className="text-xs text-c-text2">
-            {loading ? 'Loading…' : `Drop ${tab === 'protoset' ? '.protoset' : '.proto'} files or click`}
-          </span>
-        </div>
+        <>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={handlePickFiles}
+            className={`flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed cursor-pointer py-3 transition-colors ${
+              dragging ? 'border-c-accent bg-c-accent/10' : 'border-c-border hover:border-c-text3 hover:bg-c-hover'
+            }`}
+          >
+            {loading
+              ? <RefreshCw size={16} className="text-c-text2 animate-spin" />
+              : <Upload size={16} className="text-c-text2" />}
+            <span className="text-xs text-c-text2">
+              {loading ? 'Loading…' : `Drop ${tab === 'protoset' ? '.protoset' : '.proto'} files or click`}
+            </span>
+          </div>
+
+          {/* Import paths — only shown on the .proto tab */}
+          {tab === 'proto' && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-c-text3 uppercase tracking-wide font-medium">Import paths</span>
+                <button
+                  onClick={handleAddImportPath}
+                  title="Add an import path directory"
+                  className="flex items-center gap-1 text-[10px] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
+                >
+                  <FolderOpen size={10} /> Add…
+                </button>
+              </div>
+              {extraImportPaths.length === 0 ? (
+                <p className="text-[10px] text-c-text3 leading-relaxed">
+                  Parent dirs are used automatically. Add extras for multi-root projects.
+                </p>
+              ) : (
+                <div className="space-y-0.5">
+                  {extraImportPaths.map((dir) => {
+                    const name = dir.split(/[/\\]/).pop() ?? dir;
+                    return (
+                      <div key={dir} className="flex items-center gap-1.5 group">
+                        <FolderOpen size={10} className="shrink-0 text-c-text3" />
+                        <span className="flex-1 truncate text-[10px] text-c-text2" title={dir}>{name}</span>
+                        <button
+                          onClick={() => handleRemoveImportPath(dir)}
+                          className="opacity-0 group-hover:opacity-100 text-c-text3 hover:text-c-accent transition-opacity"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {error && createPortal(

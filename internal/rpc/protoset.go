@@ -25,17 +25,19 @@ type MethodInfo struct {
 
 // ServiceInfo groups methods under a service.
 type ServiceInfo struct {
-	Name       string       `json:"name"`
-	Methods    []MethodInfo `json:"methods"`
-	SourceFile string       `json:"sourceFile,omitempty"` // set when loaded from a protoset file
+	Name         string       `json:"name"`
+	Methods      []MethodInfo `json:"methods"`
+	SourceFile   string       `json:"sourceFile,omitempty"`   // set when loaded from a protoset file
+	Unresolvable bool         `json:"unresolvable,omitempty"` // true when server reflection listed the service but could not supply its descriptor
 }
 
 // ProtosetDescriptor holds the parsed descriptor source from any loading strategy.
 type ProtosetDescriptor struct {
-	source     grpcurl.DescriptorSource
-	methods    []*desc.MethodDescriptor
-	svcFiles   map[string]string   // service full name → source file path (protoset only)
-	reflClient *grpcreflect.Client // non-nil when loaded via server reflection
+	source       grpcurl.DescriptorSource
+	methods      []*desc.MethodDescriptor
+	svcFiles     map[string]string   // service full name → source file path (protoset only)
+	reflClient   *grpcreflect.Client // non-nil when loaded via server reflection
+	unresolvable []string            // service names that reflection listed but could not supply descriptors for
 }
 
 // LoadProtosets parses the given protoset (FileDescriptorSet) file paths.
@@ -86,6 +88,10 @@ func LoadProtoFiles(importPaths, protoFiles []string) (*ProtosetDescriptor, erro
 // LoadViaReflection queries server reflection on the given connection.
 func LoadViaReflection(ctx context.Context, cc *grpc.ClientConn) (*ProtosetDescriptor, error) {
 	refClient := grpcreflect.NewClientAuto(ctx, cc)
+	// AllowMissingFileDescriptors lets us build descriptors even when
+	// some imported proto files are absent — this happens when a server's
+	// reflection service omits dependency descriptors for option-only files.
+	refClient.AllowMissingFileDescriptors()
 	src := grpcurl.DescriptorSourceFromServer(ctx, refClient)
 	pd, err := newDescriptor(src, refClient)
 	if err != nil {
@@ -151,7 +157,7 @@ func newDescriptor(src grpcurl.DescriptorSource, reflClient *grpcreflect.Client)
 		fmt.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)\n", svcName)
 	}
 
-	return &ProtosetDescriptor{source: src, methods: methods, reflClient: reflClient}, nil
+	return &ProtosetDescriptor{source: src, methods: methods, reflClient: reflClient, unresolvable: pending}, nil
 }
 
 // Services returns the service/method tree suitable for the frontend.
@@ -166,19 +172,19 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 			order = append(order, svcName)
 		}
 		mi := MethodInfo{
-			FullName:       svcName + "/" + m.GetName(),
-			ServiceName:    svcName,
-			MethodName:     m.GetName(),
+			FullName:        svcName + "/" + m.GetName(),
+			ServiceName:     svcName,
+			MethodName:      m.GetName(),
 			ClientStreaming: m.IsClientStreaming(),
 			ServerStreaming: m.IsServerStreaming(),
-			InputType:      m.GetInputType().GetFullyQualifiedName(),
-			OutputType:     m.GetOutputType().GetFullyQualifiedName(),
+			InputType:       m.GetInputType().GetFullyQualifiedName(),
+			OutputType:      m.GetOutputType().GetFullyQualifiedName(),
 		}
 		byService[svcName].Methods = append(byService[svcName].Methods, mi)
 	}
 	sort.Strings(order)
 
-	result := make([]ServiceInfo, 0, len(order))
+	result := make([]ServiceInfo, 0, len(order)+len(pd.unresolvable))
 	for _, name := range order {
 		svc := *byService[name]
 		if pd.svcFiles != nil {
@@ -186,6 +192,15 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 		}
 		result = append(result, svc)
 	}
+
+	// Append services the reflection server listed but could not supply descriptors for.
+	// These are shown in the UI so the user knows to provide a protoset file.
+	unresolvedSorted := append([]string(nil), pd.unresolvable...)
+	sort.Strings(unresolvedSorted)
+	for _, name := range unresolvedSorted {
+		result = append(result, ServiceInfo{Name: name, Unresolvable: true})
+	}
+
 	return result
 }
 

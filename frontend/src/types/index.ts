@@ -27,6 +27,7 @@ export interface ServiceInfo {
   name: string;
   methods: MethodInfo[];
   sourceFile?: string;
+  unresolvable?: boolean;
 }
 
 export interface InvokeRequest {

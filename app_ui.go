@@ -4,6 +4,18 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// PickDirectory opens a native folder picker dialog.
+// Returns the selected directory path, or empty string if cancelled.
+func (a *App) PickDirectory() (string, error) {
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Import Path Directory",
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // PickProtosetFiles opens a native multi-file dialog filtered for .protoset files.
 // Returns selected file paths (empty slice if cancelled).
 func (a *App) PickProtosetFiles() ([]string, error) {

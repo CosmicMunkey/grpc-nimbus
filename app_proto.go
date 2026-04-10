@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"grpc-nimbus/internal/rpc"
 	"grpc-nimbus/internal/storage"
@@ -42,7 +43,21 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 }
 
 // LoadProtoFiles parses .proto source files with optional import paths.
+// If importPaths is empty and the file paths are absolute, the parent directories
+// of the proto files are used as import paths automatically.
 func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInfo, error) {
+	if len(importPaths) == 0 {
+		seen := map[string]bool{}
+		for _, f := range protoFiles {
+			if filepath.IsAbs(f) {
+				dir := filepath.Dir(f)
+				if !seen[dir] {
+					seen[dir] = true
+					importPaths = append(importPaths, dir)
+				}
+			}
+		}
+	}
 	pd, err := rpc.LoadProtoFiles(importPaths, protoFiles)
 	if err != nil {
 		return nil, err

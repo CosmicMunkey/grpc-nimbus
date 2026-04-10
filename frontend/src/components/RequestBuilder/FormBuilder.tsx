@@ -651,47 +651,59 @@ export default function FormBuilder() {
   const { requestSchema, requestJson } = useActiveTab();
   const { setRequestJson } = useAppStore();
 
-  // Initialize eagerly from requestJson so that the form→JSON sync effect
-  // (which fires on every mount) sees the correct formValue instead of the
-  // empty {} default and incorrectly writes '{}' back to the store.
-  const [formValue, setFormValue] = useState<FormVal>(() =>
-    requestSchema.length > 0 ? initForm(requestSchema, fromJson(requestJson)) : {}
-  );
+  const [formValue, setFormValue] = useState<FormVal>({});
   const lastFormJson = useRef<string>('{}');
+  // Tracks the schema seen in the previous effect run to detect schema-load events.
+  const prevSchemaRef = useRef<typeof requestSchema>([]);
 
-  // Re-initialize when schema changes (method switch)
+  // Unified form-initialization effect. Fires when the schema or requestJson
+  // changes and keeps the form in sync with the store.
   useEffect(() => {
+    const prevSchema = prevSchemaRef.current;
+    prevSchemaRef.current = requestSchema;
+
     if (requestSchema.length === 0) {
+      // Schema cleared (method switch / disconnect) — reset form state.
       setFormValue({});
       lastFormJson.current = '{}';
       return;
     }
-    const parsed = fromJson(requestJson);
-    const init = initForm(requestSchema, parsed);
-    setFormValue(init);
-    const json = toJson(init);
-    lastFormJson.current = json;
-    if (json !== requestJson) setRequestJson(json);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestSchema]);
 
-  // Sync form → requestJson whenever formValue changes
+    // Read requestJson directly from the store at effect-execution time rather
+    // than from the React closure. This is robust against stale closures in the
+    // Wails/WebKit async environment where schema loads asynchronously after
+    // the component mounts and the closure value may lag behind the store.
+    const storeState = useAppStore.getState();
+    const activeTab = storeState.tabs.find((t) => t.id === storeState.activeTabId);
+    const currentRequestJson = activeTab?.requestJson ?? '{}';
+
+    // Always reinitialize when schema just loaded (empty → non-empty transition).
+    // This covers the collection-load case: requestJson carries the saved value
+    // but the schema wasn't available yet, so lastFormJson.current = '{}' and
+    // a simple equality guard would skip initialization if requestJson is also '{}'.
+    const schemaJustLoaded = prevSchema.length === 0 && requestSchema.length > 0;
+    if (!schemaJustLoaded && currentRequestJson === lastFormJson.current) return;
+
+    const parsed = fromJson(currentRequestJson);
+    const merged = initForm(requestSchema, parsed);
+    lastFormJson.current = currentRequestJson;
+    setFormValue(merged);
+    const normalized = toJson(merged);
+    if (normalized !== currentRequestJson) setRequestJson(normalized);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestJson, requestSchema]);
+
+  // Sync form → requestJson whenever the user edits a field.
+  // Guard when schema is empty to avoid overwriting the store before the schema
+  // (and thus the correct initial form values) have loaded.
   useEffect(() => {
+    if (requestSchema.length === 0) return;
     const json = toJson(formValue);
     if (json === lastFormJson.current) return;
     lastFormJson.current = json;
     setRequestJson(json);
-  }, [formValue, setRequestJson]);
-
-  // Sync requestJson → form if it changed from outside (e.g. user edited JSON tab)
-  useEffect(() => {
-    if (requestJson === lastFormJson.current) return;
-    const parsed = fromJson(requestJson);
-    const merged = initForm(requestSchema, parsed);
-    lastFormJson.current = requestJson;
-    setFormValue(merged);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestJson]);
+  }, [formValue, setRequestJson]);
 
   const handleFieldChange = useCallback((jsonName: string, newVal: unknown) => {
     setFormValue(prev => ({ ...prev, [jsonName]: newVal }));

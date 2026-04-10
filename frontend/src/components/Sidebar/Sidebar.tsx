@@ -4,7 +4,7 @@ import { useAppStore, useActiveTab } from '../../store/appStore';
 import { MethodInfo, MetadataEntry, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
-  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical, X,
+  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
@@ -24,6 +24,19 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
   const { selectedMethod } = useActiveTab();
   const { openMethodInNewTab } = useAppStore();
   const shortName = svc.name.split('.').pop() ?? svc.name;
+
+  if (svc.unresolvable) {
+    return (
+      <div
+        className="flex items-center gap-1 w-full px-2 py-1 text-xs text-c-text3 rounded"
+        title={`${svc.name} — descriptor unavailable via reflection. Load a .protoset or .proto file to use this service.`}
+      >
+        <AlertTriangle size={12} className="text-yellow-500 shrink-0" />
+        <span className="font-semibold truncate opacity-60">{shortName}</span>
+        <span className="ml-auto text-c-text3 text-[10px] opacity-60">no descriptor</span>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -211,10 +224,6 @@ export default function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full bg-c-panel border-r border-c-border w-64 shrink-0 overflow-hidden">
-      <div className="px-3 py-2 border-b border-c-border">
-        <h1 className="text-sm font-bold text-c-text tracking-wide">GRPC Nimbus</h1>
-        <p className="text-[10px] text-c-text3">gRPC Client</p>
-      </div>
       <ProtosetLoader />
       <div className="flex-1 overflow-y-auto py-1 space-y-0.5">
         {services.length === 0 ? (
