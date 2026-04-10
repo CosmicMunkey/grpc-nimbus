@@ -4,6 +4,10 @@
 
 A cross-platform desktop gRPC client with first-class support for **protoset files**, built on [Wails v2](https://wails.io) (Go + React). Ships as a single native binary for macOS, Windows, and Linux.
 
+<p align="center">
+  <img src="docs/screenshots/screenshot.png" alt="GRPC Nimbus" width="900" />
+</p>
+
 ---
 
 ## Why GRPC Nimbus?
