@@ -30,7 +30,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -70,7 +70,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -94,9 +94,53 @@ jobs:
           name: grpc-nimbus-windows-amd64
           path: grpc-nimbus-${{ github.ref_name }}-windows-amd64.zip
 
+  build-linux:
+    name: Linux (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        run: wails build -platform linux/amd64 -o grpc-nimbus
+        env:
+          CGO_ENABLED: '1'
+
+      - name: Package binary
+        run: |
+          tar -czf grpc-nimbus-${{ github.ref_name }}-linux-amd64.tar.gz \
+            -C build/bin grpc-nimbus
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grpc-nimbus-linux-amd64
+          path: grpc-nimbus-${{ github.ref_name }}-linux-amd64.tar.gz
+
   release:
     name: Create GitHub Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -112,3 +156,4 @@ jobs:
           generate_release_notes: true
           files: |
             grpc-nimbus-*.zip
+            grpc-nimbus-*.tar.gz
