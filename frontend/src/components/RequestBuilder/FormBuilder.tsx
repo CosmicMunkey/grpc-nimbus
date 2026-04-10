@@ -108,7 +108,7 @@ function TypeBadge({ schema }: { schema: FieldSchema }) {
 
 // ─── Scalar editors ──────────────────────────────────────────────────────────
 
-const inputCls = 'flex-1 min-w-0 bg-[#0d1117] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] placeholder-[#4a5568] outline-none focus:border-[#e94560] font-mono';
+const inputCls = 'flex-1 min-w-0 bg-c-input border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono';
 
 function StringEditor({ value, onChange }: { value: unknown; onChange: (v: string) => void }) {
   return (
@@ -186,7 +186,7 @@ function BoolEditor({ value, onChange }: { value: unknown; onChange: (v: boolean
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${
-          checked ? 'bg-[#e94560]' : 'bg-[#2d3748]'
+          checked ? 'bg-c-accent' : 'bg-c-border'
         }`}
       >
         <span
@@ -195,7 +195,7 @@ function BoolEditor({ value, onChange }: { value: unknown; onChange: (v: boolean
           }`}
         />
       </button>
-      <span className="text-xs text-[#94a3b8]">{checked ? 'true' : 'false'}</span>
+      <span className="text-xs text-c-text2">{checked ? 'true' : 'false'}</span>
     </div>
   );
 }
@@ -206,7 +206,7 @@ function EnumEditor({ schema, value, onChange }: { schema: FieldSchema; value: u
     <select
       value={current}
       onChange={e => onChange(e.target.value)}
-      className="flex-1 min-w-0 bg-[#0d1117] border border-[#2d3748] rounded px-2 py-0.5 text-xs text-[#e2e8f0] outline-none focus:border-[#e94560]"
+      className="flex-1 min-w-0 bg-c-input border border-c-border rounded pl-2 pr-6 py-0.5 text-xs text-c-text outline-none focus:border-c-accent"
     >
       {(schema.enumValues ?? []).map(ev => (
         <option key={ev.name} value={ev.name}>{ev.name} ({ev.number})</option>
@@ -231,7 +231,7 @@ function MessageEditor({ fields, value, onChange, depth = 0 }: MessageEditorProp
         value={typeof value === 'object' ? JSON.stringify(value, null, 2) : '{}'}
         onChange={e => { try { onChange(JSON.parse(e.target.value)); } catch { /* ignore */ } }}
         rows={3}
-        className="w-full bg-[#0d1117] border border-[#2d3748] rounded px-2 py-1 text-xs font-mono text-[#e2e8f0] outline-none focus:border-[#e94560] resize-none"
+        className="w-full bg-c-input border border-c-border rounded px-2 py-1 text-xs font-mono text-c-text outline-none focus:border-c-accent resize-none"
         placeholder="{}"
       />
     );
@@ -324,14 +324,14 @@ function OneofGroup({
   const selectedField = fields.find(f => f.jsonName === selected);
 
   return (
-    <div className="border border-[#2d3748] rounded overflow-hidden">
-      <div className="flex items-center gap-1 px-2 py-0.5 bg-[#1a1a2e] text-[10px] text-[#94a3b8]">
-        <span className="text-[#4a5568] font-medium">oneof</span>
-        <span className="text-[#e94560]">{name}</span>
+    <div className="border border-c-border rounded overflow-hidden">
+      <div className="flex items-center gap-1 px-2 py-0.5 bg-c-bg text-[10px] text-c-text2">
+        <span className="text-c-text3 font-medium">oneof</span>
+        <span className="text-c-accent">{name}</span>
         <select
           value={selected}
           onChange={e => handleSelect(e.target.value)}
-          className="ml-auto bg-[#0d1117] border border-[#2d3748] rounded px-1 py-px text-[10px] text-[#e2e8f0] outline-none focus:border-[#e94560]"
+          className="ml-auto bg-c-input border border-c-border rounded pl-1 pr-5 py-px text-[10px] text-c-text outline-none focus:border-c-accent"
         >
           {fields.map(f => (
             <option key={f.jsonName} value={f.jsonName}>{f.name}</option>
@@ -378,7 +378,7 @@ function RepeatedEditor({
     <div className="w-full space-y-1">
       {value.map((item, i) => (
         <div key={i} className="flex items-start gap-1">
-          <span className="text-[10px] text-[#4a5568] font-mono mt-1 w-5 shrink-0 text-right">{i}</span>
+          <span className="text-[10px] text-c-text3 font-mono mt-1 w-5 shrink-0 text-right">{i}</span>
           <div className="flex-1 min-w-0">
             <FieldEditor
               schema={elementSchema}
@@ -389,7 +389,7 @@ function RepeatedEditor({
           </div>
           <button
             onClick={() => removeItem(i)}
-            className="shrink-0 mt-0.5 text-[#4a5568] hover:text-[#e94560] p-0.5 rounded"
+            className="shrink-0 mt-0.5 text-c-text3 hover:text-c-accent p-0.5 rounded"
           >
             <X size={11} />
           </button>
@@ -397,7 +397,7 @@ function RepeatedEditor({
       ))}
       <button
         onClick={addItem}
-        className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-hover"
       >
         <Plus size={10} /> Add item
       </button>
@@ -455,10 +455,10 @@ function MapEditor({
           <input
             value={k}
             onChange={e => updateKey(k, e.target.value)}
-            className="w-24 bg-[#0d1117] border border-[#2d3748] rounded px-1.5 py-0.5 text-xs font-mono text-[#e94560] placeholder-[#4a5568] outline-none focus:border-[#e94560]"
+            className="w-24 bg-c-input border border-c-border rounded px-1.5 py-0.5 text-xs font-mono text-c-accent placeholder-c-text3 outline-none focus:border-c-accent"
             placeholder="key"
           />
-          <span className="text-[#4a5568] text-xs mt-0.5">→</span>
+          <span className="text-c-text3 text-xs mt-0.5">→</span>
           <div className="flex-1 min-w-0">
             <FieldEditor
               schema={valueSchema}
@@ -469,7 +469,7 @@ function MapEditor({
           </div>
           <button
             onClick={() => removeEntry(k)}
-            className="shrink-0 mt-0.5 text-[#4a5568] hover:text-[#e94560] p-0.5 rounded"
+            className="shrink-0 mt-0.5 text-c-text3 hover:text-c-accent p-0.5 rounded"
           >
             <X size={11} />
           </button>
@@ -477,7 +477,7 @@ function MapEditor({
       ))}
       <button
         onClick={addEntry}
-        className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-1.5 py-0.5 rounded hover:bg-[#1e2132]"
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-hover"
       >
         <Plus size={10} /> Add entry
       </button>
@@ -521,7 +521,7 @@ function InlineMessageEditor({
     return (
       <button
         onClick={include}
-        className="flex items-center gap-1 text-xs text-[#94a3b8] hover:text-[#e2e8f0] px-2 py-0.5 rounded border border-dashed border-[#2d3748] hover:border-[#4a5568]"
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-2 py-0.5 rounded border border-dashed border-c-border hover:border-c-text3"
       >
         <Plus size={10} /> Set
       </button>
@@ -537,21 +537,21 @@ function InlineMessageEditor({
       <div className="flex items-center gap-1">
         <button
           onClick={() => setExpanded(v => !v)}
-          className="flex items-center gap-0.5 text-[#94a3b8] hover:text-[#e2e8f0]"
+          className="flex items-center gap-0.5 text-c-text2 hover:text-c-text"
         >
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <span className="text-xs text-[#4a5568]">{expanded ? 'collapse' : 'expand'}</span>
+          <span className="text-xs text-c-text3">{expanded ? 'collapse' : 'expand'}</span>
         </button>
         <button
           onClick={exclude}
-          className="ml-auto text-[#4a5568] hover:text-[#e94560] p-0.5 rounded"
+          className="ml-auto text-c-text3 hover:text-c-accent p-0.5 rounded"
           title="Remove field"
         >
           <X size={11} />
         </button>
       </div>
       {expanded && (
-        <div className="mt-1 pl-3 border-l-2 border-[#2d3748]">
+        <div className="mt-1 pl-3 border-l-2 border-c-border">
           <MessageEditor
             fields={schema.fields ?? []}
             value={nested}
@@ -618,10 +618,10 @@ function FieldRow({
       <div className="py-0.5">
         {!hideLabel && (
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs font-mono text-[#e2e8f0]">{schema.name}</span>
+            <span className="text-xs font-mono text-c-text">{schema.name}</span>
             <TypeBadge schema={schema} />
             {schema.oneofName && (
-              <span className="text-[9px] text-[#4a5568]">oneof:{schema.oneofName}</span>
+              <span className="text-[9px] text-c-text3">oneof:{schema.oneofName}</span>
             )}
           </div>
         )}
@@ -636,7 +636,7 @@ function FieldRow({
     <div className="flex items-center gap-2 py-0.5 min-h-[28px]">
       {!hideLabel && (
         <div className="flex items-center gap-1.5 w-40 shrink-0">
-          <span className="text-xs font-mono text-[#e2e8f0] truncate">{schema.name}</span>
+          <span className="text-xs font-mono text-c-text truncate">{schema.name}</span>
           <TypeBadge schema={schema} />
         </div>
       )}
@@ -699,7 +699,7 @@ export default function FormBuilder() {
 
   if (requestSchema.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[#4a5568] text-xs select-none">
+      <div className="flex-1 flex items-center justify-center text-c-text3 text-xs select-none">
         No schema available — load a protoset first
       </div>
     );

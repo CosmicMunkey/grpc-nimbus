@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"github.com/jhump/protoreflect/desc"
@@ -7,19 +7,19 @@ import (
 
 // FieldSchema describes a single proto field for the form-builder UI.
 type FieldSchema struct {
-	Name           string        `json:"name"`
-	JSONName       string        `json:"jsonName"`
-	Number         int32         `json:"number"`
+	Name     string `json:"name"`
+	JSONName string `json:"jsonName"`
+	Number   int32  `json:"number"`
 	// Type is one of: "string","bytes","bool","int32","int64","uint32","uint64",
 	// "float","double","enum","message","map"
 	Type           string        `json:"type"`
-	IsRepeated     bool          `json:"isRepeated"`   // true only for non-map repeated fields
+	IsRepeated     bool          `json:"isRepeated"`             // true only for non-map repeated fields
 	IsMap          bool          `json:"isMap"`
 	OneofName      string        `json:"oneofName,omitempty"`
 	EnumValues     []EnumValue   `json:"enumValues,omitempty"`
-	Fields         []FieldSchema `json:"fields,omitempty"`       // for message type
-	MapKeyType     string        `json:"mapKeyType,omitempty"`   // for map type
-	MapValueType   string        `json:"mapValueType,omitempty"` // for map type
+	Fields         []FieldSchema `json:"fields,omitempty"`         // for message type
+	MapKeyType     string        `json:"mapKeyType,omitempty"`     // for map type
+	MapValueType   string        `json:"mapValueType,omitempty"`   // for map type
 	MapValueFields []FieldSchema `json:"mapValueFields,omitempty"` // when map value is message
 }
 

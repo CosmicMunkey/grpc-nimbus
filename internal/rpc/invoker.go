@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"bytes"
@@ -48,12 +48,12 @@ type InvokeResponse struct {
 // StreamEvent is emitted for each message in a streaming RPC.
 type StreamEvent struct {
 	// Type is "message", "header", "trailer", or "error".
-	Type        string          `json:"type"`
-	JSON        string          `json:"json,omitempty"`
-	Metadata    []MetadataEntry `json:"metadata,omitempty"`
-	Status      string          `json:"status,omitempty"`
-	StatusCode  int             `json:"statusCode,omitempty"`
-	Error       string          `json:"error,omitempty"`
+	Type       string          `json:"type"`
+	JSON       string          `json:"json,omitempty"`
+	Metadata   []MetadataEntry `json:"metadata,omitempty"`
+	Status     string          `json:"status,omitempty"`
+	StatusCode int             `json:"statusCode,omitempty"`
+	Error      string          `json:"error,omitempty"`
 }
 
 // StreamEventCallback is called for each event during a streaming invocation.
@@ -230,4 +230,3 @@ func PrettyJSON(raw string) string {
 	}
 	return buf.String()
 }
-

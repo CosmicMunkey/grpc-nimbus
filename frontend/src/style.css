@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme tokens (Nimbus default) ────────────────────────────────────────── */
+/* applyTheme() in themes.ts overwrites these at runtime when the user        */
+/* changes their theme preference.                                            */
+:root {
+  --c-bg:      #1a1a2e;
+  --c-panel:   #16213e;
+  --c-input:   #0d1117;
+  --c-hover:   #1e2132;
+  --c-border:  #2d3748;
+  --c-text:    #e2e8f0;
+  --c-text2:   #94a3b8;
+  --c-text3:   #4a5568;
+  --c-accent:  #e94560;
+  --c-accent2: #c73652;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -9,20 +25,53 @@
 }
 
 body {
-  background-color: #1a1a2e;
-  color: #e2e8f0;
+  background-color: var(--c-bg);
+  color: var(--c-text);
   font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   overflow: hidden;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1a1a2e; }
-::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-text3); }
 
 .cm-editor { height: 100%; border-radius: 6px; overflow: hidden; }
 .cm-scroller {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 13px;
+}
+
+/* ── Select dropdowns ──────────────────────────────────────────────────────── */
+/* Remove the OS-native arrow and replace with a themed SVG chevron.           */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 1.5rem;
+  cursor: pointer;
+}
+
+/* ── Number input spinners ─────────────────────────────────────────────────── */
+/* color-scheme: dark ensures the browser draws light-coloured arrow glyphs.  */
+input[type='number'] {
+  color-scheme: dark;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: inner-spin-button;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+input[type='number']:hover::-webkit-inner-spin-button,
+input[type='number']:hover::-webkit-outer-spin-button,
+input[type='number']:focus::-webkit-inner-spin-button,
+input[type='number']:focus::-webkit-outer-spin-button {
+  opacity: 1;
 }

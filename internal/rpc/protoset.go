@@ -1,4 +1,4 @@
-package grpc
+package rpc
 
 import (
 	"context"
@@ -13,14 +13,14 @@ import (
 
 // MethodInfo is the frontend-facing descriptor for a single RPC method.
 type MethodInfo struct {
-	FullName        string `json:"fullName"`        // e.g. "com.example.Greeter/SayHello"
-	ServiceName     string `json:"serviceName"`     // e.g. "com.example.Greeter"
-	MethodName      string `json:"methodName"`      // e.g. "SayHello"
-	ClientStreaming  bool   `json:"clientStreaming"`
-	ServerStreaming  bool   `json:"serverStreaming"`
-	InputType       string `json:"inputType"`
-	OutputType      string `json:"outputType"`
-	RequestSchema   string `json:"requestSchema"`
+	FullName       string `json:"fullName"`       // e.g. "com.example.Greeter/SayHello"
+	ServiceName    string `json:"serviceName"`    // e.g. "com.example.Greeter"
+	MethodName     string `json:"methodName"`     // e.g. "SayHello"
+	ClientStreaming bool   `json:"clientStreaming"`
+	ServerStreaming bool   `json:"serverStreaming"`
+	InputType      string `json:"inputType"`
+	OutputType     string `json:"outputType"`
+	RequestSchema  string `json:"requestSchema"`
 }
 
 // ServiceInfo groups methods under a service.
@@ -34,8 +34,8 @@ type ServiceInfo struct {
 type ProtosetDescriptor struct {
 	source     grpcurl.DescriptorSource
 	methods    []*desc.MethodDescriptor
-	svcFiles   map[string]string    // service full name → source file path (protoset only)
-	reflClient *grpcreflect.Client  // non-nil when loaded via server reflection
+	svcFiles   map[string]string   // service full name → source file path (protoset only)
+	reflClient *grpcreflect.Client // non-nil when loaded via server reflection
 }
 
 // LoadProtosets parses the given protoset (FileDescriptorSet) file paths.
@@ -108,23 +108,49 @@ func newDescriptor(src grpcurl.DescriptorSource, reflClient *grpcreflect.Client)
 		return nil, fmt.Errorf("listing services: %w", err)
 	}
 
-	var methods []*desc.MethodDescriptor
-	for _, svcName := range svcNames {
-		// Skip the gRPC reflection meta-service.
-		if svcName == "grpc.reflection.v1alpha.ServerReflection" ||
-			svcName == "grpc.reflection.v1.ServerReflection" {
-			continue
+	// Build the pending list, excluding the gRPC reflection meta-service.
+	pending := make([]string, 0, len(svcNames))
+	for _, n := range svcNames {
+		if n != "grpc.reflection.v1alpha.ServerReflection" &&
+			n != "grpc.reflection.v1.ServerReflection" {
+			pending = append(pending, n)
 		}
-		dsc, err := src.FindSymbol(svcName)
-		if err != nil {
-			continue
-		}
-		sd, ok := dsc.(*desc.ServiceDescriptor)
-		if !ok {
-			continue
-		}
-		methods = append(methods, sd.GetMethods()...)
 	}
+
+	// When loading via server reflection, the grpcreflect library builds file
+	// descriptors lazily. Processing one service caches its transitive
+	// dependencies as a side-effect, which can unblock earlier failures. We
+	// retry up to 3 passes so all services eventually resolve. For non-reflection
+	// sources the loop converges in a single pass.
+	var methods []*desc.MethodDescriptor
+	seenSvcs := make(map[string]bool)
+	const maxPasses = 3
+	for pass := 0; pass < maxPasses && len(pending) > 0; pass++ {
+		var stillPending []string
+		for _, svcName := range pending {
+			dsc, err := src.FindSymbol(svcName)
+			if err != nil {
+				stillPending = append(stillPending, svcName)
+				continue
+			}
+			sd, ok := dsc.(*desc.ServiceDescriptor)
+			if !ok || seenSvcs[svcName] {
+				continue
+			}
+			seenSvcs[svcName] = true
+			methods = append(methods, sd.GetMethods()...)
+		}
+		if len(stillPending) == len(pending) {
+			// No progress this pass; further retries won't help.
+			break
+		}
+		pending = stillPending
+	}
+
+	for _, svcName := range pending {
+		fmt.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)\n", svcName)
+	}
+
 	return &ProtosetDescriptor{source: src, methods: methods, reflClient: reflClient}, nil
 }
 
@@ -140,13 +166,13 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 			order = append(order, svcName)
 		}
 		mi := MethodInfo{
-			FullName:        svcName + "/" + m.GetName(),
-			ServiceName:     svcName,
-			MethodName:      m.GetName(),
-			ClientStreaming:  m.IsClientStreaming(),
-			ServerStreaming:  m.IsServerStreaming(),
-			InputType:       m.GetInputType().GetFullyQualifiedName(),
-			OutputType:      m.GetOutputType().GetFullyQualifiedName(),
+			FullName:       svcName + "/" + m.GetName(),
+			ServiceName:    svcName,
+			MethodName:     m.GetName(),
+			ClientStreaming: m.IsClientStreaming(),
+			ServerStreaming: m.IsServerStreaming(),
+			InputType:      m.GetInputType().GetFullyQualifiedName(),
+			OutputType:     m.GetOutputType().GetFullyQualifiedName(),
 		}
 		byService[svcName].Methods = append(byService[svcName].Methods, mi)
 	}
@@ -179,4 +205,3 @@ func (pd *ProtosetDescriptor) FindMethod(fullName string) (*desc.MethodDescripto
 func (pd *ProtosetDescriptor) Source() grpcurl.DescriptorSource {
 	return pd.source
 }
-

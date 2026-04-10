@@ -7,19 +7,19 @@ import (
 	"path/filepath"
 	"time"
 
-	grpcinternal "grpc-nimbus/internal/grpc"
+	"grpc-nimbus/internal/rpc"
 )
 
 const maxHistoryPerMethod = 50
 
 // HistoryEntry is a single recorded invocation.
 type HistoryEntry struct {
-	ID          string                       `json:"id"`
-	MethodPath  string                       `json:"methodPath"`
-	RequestJSON string                       `json:"requestJson"`
-	Metadata    []grpcinternal.MetadataEntry `json:"metadata"`
-	Response    *grpcinternal.InvokeResponse `json:"response,omitempty"`
-	InvokedAt   time.Time                    `json:"invokedAt"`
+	ID          string               `json:"id"`
+	MethodPath  string               `json:"methodPath"`
+	RequestJSON string               `json:"requestJson"`
+	Metadata    []rpc.MetadataEntry  `json:"metadata"`
+	Response    *rpc.InvokeResponse  `json:"response,omitempty"`
+	InvokedAt   time.Time            `json:"invokedAt"`
 }
 
 // HistoryStore manages per-method request/response history on disk.

@@ -10,19 +10,19 @@ export default function ConfirmDialog() {
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={() => resolveConfirm(false)} />
       {/* Dialog */}
-      <div className="relative z-10 bg-[#16213e] border border-[#2d3748] rounded-lg shadow-xl p-5 w-80 max-w-[90vw]">
-        <p className="text-sm text-[#e2e8f0] mb-5">{confirmDialog.message}</p>
+      <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl p-5 w-80 max-w-[90vw]">
+        <p className="text-sm text-c-text mb-5">{confirmDialog.message}</p>
         <div className="flex justify-end gap-2">
           <button
             autoFocus
             onClick={() => resolveConfirm(false)}
-            className="px-3 py-1.5 text-xs rounded bg-[#2d3748] text-[#e2e8f0] hover:bg-[#374151]"
+            className="px-3 py-1.5 text-xs rounded bg-c-border text-c-text hover:bg-c-border"
           >
             Cancel
           </button>
           <button
             onClick={() => resolveConfirm(true)}
-            className="px-3 py-1.5 text-xs rounded bg-[#e94560] text-white hover:bg-[#c73652]"
+            className="px-3 py-1.5 text-xs rounded bg-c-accent text-white hover:bg-c-accent2"
           >
             Delete
           </button>
