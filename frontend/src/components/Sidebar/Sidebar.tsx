@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { MethodInfo, MetadataEntry, ServiceInfo } from '../../types';
+import { Collection, MethodInfo, SavedRequest, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
-  FolderOpen, Folder, Trash2, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle,
+  FolderOpen, Folder, Trash2, Book, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle, Pencil,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
@@ -114,30 +114,103 @@ function CollectionMenu({ colId, colName }: { colId: string; colName: string }) 
   );
 }
 
+function RenameRequestModal({
+  name,
+  setName,
+  onClose,
+  onSave,
+}: {
+  name: string;
+  setName: (name: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-c-panel border border-c-border rounded-lg p-4 w-72 shadow-xl">
+        <h3 className="text-sm font-semibold text-c-text mb-3">Rename Request</h3>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSave();
+            if (e.key === 'Escape') onClose();
+          }}
+          placeholder="Request name"
+          className="w-full bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
+        />
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 py-1.5 text-xs text-c-text2 border border-c-border rounded hover:bg-c-hover"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={!name.trim()}
+            className="flex-1 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function CollectionsPanel() {
-  const { collections, loadCollections, importCollection, services, openMethodInNewTab, deleteRequest, renameCollectionRequest } = useAppStore();
+  const { collections, loadCollections, importCollection, openSavedRequest, deleteRequest, renameCollection, renameCollectionRequest } = useAppStore();
   const [expanded, setExpanded] = useState(true);
-  const [editingReqId, setEditingReqId] = useState<string | null>(null);
+  const [collapsedCollections, setCollapsedCollections] = useState<Set<string>>(new Set());
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [renamingRequest, setRenamingRequest] = useState<{ colId: string; reqId: string } | null>(null);
+  const [requestName, setRequestName] = useState('');
 
   React.useEffect(() => { loadCollections(); }, []);
 
-  const startRename = (reqId: string, currentName: string, e: React.MouseEvent) => {
+  const startCollectionRename = (colId: string, currentName: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingReqId(reqId);
+    setRenamingRequest(null);
+    setEditingCollectionId(colId);
     setEditValue(currentName);
   };
 
-  const commitRename = (colId: string, reqId: string) => {
-    if (editValue.trim()) renameCollectionRequest(colId, reqId, editValue.trim());
-    setEditingReqId(null);
+  const startRequestRename = (reqId: string, currentName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const colId = (e.currentTarget as HTMLElement).dataset.collectionId;
+    if (!colId) return;
+    setEditingCollectionId(null);
+    setRenamingRequest({ colId, reqId });
+    setRequestName(currentName);
   };
 
-  const handleLoadRequest = (methodPath: string, requestJson?: string, metadata?: MetadataEntry[], reqId?: string, reqName?: string) => {
-    for (const svc of services) {
-      const m = svc.methods.find((m) => m.fullName === methodPath);
-      if (m) { openMethodInNewTab(m, requestJson, metadata, reqId, reqName); return; }
-    }
+  const commitCollectionRename = (colId: string) => {
+    if (editValue.trim()) renameCollection(colId, editValue.trim());
+    setEditingCollectionId(null);
+  };
+
+  const commitRename = () => {
+    if (!renamingRequest || !requestName.trim()) return;
+    renameCollectionRequest(renamingRequest.colId, renamingRequest.reqId, requestName.trim());
+    setRenamingRequest(null);
+  };
+
+  const handleLoadRequest = async (col: Collection, req: SavedRequest) => {
+    await openSavedRequest(col, req);
+  };
+
+  const toggleCollectionCollapsed = (colId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCollapsedCollections((prev) => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      return next;
+    });
   };
 
   return (
@@ -160,49 +233,70 @@ function CollectionsPanel() {
           {collections.map((col) => (
             <div key={col.id} className="px-2">
               <div className="flex items-center gap-1 text-xs text-c-text2 py-0.5 group">
-                <BookOpen size={11} />
-                <span className="font-medium truncate flex-1" title={col.name}>{col.name}</span>
-                <CollectionMenu colId={col.id} colName={col.name} />
+                <button
+                  onClick={(e) => toggleCollectionCollapsed(col.id, e)}
+                  className="shrink-0 hover:text-c-text p-0.5 rounded"
+                  title={collapsedCollections.has(col.id) ? 'Expand collection' : 'Collapse collection'}
+                >
+                  {collapsedCollections.has(col.id) ? <Book size={11} /> : <BookOpen size={11} />}
+                </button>
+                {editingCollectionId === col.id ? (
+                  <input
+                    autoFocus
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); commitCollectionRename(col.id); }
+                      if (e.key === 'Escape') setEditingCollectionId(null);
+                    }}
+                    onBlur={() => commitCollectionRename(col.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 min-w-0 bg-c-bg border border-c-accent rounded px-1.5 py-0.5 text-xs text-c-text outline-none"
+                  />
+                ) : (
+                  <>
+                    <span
+                      className="font-medium truncate flex-1"
+                      title={`${col.name} — double-click to rename`}
+                      onDoubleClick={(e) => startCollectionRename(col.id, col.name, e)}
+                    >
+                      {col.name}
+                    </span>
+                    <CollectionMenu colId={col.id} colName={col.name} />
+                  </>
+                )}
               </div>
-              <div className="ml-3 space-y-0.5">
-                {(col.requests ?? []).map((req) => (
-                  <div key={req.id} className="group flex items-center rounded hover:bg-c-hover">
-                    {editingReqId === req.id ? (
-                      <input
-                        autoFocus
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); commitRename(col.id, req.id); }
-                          if (e.key === 'Escape') setEditingReqId(null);
-                        }}
-                        onBlur={() => commitRename(col.id, req.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 min-w-0 mx-2 my-0.5 bg-c-bg border border-c-accent rounded px-1.5 py-0.5 text-xs text-c-text outline-none"
-                      />
-                    ) : (
+              {!collapsedCollections.has(col.id) && (
+                <div className="ml-3 space-y-0.5">
+                  {(col.requests ?? []).map((req) => (
+                    <div key={req.id} className="group flex items-center rounded hover:bg-c-hover">
                       <button
-                        onClick={() => handleLoadRequest(req.methodPath, req.requestJson, req.metadata, req.id, req.name)}
-                        onDoubleClick={(e) => startRename(req.id, req.name, e)}
+                        onClick={() => handleLoadRequest(col, req)}
                         className="flex items-center gap-1 flex-1 min-w-0 text-left text-xs text-c-text px-2 py-0.5 truncate"
                         title={req.name}
                       >
                         <Zap size={10} className="text-yellow-400 shrink-0" />
-                        <span className="truncate">{req.name}</span>
+                        <span className="truncate" title={req.name}>{req.name}</span>
                       </button>
-                    )}
-                    {editingReqId !== req.id && (
                       <button
-                        onClick={() => deleteRequest(col.id, req.id)}
+                        data-collection-id={col.id}
+                        onClick={(e) => startRequestRename(req.id, req.name, e)}
+                        title="Rename request"
+                        className="opacity-0 group-hover:opacity-100 shrink-0 px-1 py-0.5 text-c-text3 hover:text-c-text transition-opacity"
+                      >
+                        <Pencil size={10} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteRequest(col.id, req.id); }}
                         title="Delete request"
                         className="opacity-0 group-hover:opacity-100 shrink-0 px-1.5 py-0.5 text-c-text3 hover:text-c-accent transition-opacity"
                       >
                         <X size={11} />
                       </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
 
@@ -214,6 +308,14 @@ function CollectionsPanel() {
             <Upload size={11} /> Import collection…
           </button>
         </div>
+      )}
+      {renamingRequest && (
+        <RenameRequestModal
+          name={requestName}
+          setName={setRequestName}
+          onClose={() => setRenamingRequest(null)}
+          onSave={commitRename}
+        />
       )}
     </div>
   );

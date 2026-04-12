@@ -75,6 +75,8 @@ export interface Collection {
   name: string;
   description: string;
   protosetPaths: string[];
+  protoFilePaths: string[];
+  protoImportPaths: string[];
   requests: SavedRequest[];
   createdAt: string;
   updatedAt: string;
@@ -120,6 +122,8 @@ export interface FieldSchema {
 export interface LoadedState {
   services: ServiceInfo[];
   loadedPaths: string[];
+  loadedProtosets: string[];
+  loadedProtoFiles: string[];
   loadMode: 'protoset' | 'proto' | 'reflection' | 'mixed' | '';
   protoImportPaths: string[];
   lastTarget: string;

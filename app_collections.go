@@ -39,7 +39,7 @@ func (a *App) GetCollection(id string) (*storage.Collection, error) {
 }
 
 // ExportCollection writes a portable, self-contained collection bundle to destPath.
-// Protoset files referenced by the collection are embedded in the output so the
+// Protoset files and proto sources referenced by the collection are embedded so the
 // export can be shared with colleagues on different machines.
 func (a *App) ExportCollection(id, destPath string) error {
 	if a.store == nil {

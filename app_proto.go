@@ -15,6 +15,8 @@ import (
 type LoadedState struct {
 	Services         []rpc.ServiceInfo `json:"services"`
 	LoadedPaths      []string          `json:"loadedPaths"`
+	LoadedProtosets  []string          `json:"loadedProtosets"`
+	LoadedProtoFiles []string          `json:"loadedProtoFiles"`
 	LoadMode         string            `json:"loadMode"`         // "protoset", "proto", "reflection", "mixed", or ""
 	ProtoImportPaths []string          `json:"protoImportPaths"` // effective import paths for loaded .proto files
 	LastTarget       string            `json:"lastTarget"`       // last-used connection target
@@ -387,10 +389,19 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 	a.mu.Lock()
 	pd := a.protoset
 	paths := a.combinedLoadedPathsLocked()
+	protosets := append([]string(nil), a.loadedProtosetPaths...)
+	protoFiles := append([]string(nil), a.loadedProtoFiles...)
 	mode := a.currentLoadModeLocked()
+	importPaths := append([]string(nil), a.loadImportPaths...)
 	a.mu.Unlock()
 
-	state := &LoadedState{LoadMode: mode, LoadedPaths: paths, ProtoImportPaths: append([]string(nil), a.loadImportPaths...)}
+	state := &LoadedState{
+		LoadMode:         mode,
+		LoadedPaths:      paths,
+		LoadedProtosets:  protosets,
+		LoadedProtoFiles: protoFiles,
+		ProtoImportPaths: importPaths,
+	}
 
 	if pd != nil {
 		state.Services = pd.Services()

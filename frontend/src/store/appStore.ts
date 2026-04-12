@@ -10,6 +10,7 @@ import {
   LoadedState,
   MetadataEntry,
   MethodInfo,
+  SavedRequest,
   ServiceInfo,
   StreamEvent,
   Tab,
@@ -155,6 +156,30 @@ function patchTab(tabs: Tab[], id: string, patch: Partial<Tab>): Tab[] {
   return tabs.map((t) => (t.id === id ? { ...t, ...patch } : t));
 }
 
+function applyLoadedState(state?: LoadedState) {
+  return {
+    services: state?.services ?? [],
+    protosetPaths: state?.loadedPaths ?? [],
+    loadedProtosetPaths: state?.loadedProtosets ?? [],
+    loadedProtoFilePaths: state?.loadedProtoFiles ?? [],
+    protoImportPaths: state?.protoImportPaths ?? [],
+    loadMode: state?.loadMode ?? '',
+  };
+}
+
+function findMethodByPath(services: ServiceInfo[], methodPath: string): MethodInfo | null {
+  for (const svc of services) {
+    const method = svc.methods.find((m) => m.fullName === methodPath);
+    if (method) return method;
+  }
+  return null;
+}
+
+function includesAll(current: string[], expected: string[] = []): boolean {
+  const loaded = new Set(current);
+  return expected.every((value) => loaded.has(value));
+}
+
 const INITIAL_TAB = makeTab();
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -175,6 +200,8 @@ interface AppState {
   // Descriptor sources
   services: ServiceInfo[];
   protosetPaths: string[];
+  loadedProtosetPaths: string[];
+  loadedProtoFilePaths: string[];
   protoImportPaths: string[];
   loadMode: string;
   loadProtosets: (paths: string[]) => Promise<void>;
@@ -212,7 +239,10 @@ interface AppState {
   // Collections
   collections: Collection[];
   loadCollections: () => Promise<void>;
+  loadCollectionDescriptors: (collection: Collection) => Promise<void>;
   saveToCollection: (collectionId: string, name: string) => Promise<void>;
+  openSavedRequest: (collection: Collection, request: SavedRequest) => Promise<void>;
+  renameCollection: (collectionId: string, newName: string) => Promise<void>;
   updateSavedRequest: () => Promise<void>;
   renameRequest: (tabId: string, newName: string) => Promise<void>;
   renameCollectionRequest: (collectionId: string, requestId: string, newName: string) => Promise<void>;
@@ -291,7 +321,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
         }));
       }
-      set({ services: state.services ?? [], protosetPaths: state.loadedPaths ?? [], protoImportPaths: state.protoImportPaths ?? [], loadMode: state.loadMode ?? '' });
+      set(applyLoadedState(state));
     } catch { /* non-fatal */ }
     // Load user preferences in parallel (non-fatal)
     get().loadUserSettings().catch(() => {});
@@ -300,25 +330,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── Descriptor sources ──────────────────────────────────────────────────────
   services: [],
   protosetPaths: [],
+  loadedProtosetPaths: [],
+  loadedProtoFilePaths: [],
   protoImportPaths: [],
   loadMode: '',
 
   loadProtosets: async (paths) => {
     await api.loadProtosets(paths);
     const state = await api.getLoadedState();
-    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
+    set(applyLoadedState(state));
   },
 
   loadProtoFiles: async (importPaths, protoFiles) => {
     await api.loadProtoFiles(importPaths, protoFiles);
     const state = await api.getLoadedState();
-    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
+    set(applyLoadedState(state));
   },
 
   loadViaReflection: async () => {
     await api.loadViaReflection();
     const state = await api.getLoadedState();
-    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
+    set(applyLoadedState(state));
   },
 
   clearLoadedProtos: async () => {
@@ -328,7 +360,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
     };
     set((s) => ({
-      services: [], protosetPaths: [], protoImportPaths: [], loadMode: '',
+      services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '',
       tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
     }));
   },
@@ -336,19 +368,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   reloadProtos: async () => {
     const services = await api.reloadProtos();
     const state = await api.getLoadedState();
-    set({ services: services ?? state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
+    set({ ...applyLoadedState(state), services: services ?? state?.services ?? [] });
   },
 
   removeProtoPath: async (path) => {
     const services = await api.removeProtoPath(path);
     const state = await api.getLoadedState();
-    set({ services: services ?? state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
+    set({ ...applyLoadedState(state), services: services ?? state?.services ?? [] });
     if (!(services ?? []).length) {
       const blankTabPatch: Partial<Tab> = {
         selectedMethod: null, requestSchema: [], requestJson: '{}',
         response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
       };
-      set((s) => ({ loadMode: '', protoImportPaths: [], tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })) }));
+      set((s) => ({
+        loadMode: '',
+        protoImportPaths: [],
+        loadedProtosetPaths: [],
+        loadedProtoFilePaths: [],
+        tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
+      }));
     }
   },
 
@@ -590,8 +628,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { set({ collections: [] }); }
   },
 
+  loadCollectionDescriptors: async (collection) => {
+    const { loadedProtosetPaths, loadedProtoFilePaths, protoImportPaths } = get();
+    const needsProtosets = (collection.protosetPaths?.length ?? 0) > 0
+      && !includesAll(loadedProtosetPaths, collection.protosetPaths);
+    const needsProtoFiles = (collection.protoFilePaths?.length ?? 0) > 0
+      && (!includesAll(loadedProtoFilePaths, collection.protoFilePaths)
+        || !includesAll(protoImportPaths, collection.protoImportPaths ?? []));
+
+    if (needsProtosets) {
+      await get().loadProtosets(collection.protosetPaths);
+    }
+    if (needsProtoFiles) {
+      await get().loadProtoFiles(collection.protoImportPaths ?? [], collection.protoFilePaths);
+    }
+  },
+
   saveToCollection: async (collectionId, name) => {
-    const { tabs, activeTabId, connectionConfig, collections, protosetPaths } = get();
+    const { tabs, activeTabId, connectionConfig, collections, loadedProtosetPaths, loadedProtoFilePaths, protoImportPaths } = get();
     const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
     const { selectedMethod, requestJson, requestMetadata } = tab;
     if (!selectedMethod) return;
@@ -605,14 +659,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     let col = collections.find((c) => c.id === collectionId);
     if (!col) {
-      col = { id: collectionId, name: collectionId, description: '', protosetPaths, requests: [], createdAt: now, updatedAt: now };
+      col = {
+        id: collectionId,
+        name: collectionId,
+        description: '',
+        protosetPaths: loadedProtosetPaths,
+        protoFilePaths: loadedProtoFilePaths,
+        protoImportPaths,
+        requests: [],
+        createdAt: now,
+        updatedAt: now,
+      };
     }
-    await api.saveCollection({ ...col, requests: [...(col.requests ?? []), req], updatedAt: now });
+    await api.saveCollection({
+      ...col,
+      protosetPaths: loadedProtosetPaths,
+      protoFilePaths: loadedProtoFilePaths,
+      protoImportPaths,
+      requests: [...(col.requests ?? []), req],
+      updatedAt: now,
+    });
     await get().loadCollections();
     // Link this tab to the newly saved request.
     set((s) => ({
       tabs: patchTab(s.tabs, activeTabId, { savedRequestId: newReqId, savedRequestName: name, label: name }),
     }));
+  },
+
+  openSavedRequest: async (collection, request) => {
+    let method = findMethodByPath(get().services, request.methodPath);
+    if (!method) {
+      await get().loadCollectionDescriptors(collection);
+      method = findMethodByPath(get().services, request.methodPath);
+    }
+    if (!method) return;
+    get().openMethodInNewTab(method, request.requestJson, request.metadata, request.id, request.name);
+  },
+
+  renameCollection: async (collectionId, newName) => {
+    const name = newName.trim();
+    if (!name) return;
+    const col = get().collections.find((c) => c.id === collectionId);
+    if (!col) return;
+    const now = new Date().toISOString();
+    await api.saveCollection({ ...col, name, updatedAt: now });
+    await get().loadCollections();
   },
 
   updateSavedRequest: async () => {
@@ -702,8 +793,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   importCollection: async () => {
     const srcPath = await api.pickImportFile();
     if (srcPath) {
-      await api.importCollection(srcPath);
+      const imported = await api.importCollection(srcPath);
       await get().loadCollections();
+      if (imported) {
+        await get().loadCollectionDescriptors(imported);
+      }
     }
   },
 

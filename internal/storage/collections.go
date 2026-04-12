@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"grpc-nimbus/internal/rpc"
@@ -27,13 +29,15 @@ type SavedRequest struct {
 
 // Collection is a named group of saved requests.
 type Collection struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	ProtosetPaths []string     `json:"protosetPaths"`
-	Requests    []SavedRequest `json:"requests"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
+	ID               string         `json:"id"`
+	Name             string         `json:"name"`
+	Description      string         `json:"description"`
+	ProtosetPaths    []string       `json:"protosetPaths"`
+	ProtoFilePaths   []string       `json:"protoFilePaths,omitempty"`
+	ProtoImportPaths []string       `json:"protoImportPaths,omitempty"`
+	Requests         []SavedRequest `json:"requests"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	UpdatedAt        time.Time      `json:"updatedAt"`
 }
 
 // Store manages persistent collection data on disk.
@@ -113,12 +117,13 @@ func (s *Store) FilePath(id string) string {
 }
 
 // PortableExport is a self-contained collection bundle for sharing across machines.
-// Referenced protoset files are embedded as raw bytes (base64 in JSON) so the
-// recipient doesn't need to have the same files on disk.
+// Referenced protoset files and proto sources are embedded as raw bytes (base64 in
+// JSON) so the recipient doesn't need the same files on disk.
 type PortableExport struct {
-	Version    int                `json:"version"`
-	Collection Collection         `json:"collection"`
-	Protosets  []EmbeddedProtoset `json:"protosets,omitempty"`
+	Version    int                 `json:"version"`
+	Collection Collection          `json:"collection"`
+	Protosets  []EmbeddedProtoset  `json:"protosets,omitempty"`
+	ProtoFiles []EmbeddedProtoFile `json:"protoFiles,omitempty"`
 }
 
 // EmbeddedProtoset holds one protoset file's content inside a PortableExport.
@@ -127,9 +132,128 @@ type EmbeddedProtoset struct {
 	Data []byte `json:"data"` // marshalled as base64 by encoding/json
 }
 
+// EmbeddedProtoFile holds one proto source file inside a PortableExport.
+type EmbeddedProtoFile struct {
+	Path    string `json:"path"`
+	Data    []byte `json:"data"`
+	IsEntry bool   `json:"isEntry,omitempty"`
+}
+
+func importRefs(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(string(data), "\n")
+	var refs []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		const prefix = `import "`
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(line, prefix)
+		end := strings.Index(rest, `"`)
+		if end == -1 {
+			continue
+		}
+		refs = append(refs, rest[:end])
+	}
+	return refs
+}
+
+func commonDir(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	common := filepath.Dir(paths[0])
+	for _, p := range paths[1:] {
+		dir := filepath.Dir(p)
+		for dir != common && !strings.HasPrefix(dir, common+string(filepath.Separator)) {
+			parent := filepath.Dir(common)
+			if parent == common {
+				return common
+			}
+			common = parent
+		}
+	}
+	return common
+}
+
+func resolveImport(importPaths []string, ref string) (string, bool) {
+	rel := filepath.FromSlash(ref)
+	for _, root := range importPaths {
+		candidate := filepath.Join(root, rel)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func bundleProtoSources(protoFiles, importPaths []string) ([]EmbeddedProtoFile, []string, []string, error) {
+	if len(protoFiles) == 0 {
+		return nil, nil, nil, nil
+	}
+	entryBase := commonDir(protoFiles)
+	if entryBase == "" {
+		entryBase = filepath.Dir(protoFiles[0])
+	}
+
+	var bundled []EmbeddedProtoFile
+	var entryRelPaths []string
+	seenEntries := map[string]bool{}
+	for _, file := range protoFiles {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("reading proto entry %s: %w", file, err)
+		}
+		rel, err := filepath.Rel(entryBase, file)
+		if err != nil {
+			rel = filepath.Base(file)
+		}
+		rel = filepath.ToSlash(path.Join("entries", filepath.ToSlash(rel)))
+		if !seenEntries[rel] {
+			seenEntries[rel] = true
+			bundled = append(bundled, EmbeddedProtoFile{Path: rel, Data: data, IsEntry: true})
+			entryRelPaths = append(entryRelPaths, rel)
+		}
+	}
+
+	seenImports := map[string]bool{}
+	queue := append([]string(nil), protoFiles...)
+	for len(queue) > 0 {
+		file := queue[0]
+		queue = queue[1:]
+		for _, ref := range importRefs(file) {
+			if seenImports[ref] {
+				continue
+			}
+			resolved, ok := resolveImport(importPaths, ref)
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("resolving imported proto %q", ref)
+			}
+			data, err := os.ReadFile(resolved)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("reading imported proto %s: %w", resolved, err)
+			}
+			seenImports[ref] = true
+			rel := filepath.ToSlash(path.Join("imports", ref))
+			bundled = append(bundled, EmbeddedProtoFile{Path: rel, Data: data})
+			queue = append(queue, resolved)
+		}
+	}
+
+	importRoots := []string(nil)
+	if len(seenImports) > 0 {
+		importRoots = []string{"imports"}
+	}
+	return bundled, entryRelPaths, importRoots, nil
+}
+
 // ExportPortable writes a self-contained bundle to destPath.
-// All protoset files referenced by the collection are embedded so the file
-// can be shared without shipping separate .protoset files alongside it.
+// All descriptor assets referenced by the collection are embedded so the file can
+// be shared without shipping separate proto/protoset files alongside it.
 func (s *Store) ExportPortable(id, destPath string) error {
 	col, err := s.GetCollection(id)
 	if err != nil {
@@ -151,6 +275,15 @@ func (s *Store) ExportPortable(id, destPath string) error {
 	}
 	// Store relative names so the importer can resolve them to its own local paths.
 	exp.Collection.ProtosetPaths = relativeNames
+	if len(col.ProtoFilePaths) > 0 {
+		files, entryRelPaths, importRoots, err := bundleProtoSources(col.ProtoFilePaths, col.ProtoImportPaths)
+		if err != nil {
+			return err
+		}
+		exp.ProtoFiles = files
+		exp.Collection.ProtoFilePaths = entryRelPaths
+		exp.Collection.ProtoImportPaths = importRoots
+	}
 
 	out, err := json.MarshalIndent(exp, "", "  ")
 	if err != nil {
@@ -197,6 +330,10 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 	}
 
 	col := exp.Collection
+	assetDirName := filepath.Base(exp.Collection.ID)
+	if assetDirName == "." || assetDirName == string(filepath.Separator) || assetDirName == "" {
+		assetDirName = "imported"
+	}
 	col.ID = col.ID + "_imported_" + fmt.Sprintf("%d", time.Now().UnixNano())
 
 	if len(exp.Protosets) > 0 {
@@ -228,6 +365,35 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 			}
 		}
 		col.ProtosetPaths = resolved
+	}
+	if len(exp.ProtoFiles) > 0 {
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			return nil, fmt.Errorf("locating config dir: %w", err)
+		}
+		protoDir := filepath.Join(configDir, appDirName, "proto-sources", assetDirName)
+		if err := os.MkdirAll(protoDir, 0o755); err != nil {
+			return nil, fmt.Errorf("creating proto source dir: %w", err)
+		}
+		for _, pf := range exp.ProtoFiles {
+			abs := filepath.Join(protoDir, filepath.FromSlash(pf.Path))
+			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+				return nil, fmt.Errorf("creating proto source path: %w", err)
+			}
+			if err := os.WriteFile(abs, pf.Data, 0o644); err != nil {
+				return nil, fmt.Errorf("extracting %s: %w", pf.Path, err)
+			}
+		}
+		resolvedFiles := make([]string, 0, len(col.ProtoFilePaths))
+		for _, rel := range col.ProtoFilePaths {
+			resolvedFiles = append(resolvedFiles, filepath.Join(protoDir, filepath.FromSlash(rel)))
+		}
+		col.ProtoFilePaths = resolvedFiles
+		resolvedImports := make([]string, 0, len(col.ProtoImportPaths))
+		for _, rel := range col.ProtoImportPaths {
+			resolvedImports = append(resolvedImports, filepath.Join(protoDir, filepath.FromSlash(rel)))
+		}
+		col.ProtoImportPaths = resolvedImports
 	}
 
 	if err := s.SaveCollection(col); err != nil {
