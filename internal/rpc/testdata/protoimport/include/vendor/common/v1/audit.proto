@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package common.v1;
+
+message AuditStamp {
+  string actor = 1;
+  int64 unix_seconds = 2;
+}

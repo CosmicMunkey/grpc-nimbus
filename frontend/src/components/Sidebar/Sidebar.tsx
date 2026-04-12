@@ -228,7 +228,7 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto py-1 space-y-0.5">
         {services.length === 0 ? (
           <p className="px-3 py-4 text-xs text-c-text3 text-center">
-            Load a .protoset file to browse services
+            Load a .protoset or .proto file to browse services
           </p>
         ) : (
           services.map((svc) => <ServiceNode key={svc.name} svc={svc} />)

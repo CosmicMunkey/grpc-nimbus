@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle, FolderOpen } from 'lucide-react';
@@ -7,7 +7,7 @@ type LoadMode = 'protoset' | 'proto' | 'reflection';
 
 export default function ProtosetLoader() {
   const {
-    protosetPaths, loadMode,
+    protosetPaths, protoImportPaths, loadMode,
     loadProtosets, loadProtoFiles, loadViaReflection,
     clearLoadedProtos, reloadProtos, removeProtoPath,
     isConnected, showConfirm,
@@ -20,6 +20,11 @@ export default function ProtosetLoader() {
   const [collapsed, setCollapsed] = useState(false);
   // Extra import paths the user has added for multi-root proto setups.
   const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (loadMode === 'proto' || loadMode === 'mixed') setExtraImportPaths(protoImportPaths ?? []);
+    else if (loadMode !== 'protoset') setExtraImportPaths([]);
+  }, [protoImportPaths, loadMode]);
 
   const withLoading = async (fn: () => Promise<void>) => {
     setError(null);
@@ -90,7 +95,7 @@ export default function ProtosetLoader() {
   };
 
   // Determine if the active loaded mode matches a reloadable type
-  const canReload = loadMode === 'protoset' || loadMode === 'proto';
+  const canReload = loadMode === 'protoset' || loadMode === 'proto' || loadMode === 'mixed';
   const hasLoaded = loadMode === 'reflection' || protosetPaths.length > 0;
 
   return (
@@ -157,7 +162,7 @@ export default function ProtosetLoader() {
               </div>
               {extraImportPaths.length === 0 ? (
                 <p className="text-[10px] text-c-text3 leading-relaxed">
-                  Parent dirs are used automatically. Add extras for multi-root projects.
+                  Load the service-entry `.proto`, not just shared message files. Import roots are auto-detected when possible; add extras here for layouts that still fail.
                 </p>
               ) : (
                 <div className="space-y-0.5">
@@ -185,12 +190,12 @@ export default function ProtosetLoader() {
 
       {error && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-c-panel border border-c-accent/50 rounded-lg p-5 w-[22rem] shadow-xl flex flex-col gap-4">
+          <div className="bg-c-panel border border-c-accent/50 rounded-lg p-5 w-[min(36rem,calc(100vw-2rem))] max-h-[min(28rem,calc(100vh-2rem))] shadow-xl flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <AlertCircle size={18} className="text-c-accent shrink-0 mt-0.5" />
-              <div>
+              <div className="min-w-0 flex-1 overflow-auto">
                 <p className="text-sm font-semibold text-c-text mb-1">Failed to load</p>
-                <p className="text-xs text-c-text2 leading-relaxed break-words">{error}</p>
+                <p className="text-xs text-c-text2 leading-relaxed whitespace-pre-wrap break-all">{error}</p>
               </div>
             </div>
             <button

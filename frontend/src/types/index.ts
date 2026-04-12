@@ -120,7 +120,8 @@ export interface FieldSchema {
 export interface LoadedState {
   services: ServiceInfo[];
   loadedPaths: string[];
-  loadMode: 'protoset' | 'proto' | 'reflection' | '';
+  loadMode: 'protoset' | 'proto' | 'reflection' | 'mixed' | '';
+  protoImportPaths: string[];
   lastTarget: string;
   lastTLS: string;
 }

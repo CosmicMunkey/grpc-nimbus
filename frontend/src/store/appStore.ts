@@ -175,6 +175,7 @@ interface AppState {
   // Descriptor sources
   services: ServiceInfo[];
   protosetPaths: string[];
+  protoImportPaths: string[];
   loadMode: string;
   loadProtosets: (paths: string[]) => Promise<void>;
   loadProtoFiles: (importPaths: string[], protoFiles: string[]) => Promise<void>;
@@ -290,9 +291,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
         }));
       }
-      if (state.services?.length) {
-        set({ services: state.services, protosetPaths: state.loadedPaths ?? [], loadMode: state.loadMode ?? '' });
-      }
+      set({ services: state.services ?? [], protosetPaths: state.loadedPaths ?? [], protoImportPaths: state.protoImportPaths ?? [], loadMode: state.loadMode ?? '' });
     } catch { /* non-fatal */ }
     // Load user preferences in parallel (non-fatal)
     get().loadUserSettings().catch(() => {});
@@ -301,29 +300,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── Descriptor sources ──────────────────────────────────────────────────────
   services: [],
   protosetPaths: [],
+  protoImportPaths: [],
   loadMode: '',
 
   loadProtosets: async (paths) => {
-    const { protosetPaths, loadMode } = get();
-    const allPaths = loadMode === 'protoset'
-      ? [...new Set([...protosetPaths, ...paths])]
-      : paths;
-    const services = await api.loadProtosets(allPaths);
-    set({ services, protosetPaths: allPaths, loadMode: 'protoset' });
+    await api.loadProtosets(paths);
+    const state = await api.getLoadedState();
+    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
   },
 
   loadProtoFiles: async (importPaths, protoFiles) => {
-    const { protosetPaths, loadMode } = get();
-    const allFiles = loadMode === 'proto'
-      ? [...new Set([...protosetPaths, ...protoFiles])]
-      : protoFiles;
-    const services = await api.loadProtoFiles(importPaths, allFiles);
-    set({ services, protosetPaths: allFiles, loadMode: 'proto' });
+    await api.loadProtoFiles(importPaths, protoFiles);
+    const state = await api.getLoadedState();
+    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
   },
 
   loadViaReflection: async () => {
-    const services = await api.loadViaReflection();
-    set({ services, protosetPaths: [], loadMode: 'reflection' });
+    await api.loadViaReflection();
+    const state = await api.getLoadedState();
+    set({ services: state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
   },
 
   clearLoadedProtos: async () => {
@@ -333,26 +328,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
     };
     set((s) => ({
-      services: [], protosetPaths: [], loadMode: '',
+      services: [], protosetPaths: [], protoImportPaths: [], loadMode: '',
       tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
     }));
   },
 
   reloadProtos: async () => {
     const services = await api.reloadProtos();
-    if (services?.length) set({ services });
+    const state = await api.getLoadedState();
+    set({ services: services ?? state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
   },
 
   removeProtoPath: async (path) => {
     const services = await api.removeProtoPath(path);
-    const remaining = get().protosetPaths.filter((p) => p !== path);
-    set({ services: services ?? [], protosetPaths: remaining });
+    const state = await api.getLoadedState();
+    set({ services: services ?? state?.services ?? [], protosetPaths: state?.loadedPaths ?? [], protoImportPaths: state?.protoImportPaths ?? [], loadMode: state?.loadMode ?? '' });
     if (!(services ?? []).length) {
       const blankTabPatch: Partial<Tab> = {
         selectedMethod: null, requestSchema: [], requestJson: '{}',
         response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
       };
-      set((s) => ({ loadMode: '', tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })) }));
+      set((s) => ({ loadMode: '', protoImportPaths: [], tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })) }));
     }
   },
 

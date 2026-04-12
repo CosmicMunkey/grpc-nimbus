@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package library.v1;
+
+import "vendor/common/v1/audit.proto";
+
+message LibraryFilter {
+  repeated string shelf_ids = 1;
+  common.v1.AuditStamp requested_by = 2;
+}
+
+message Shelf {
+  string id = 1;
+  string theme = 2;
+}
+
+message Book {
+  string isbn = 1;
+  string title = 2;
+  Shelf shelf = 3;
+}

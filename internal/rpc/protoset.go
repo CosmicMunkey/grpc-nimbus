@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/fullstorydev/grpcurl"
 	"github.com/jhump/protoreflect/desc"
@@ -13,14 +14,14 @@ import (
 
 // MethodInfo is the frontend-facing descriptor for a single RPC method.
 type MethodInfo struct {
-	FullName       string `json:"fullName"`       // e.g. "com.example.Greeter/SayHello"
-	ServiceName    string `json:"serviceName"`    // e.g. "com.example.Greeter"
-	MethodName     string `json:"methodName"`     // e.g. "SayHello"
+	FullName        string `json:"fullName"`    // e.g. "com.example.Greeter/SayHello"
+	ServiceName     string `json:"serviceName"` // e.g. "com.example.Greeter"
+	MethodName      string `json:"methodName"`  // e.g. "SayHello"
 	ClientStreaming bool   `json:"clientStreaming"`
 	ServerStreaming bool   `json:"serverStreaming"`
-	InputType      string `json:"inputType"`
-	OutputType     string `json:"outputType"`
-	RequestSchema  string `json:"requestSchema"`
+	InputType       string `json:"inputType"`
+	OutputType      string `json:"outputType"`
+	RequestSchema   string `json:"requestSchema"`
 }
 
 // ServiceInfo groups methods under a service.
@@ -35,9 +36,66 @@ type ServiceInfo struct {
 type ProtosetDescriptor struct {
 	source       grpcurl.DescriptorSource
 	methods      []*desc.MethodDescriptor
-	svcFiles     map[string]string   // service full name → source file path (protoset only)
-	reflClient   *grpcreflect.Client // non-nil when loaded via server reflection
-	unresolvable []string            // service names that reflection listed but could not supply descriptors for
+	svcFiles     map[string]string     // service full name → source file path (protoset only)
+	reflClients  []*grpcreflect.Client // non-nil when loaded via server reflection
+	unresolvable []string              // service names that reflection listed but could not supply descriptors for
+}
+
+type mergedDescriptorSource struct {
+	sources []grpcurl.DescriptorSource
+}
+
+func (m mergedDescriptorSource) ListServices() ([]string, error) {
+	seen := map[string]bool{}
+	var names []string
+	for _, src := range m.sources {
+		svcNames, err := src.ListServices()
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range svcNames {
+			if !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+func (m mergedDescriptorSource) FindSymbol(name string) (desc.Descriptor, error) {
+	var lastErr error
+	for _, src := range m.sources {
+		dsc, err := src.FindSymbol(name)
+		if err == nil {
+			return dsc, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("symbol %q not found", name)
+	}
+	return nil, lastErr
+}
+
+func (m mergedDescriptorSource) AllExtensionsForType(typeName string) ([]*desc.FieldDescriptor, error) {
+	seen := map[string]bool{}
+	var out []*desc.FieldDescriptor
+	for _, src := range m.sources {
+		exts, err := src.AllExtensionsForType(typeName)
+		if err != nil {
+			return nil, err
+		}
+		for _, ext := range exts {
+			key := ext.GetFullyQualifiedName()
+			if !seen[key] {
+				seen[key] = true
+				out = append(out, ext)
+			}
+		}
+	}
+	return out, nil
 }
 
 // LoadProtosets parses the given protoset (FileDescriptorSet) file paths.
@@ -52,6 +110,9 @@ func LoadProtosets(paths []string) (*ProtosetDescriptor, error) {
 	pd, err := newDescriptor(src, nil)
 	if err != nil {
 		return nil, err
+	}
+	if len(pd.Services()) == 0 {
+		return nil, fmt.Errorf("no services found in loaded protoset files")
 	}
 	// Build service → source file mapping by probing each path individually.
 	pd.svcFiles = make(map[string]string)
@@ -82,7 +143,14 @@ func LoadProtoFiles(importPaths, protoFiles []string) (*ProtosetDescriptor, erro
 	if err != nil {
 		return nil, fmt.Errorf("loading proto files: %w", err)
 	}
-	return newDescriptor(src, nil)
+	pd, err := newDescriptor(src, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(pd.Services()) == 0 {
+		return nil, fmt.Errorf("no services found in loaded proto files; select a .proto that defines a service")
+	}
+	return pd, nil
 }
 
 // LoadViaReflection queries server reflection on the given connection.
@@ -101,10 +169,67 @@ func LoadViaReflection(ctx context.Context, cc *grpc.ClientConn) (*ProtosetDescr
 	return pd, nil
 }
 
+// MergeDescriptors combines multiple descriptor sources into a single unified view.
+func MergeDescriptors(parts ...*ProtosetDescriptor) *ProtosetDescriptor {
+	var compact []*ProtosetDescriptor
+	for _, pd := range parts {
+		if pd != nil {
+			compact = append(compact, pd)
+		}
+	}
+	if len(compact) == 0 {
+		return nil
+	}
+	if len(compact) == 1 {
+		return compact[0]
+	}
+
+	seenMethods := map[string]bool{}
+	var methods []*desc.MethodDescriptor
+	svcFiles := map[string]string{}
+	unresolvedSeen := map[string]bool{}
+	var unresolved []string
+	var sources []grpcurl.DescriptorSource
+	var reflClients []*grpcreflect.Client
+
+	for _, pd := range compact {
+		sources = append(sources, pd.source)
+		reflClients = append(reflClients, pd.reflClients...)
+		for _, m := range pd.methods {
+			fullName := m.GetService().GetFullyQualifiedName() + "/" + m.GetName()
+			if !seenMethods[fullName] {
+				seenMethods[fullName] = true
+				methods = append(methods, m)
+			}
+		}
+		for svc, file := range pd.svcFiles {
+			if _, ok := svcFiles[svc]; !ok {
+				svcFiles[svc] = file
+			}
+		}
+		for _, svc := range pd.unresolvable {
+			if !unresolvedSeen[svc] {
+				unresolvedSeen[svc] = true
+				unresolved = append(unresolved, svc)
+			}
+		}
+	}
+
+	return &ProtosetDescriptor{
+		source:       mergedDescriptorSource{sources: sources},
+		methods:      methods,
+		svcFiles:     svcFiles,
+		reflClients:  reflClients,
+		unresolvable: unresolved,
+	}
+}
+
 // Close cleans up any resources held by the descriptor (e.g., reflection stream).
 func (pd *ProtosetDescriptor) Close() {
-	if pd.reflClient != nil {
-		pd.reflClient.Reset()
+	for _, client := range pd.reflClients {
+		if client != nil {
+			client.Reset()
+		}
 	}
 }
 
@@ -153,11 +278,19 @@ func newDescriptor(src grpcurl.DescriptorSource, reflClient *grpcreflect.Client)
 		pending = stillPending
 	}
 
+	if len(pending) > 0 && reflClient == nil {
+		return nil, fmt.Errorf("resolving service descriptors: could not resolve %s", strings.Join(pending, ", "))
+	}
+
 	for _, svcName := range pending {
 		fmt.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)\n", svcName)
 	}
 
-	return &ProtosetDescriptor{source: src, methods: methods, reflClient: reflClient, unresolvable: pending}, nil
+	pd := &ProtosetDescriptor{source: src, methods: methods, unresolvable: pending}
+	if reflClient != nil {
+		pd.reflClients = []*grpcreflect.Client{reflClient}
+	}
+	return pd, nil
 }
 
 // Services returns the service/method tree suitable for the frontend.
