@@ -20,8 +20,8 @@ type Environment struct {
 	ID        string      `json:"id"`
 	Name      string      `json:"name"`
 	Headers   []EnvHeader `json:"headers,omitempty"`
-	CreatedAt time.Time   `json:"createdAt"`
-	UpdatedAt time.Time   `json:"updatedAt"`
+	CreatedAt string      `json:"createdAt"`
+	UpdatedAt string      `json:"updatedAt"`
 }
 
 // EnvStore manages environment persistence.
@@ -69,8 +69,8 @@ func (s *EnvStore) GetEnvironment(id string) (*Environment, error) {
 
 // SaveEnvironment persists an environment to disk.
 func (s *EnvStore) SaveEnvironment(env Environment) error {
-	now := time.Now()
-	if env.CreatedAt.IsZero() {
+	now := time.Now().Format(time.RFC3339Nano)
+	if env.CreatedAt == "" {
 		env.CreatedAt = now
 	}
 	env.UpdatedAt = now
@@ -106,5 +106,3 @@ func (s *EnvStore) loadEnvFile(path string) (*Environment, error) {
 	}
 	return &env, nil
 }
-
-

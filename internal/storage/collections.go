@@ -23,8 +23,8 @@ type SavedRequest struct {
 	RequestJSON  string               `json:"requestJson"`
 	Metadata     []rpc.MetadataEntry  `json:"metadata"`
 	Connection   rpc.ConnectionConfig `json:"connection"`
-	CreatedAt    time.Time            `json:"createdAt"`
-	UpdatedAt    time.Time            `json:"updatedAt"`
+	CreatedAt    string               `json:"createdAt"`
+	UpdatedAt    string               `json:"updatedAt"`
 }
 
 // Collection is a named group of saved requests.
@@ -36,8 +36,8 @@ type Collection struct {
 	ProtoFilePaths   []string       `json:"protoFilePaths,omitempty"`
 	ProtoImportPaths []string       `json:"protoImportPaths,omitempty"`
 	Requests         []SavedRequest `json:"requests"`
-	CreatedAt        time.Time      `json:"createdAt"`
-	UpdatedAt        time.Time      `json:"updatedAt"`
+	CreatedAt        string         `json:"createdAt"`
+	UpdatedAt        string         `json:"updatedAt"`
 }
 
 // Store manages persistent collection data on disk.
@@ -85,8 +85,8 @@ func (s *Store) GetCollection(id string) (*Collection, error) {
 
 // SaveCollection persists a collection to disk (create or update).
 func (s *Store) SaveCollection(col Collection) error {
-	now := time.Now()
-	if col.CreatedAt.IsZero() {
+	now := time.Now().Format(time.RFC3339Nano)
+	if col.CreatedAt == "" {
 		col.CreatedAt = now
 	}
 	col.UpdatedAt = now
@@ -153,11 +153,11 @@ func importRefs(path string) []string {
 			continue
 		}
 		rest := strings.TrimPrefix(line, prefix)
-		end := strings.Index(rest, `"`)
-		if end == -1 {
+		before, _, ok := strings.Cut(rest, `"`)
+		if !ok {
 			continue
 		}
-		refs = append(refs, rest[:end])
+		refs = append(refs, before)
 	}
 	return refs
 }

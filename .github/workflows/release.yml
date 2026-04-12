@@ -5,9 +5,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-macos:
     name: macOS (${{ matrix.arch }})
@@ -20,15 +17,15 @@ jobs:
           - arch: arm64
             goarch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
@@ -51,7 +48,7 @@ jobs:
           zip -r ../../grpc-nimbus-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip "GRPC Nimbus.app"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: grpc-nimbus-darwin-${{ matrix.arch }}
           path: grpc-nimbus-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip
@@ -60,15 +57,15 @@ jobs:
     name: Windows (amd64)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
@@ -89,7 +86,7 @@ jobs:
             -DestinationPath grpc-nimbus-${{ github.ref_name }}-windows-amd64.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: grpc-nimbus-windows-amd64
           path: grpc-nimbus-${{ github.ref_name }}-windows-amd64.zip
@@ -98,15 +95,15 @@ jobs:
     name: Linux (amd64)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
@@ -133,7 +130,7 @@ jobs:
             -C build/bin grpc-nimbus
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: grpc-nimbus-linux-amd64
           path: grpc-nimbus-${{ github.ref_name }}-linux-amd64.tar.gz
@@ -146,7 +143,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
 

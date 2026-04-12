@@ -55,11 +55,11 @@ func commonDir(paths []string) string {
 
 func importFromErrorLine(err error, protoFiles []string) (string, string, bool) {
 	msg := err.Error()
-	openIdx := strings.Index(msg, ": open ")
-	if openIdx == -1 {
+	before, _, ok := strings.Cut(msg, ": open ")
+	if !ok {
 		return "", "", false
 	}
-	prefix := msg[:openIdx]
+	prefix := before
 	parts := strings.Split(prefix, ":")
 	if len(parts) < 3 {
 		return "", "", false
@@ -93,11 +93,11 @@ func importFromErrorLine(err error, protoFiles []string) (string, string, bool) 
 		return "", "", false
 	}
 	rest := strings.TrimPrefix(line, prefixImport)
-	endIdx := strings.Index(rest, `"`)
-	if endIdx == -1 {
+	before, _, found := strings.Cut(rest, `"`)
+	if !found {
 		return "", "", false
 	}
-	return sourcePath, rest[:endIdx], true
+	return sourcePath, before, true
 }
 
 func importRefsForFile(path string) []string {
@@ -114,11 +114,11 @@ func importRefsForFile(path string) []string {
 			continue
 		}
 		rest := strings.TrimPrefix(line, prefixImport)
-		endIdx := strings.Index(rest, `"`)
-		if endIdx == -1 {
+		before, _, ok := strings.Cut(rest, `"`)
+		if !ok {
 			continue
 		}
-		refs = append(refs, rest[:endIdx])
+		refs = append(refs, before)
 	}
 	return refs
 }
@@ -330,7 +330,7 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 		pd  *rpc.ProtosetDescriptor
 		err error
 	)
-	for attempts := 0; attempts < 8; attempts++ {
+	for range 8 {
 		pd, err = a.rebuildDescriptor(protosets, allImportPaths, allProtoFiles, withReflection, conn)
 		if err == nil {
 			break

@@ -52,7 +52,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 			RequestJSON: req.RequestJSON,
 			Metadata:    req.Metadata,
 			Response:    resp,
-			InvokedAt:   time.Now(),
+			InvokedAt:   time.Now().Format(time.RFC3339Nano),
 		})
 	}
 	return resp, nil
