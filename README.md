@@ -10,6 +10,22 @@ A cross-platform desktop gRPC client with first-class support for **protoset fil
 
 ---
 
+## macOS: allowing the app to run
+
+macOS Gatekeeper will block GRPC Nimbus from launching because the app is not notarized with an Apple Developer certificate. You'll see a message like *"GRPC Nimbus.app cannot be opened because the developer cannot be verified."*
+
+To clear the quarantine flag, run this once in Terminal after installing the app:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/GRPC Nimbus.app"
+```
+
+Then double-click the app as normal. You only need to do this once per installation.
+
+> **Why does this happen?** Apple's Gatekeeper quarantines any app downloaded from the internet that isn't signed and notarized through Apple's paid Developer Program. This is a distribution-time restriction, not a security flaw in the app itself. The command above removes that quarantine attribute.
+
+---
+
 ## Why GRPC Nimbus?
 
 Many teams use build pipelines that emit **compiled `.protoset` files** — binary FileDescriptorSet bundles that encode the full schema without requiring all imported `.proto` sources to be present. GRPC Nimbus makes these first-class citizens alongside raw proto files and server reflection.
@@ -97,22 +113,6 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 ### Streaming
 - Unary, server-streaming, client-streaming, and bidirectional streaming
 - Live event log in the response panel with a stop button
-
----
-
-## macOS: allowing the app to run
-
-macOS Gatekeeper will block GRPC Nimbus from launching because the app is not notarized with an Apple Developer certificate. You'll see a message like *"GRPC Nimbus.app cannot be opened because the developer cannot be verified."*
-
-To clear the quarantine flag, run this once in Terminal after installing the app:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/GRPC Nimbus.app"
-```
-
-Then double-click the app as normal. You only need to do this once per installation.
-
-> **Why does this happen?** Apple's Gatekeeper quarantines any app downloaded from the internet that isn't signed and notarized through Apple's paid Developer Program. This is a distribution-time restriction, not a security flaw in the app itself. The command above removes that quarantine attribute.
 
 ---
 
