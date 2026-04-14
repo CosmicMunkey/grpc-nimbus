@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { Wifi, WifiOff, ChevronDown, Lock, Unlock, AlertTriangle, X } from 'lucide-react';
+import { Wifi, WifiOff, ChevronDown, Lock, Unlock, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import EnvSelector from '../Environments/EnvSelector';
 import SettingsPanel from '../Settings/SettingsPanel';
 
@@ -45,6 +45,32 @@ export default function ConnectionBar() {
   const [errorOpen, setErrorOpen] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const tlsRef = useRef<HTMLDivElement>(null);
+
+  // Track the config that was active when we last connected
+  const connectedConfigRef = useRef<{ target: string; tls: string } | null>(null);
+  const [isStale, setIsStale] = useState(false);
+
+  // Snapshot config on connect; clear on disconnect
+  useEffect(() => {
+    if (isConnected) {
+      connectedConfigRef.current = { target: connectionConfig.target, tls: connectionConfig.tls };
+      setIsStale(false);
+    } else {
+      connectedConfigRef.current = null;
+      setIsStale(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
+
+  // Check staleness whenever config changes while connected
+  useEffect(() => {
+    if (!isConnected || !connectedConfigRef.current) return;
+    const { target, tls } = connectedConfigRef.current;
+    setIsStale(connectionConfig.target !== target || connectionConfig.tls !== tls);
+  }, [connectionConfig.target, connectionConfig.tls, isConnected]);
+
+  const handleReconnect = async () => { await disconnect(); connect(); };
+
   const selectedTls = TLS_OPTIONS.find((o) => o.value === connectionConfig.tls) ?? TLS_OPTIONS[0];
 
   useEffect(() => {
@@ -77,7 +103,11 @@ export default function ConnectionBar() {
           type="text"
           value={connectionConfig.target}
           onChange={(e) => setConnectionConfig({ target: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && !useAppStore.getState().isConnected && connect()}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            if (isStale) { handleReconnect(); }
+            else if (!useAppStore.getState().isConnected) { connect(); }
+          }}
           placeholder="host:port"
           className="flex-1 bg-transparent text-c-text placeholder-c-text3 text-sm outline-none font-mono"
           spellCheck={false}
@@ -109,16 +139,26 @@ export default function ConnectionBar() {
         )}
       </div>
 
-      {/* Connect / Disconnect */}
-      <button
-        onClick={() => isConnected ? disconnect() : connect()}
-        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-          isConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
-        }`}
-      >
-        {isConnected ? <WifiOff size={13} /> : <Wifi size={13} />}
-        {isConnected ? 'Disconnect' : 'Connect'}
-      </button>
+      {/* Connect / Disconnect / Reconnect */}
+      {isStale ? (
+        <button
+          onClick={handleReconnect}
+          title="Settings changed — click to reconnect with new config"
+          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/30"
+        >
+          <RefreshCw size={13} /> Reconnect
+        </button>
+      ) : (
+        <button
+          onClick={() => isConnected ? disconnect() : connect()}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+            isConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
+          }`}
+        >
+          {isConnected ? <WifiOff size={13} /> : <Wifi size={13} />}
+          {isConnected ? 'Disconnect' : 'Connect'}
+        </button>
+      )}
 
       {/* Connection status indicator */}
       <div ref={errorRef} className="relative flex items-center gap-1">
