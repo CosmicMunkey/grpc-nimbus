@@ -116,9 +116,36 @@ Then double-click the app as normal. You only need to do this once per installat
 
 ---
 
+## Usage
 
+### Loading a protoset
 
-### Prerequisites
+1. Open the **ProtoLoader** panel in the sidebar (top section).
+2. Choose the **Protoset** tab and click **Load .protoset files…**
+3. Select one or more `.protoset` files — services appear in the service tree immediately.
+
+Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify import paths if needed), or the **Reflect** tab to load from a live server.
+
+### Making a request
+
+1. Click any method in the service tree.
+2. The **Form** tab populates with all available request fields.
+3. Fill in values (scalar, nested, repeated, map, oneof — all supported).
+4. Optionally add metadata/headers in the **Metadata** tab.
+5. Press **Send** (or `Cmd/Ctrl+Enter`).
+6. The response appears in the right panel. Streaming responses update in real time.
+
+### Saving and exporting
+
+- Click the **Save** button in the request panel toolbar to save the current request to a collection.
+- To export: **File → Export Collection…** (or the `⋮` menu on any collection in the sidebar). The exported `.json` bundles the protoset so the recipient needs no extra files.
+- To import: **File → Import Collection…** or the **Import collection…** button at the bottom of the collections list.
+
+---
+
+## Building from source
+
+### Dependencies
 | Tool | Version |
 |---|---|
 | Go | 1.21+ |
@@ -146,33 +173,6 @@ wails dev
 ```
 
 This starts the backend in watch mode and opens the UI in a native window with Vite's hot-reload active.
-
----
-
-## Usage
-
-### Loading a protoset
-
-1. Open the **ProtoLoader** panel in the sidebar (top section).
-2. Choose the **Protoset** tab and click **Load .protoset files…**
-3. Select one or more `.protoset` files — services appear in the service tree immediately.
-
-Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify import paths if needed), or the **Reflect** tab to load from a live server.
-
-### Making a request
-
-1. Click any method in the service tree.
-2. The **Form** tab populates with all available request fields.
-3. Fill in values (scalar, nested, repeated, map, oneof — all supported).
-4. Optionally add metadata/headers in the **Metadata** tab.
-5. Press **Send** (or `Cmd/Ctrl+Enter`).
-6. The response appears in the right panel. Streaming responses update in real time.
-
-### Saving and exporting
-
-- Click the **Save** button in the request panel toolbar to save the current request to a collection.
-- To export: **File → Export Collection…** (or the `⋮` menu on any collection in the sidebar). The exported `.json` bundles the protoset so the recipient needs no extra files.
-- To import: **File → Import Collection…** or the **Import collection…** button at the bottom of the collections list.
 
 ---
 
