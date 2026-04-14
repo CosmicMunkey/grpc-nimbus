@@ -142,6 +142,18 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Extract tag annotation
+        id: tag_body
+        run: |
+          body=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
@@ -150,6 +162,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.tag_body.outputs.body }}
           files: |
             grpc-nimbus-*.zip
             grpc-nimbus-*.tar.gz
