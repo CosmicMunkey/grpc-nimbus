@@ -14,16 +14,24 @@ A cross-platform desktop gRPC client with first-class support for **protoset fil
 
 Most gRPC tools (Insomnia, Postman, BloomRPC, grpc-client-cli) focus on loading raw `.proto` source files. In many teams the build pipeline emits **compiled `.protoset` files** — binary FileDescriptorSet bundles that encode the full schema without requiring all imported `.proto` sources to be present. GRPC Nimbus makes these first-class citizens.
 
-| Feature | grpc-nimbus | grpcui | grpcurl | Postman |
-|---|---|---|---|---|
-| Protoset file loading | ✅ | ✅ | ✅ | ❌ |
-| Visual form builder | ✅ | ✅ | ❌ | ✅ |
-| Server reflection | ✅ | ✅ | ✅ | ✅ |
-| Saved collections | ✅ | ❌ | ❌ | ✅ |
-| Portable export (bundled protosets) | ✅ | ❌ | ❌ | ❌ |
-| Native desktop binary | ✅ | ❌ | ❌ | ✅ |
-| Streaming (client/server/bidi) | ✅ | ✅ | ✅ | ✅ |
-| Environment headers (per-env default metadata) | ✅ | ❌ | ❌ | ✅ |
+## Features at a glance
+
+- **Protoset files** — load compiled `.protoset` FileDescriptorSet bundles; no import paths needed
+- **Proto source files** — load raw `.proto` files with automatic import path detection
+- **Server reflection** — load the full service tree from a live server, with a cancel button if it takes too long
+- **Type-aware form builder** — strings, numbers, booleans, enums, nested messages, repeated fields, maps, and oneof groups
+- **JSON editor** — switch between the form and a raw JSON body at any time; both stay in sync
+- **Multi-tab interface** — open multiple methods simultaneously, rename tabs with a double-click
+- **Saved collections** — save requests by name, organized into collections that persist across restarts
+- **Portable export** — exported collections embed all referenced protoset files as base64 so the `.json` bundle works on any machine with no extra files
+- **Request history** — expandable per-method history showing the full request, response body, status, headers, and trailers
+- **Environments** — define named environments with default gRPC metadata headers; switch from the connection bar
+- **Streaming** — unary, server-streaming, client-streaming, and bidirectional; live event log with stop button
+- **Resizable layout** — drag to resize the sidebar and request/response panel split; sizes persist across restarts
+- **Stale connection detection** — editing the host or TLS mode while connected surfaces a Reconnect button
+- **grpcurl tab** — generates the equivalent grpcurl command for any request
+- **Themes and font size** — multiple built-in themes, adjustable font size, all persisted
+- **Cross-platform** — native desktop binary for macOS (arm64 + amd64), Windows, and Linux
 
 ---
 
@@ -56,7 +64,7 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - Save any request to a named collection (create new or add to existing)
 - Collections persist across restarts; load a saved request in one click
 - **Portable export** — exporting a collection embeds all referenced protoset files as base64 so the `.json` bundle can be shared with a colleague and imported on any machine, no separate file transfer needed
-- Per-session request history ring-buffer for quick replay
+- Per-session request history ring-buffer — click any entry to expand and see the full request, response body, status, headers, and trailers
 
 ### Environments
 - Define named environments with default **gRPC metadata headers** (e.g. `Authorization: Bearer <token>`, `x-api-key: …`)
@@ -68,13 +76,23 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - **Font size** — Small (14 px), Medium (16 px), or Large (18 px); scales all UI text proportionally
 - **Confirm before delete** — toggle whether a confirmation dialog appears when deleting requests, collections, or environments; defaults to on
 
+### Resizable layout
+- Drag the divider between the sidebar and request panel to resize the sidebar
+- Drag the divider between the request and response panels to adjust the split
+- Sizes persist across restarts
+
 ### Connection status
-- The dot next to the Connect button reflects real gRPC connectivity state: gray = disconnected, yellow = connecting/idle, green = ready, red = transient failure
+- The dot next to the Connect/Disconnect button reflects real gRPC connectivity: gray = disconnected, green = connected, yellow = connecting, red = transient failure
+- Editing the host or TLS mode while connected changes the button to **Reconnect**, applying new settings in one click without a manual disconnect first
 
 ### Connections
-- Plain-text or TLS connections
+- Plain-text or TLS connections (system CA or skip-verify)
 - Connection config (host:port, TLS mode) saved and restored automatically
 - Last-loaded protoset / proto files restored on next launch
+
+### Server reflection
+- Load the full service tree directly from a live server via gRPC reflection
+- A **Cancel** button is shown while reflection is loading so you're never stuck waiting
 
 ### Streaming
 - Unary, server-streaming, client-streaming, and bidirectional streaming
