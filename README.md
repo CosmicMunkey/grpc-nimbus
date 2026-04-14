@@ -12,7 +12,7 @@ A cross-platform desktop gRPC client with first-class support for **protoset fil
 
 ## Why GRPC Nimbus?
 
-Most gRPC tools (Insomnia, Postman, BloomRPC, grpc-client-cli) focus on loading raw `.proto` source files. In many teams the build pipeline emits **compiled `.protoset` files** — binary FileDescriptorSet bundles that encode the full schema without requiring all imported `.proto` sources to be present. GRPC Nimbus makes these first-class citizens.
+Many teams use build pipelines that emit **compiled `.protoset` files** — binary FileDescriptorSet bundles that encode the full schema without requiring all imported `.proto` sources to be present. GRPC Nimbus makes these first-class citizens alongside raw proto files and server reflection.
 
 ## Features at a glance
 
