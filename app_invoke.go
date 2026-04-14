@@ -96,7 +96,12 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 	req = interpolateRequest(req, env)
 
 	go func() {
-		defer cancel()
+		defer func() {
+			cancel()
+			a.mu.Lock()
+			a.streamCancel = nil
+			a.mu.Unlock()
+		}()
 		err := rpc.InvokeStream(ctx, conn, pd, req, func(evt rpc.StreamEvent) {
 			runtime.EventsEmit(a.ctx, "stream:event", evt)
 		})

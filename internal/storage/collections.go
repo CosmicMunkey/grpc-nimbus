@@ -96,7 +96,11 @@ func (s *Store) SaveCollection(col Collection) error {
 		return fmt.Errorf("marshalling collection: %w", err)
 	}
 	path := s.filePath(col.ID)
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return fmt.Errorf("writing collection file: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
 		return fmt.Errorf("writing collection file: %w", err)
 	}
 	return nil

@@ -79,7 +79,12 @@ func (s *EnvStore) SaveEnvironment(env Environment) error {
 	if err != nil {
 		return fmt.Errorf("marshalling environment: %w", err)
 	}
-	return os.WriteFile(s.envFilePath(env.ID), data, 0o644)
+	path := s.envFilePath(env.ID)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return fmt.Errorf("writing environment file: %w", err)
+	}
+	return os.Rename(tmp, path)
 }
 
 // DeleteEnvironment removes an environment from disk.

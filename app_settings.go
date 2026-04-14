@@ -12,11 +12,13 @@ type UserSettings struct {
 	Theme          string            `json:"theme"`
 	CustomTheme    map[string]string `json:"customTheme,omitempty"`
 	FontSize       int               `json:"fontSize"`
+	SidebarWidth   float64           `json:"sidebarWidth"`
+	PanelSplit     float64           `json:"panelSplit"`
 }
 
 // GetUserSettings returns the current user preference settings.
 func (a *App) GetUserSettings() UserSettings {
-	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus", FontSize: 16}
+	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus", FontSize: 16, SidebarWidth: 256, PanelSplit: 0.5}
 	if a.settings == nil {
 		return defaults
 	}
@@ -37,6 +39,12 @@ func (a *App) GetUserSettings() UserSettings {
 	if saved.FontSize != nil {
 		result.FontSize = *saved.FontSize
 	}
+	if saved.SidebarWidth != nil {
+		result.SidebarWidth = *saved.SidebarWidth
+	}
+	if saved.PanelSplit != nil {
+		result.PanelSplit = *saved.PanelSplit
+	}
 	return result
 }
 
@@ -47,13 +55,16 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.Theme = s.Theme
 		settings.CustomTheme = s.CustomTheme
 		settings.FontSize = &s.FontSize
+		settings.SidebarWidth = &s.SidebarWidth
+		settings.PanelSplit = &s.PanelSplit
 	})
 }
 
 // saveSettings merges a settings mutation into the persisted settings file.
-// Safe to call from goroutines (goroutine-level serialization is acceptable
-// since saves are infrequent and SettingsStore.Save is atomic via rename).
+// Serialized via settingsMu to prevent concurrent read-modify-write races.
 func (a *App) saveSettings(mutate func(*storage.AppSettings)) {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
 	if a.settings == nil {
 		return
 	}

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"grpc-nimbus/internal/rpc"
 	"grpc-nimbus/internal/storage"
@@ -225,7 +227,7 @@ func (a *App) combinedLoadedPathsLocked() []string {
 	return dedupeStrings(paths)
 }
 
-func (a *App) rebuildDescriptor(protosets, importPaths, protoFiles []string, withReflection bool, connTarget *rpc.Connection) (*rpc.ProtosetDescriptor, error) {
+func (a *App) rebuildDescriptor(ctx context.Context, protosets, importPaths, protoFiles []string, withReflection bool, connTarget *rpc.Connection) (*rpc.ProtosetDescriptor, error) {
 	var parts []*rpc.ProtosetDescriptor
 	if len(protosets) > 0 {
 		pd, err := rpc.LoadProtosets(protosets)
@@ -245,7 +247,7 @@ func (a *App) rebuildDescriptor(protosets, importPaths, protoFiles []string, wit
 		if connTarget == nil {
 			return nil, fmt.Errorf("not connected — call Connect first")
 		}
-		pd, err := rpc.LoadViaReflection(a.ctx, connTarget.ClientConn())
+		pd, err := rpc.LoadViaReflection(ctx, connTarget.ClientConn())
 		if err != nil {
 			return nil, err
 		}
@@ -256,15 +258,21 @@ func (a *App) rebuildDescriptor(protosets, importPaths, protoFiles []string, wit
 
 func (a *App) storeDescriptorState(pd *rpc.ProtosetDescriptor, protosets, importPaths, protoFiles []string, withReflection bool) {
 	a.mu.Lock()
-	if a.protoset != nil {
-		a.protoset.Close()
-	}
+	old := a.protoset
 	a.protoset = pd
 	a.loadedProtosetPaths = append([]string(nil), protosets...)
 	a.loadedProtoFiles = append([]string(nil), protoFiles...)
 	a.loadImportPaths = append([]string(nil), importPaths...)
 	a.loadReflection = withReflection
 	a.mu.Unlock()
+
+	// Close old descriptor after a delay so in-flight RPCs can finish.
+	if old != nil {
+		go func() {
+			time.Sleep(5 * time.Second)
+			old.Close()
+		}()
+	}
 }
 
 // LoadProtosets parses the given protoset file paths and returns the service tree.
@@ -278,7 +286,7 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 	a.mu.Unlock()
 
 	allProtosets := dedupeStrings(append(currentProtosets, paths...))
-	pd, err := a.rebuildDescriptor(allProtosets, importPaths, protoFiles, withReflection, conn)
+	pd, err := a.rebuildDescriptor(a.ctx, allProtosets, importPaths, protoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +339,7 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 		err error
 	)
 	for range 8 {
-		pd, err = a.rebuildDescriptor(protosets, allImportPaths, allProtoFiles, withReflection, conn)
+		pd, err = a.rebuildDescriptor(a.ctx, protosets, allImportPaths, allProtoFiles, withReflection, conn)
 		if err == nil {
 			break
 		}
@@ -364,11 +372,21 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	protosets := append([]string(nil), a.loadedProtosetPaths...)
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	protoFiles := append([]string(nil), a.loadedProtoFiles...)
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.reflectionCancel = cancel
 	a.mu.Unlock()
+
+	defer func() {
+		cancel()
+		a.mu.Lock()
+		a.reflectionCancel = nil
+		a.mu.Unlock()
+	}()
+
 	if conn == nil {
 		return nil, fmt.Errorf("not connected — call Connect first")
 	}
-	pd, err := a.rebuildDescriptor(protosets, importPaths, protoFiles, true, conn)
+	pd, err := a.rebuildDescriptor(ctx, protosets, importPaths, protoFiles, true, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +399,16 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 		s.ProtoImportPaths = importPaths
 	})
 	return pd.Services(), nil
+}
+
+// CancelReflection aborts the currently in-flight reflection load.
+func (a *App) CancelReflection() {
+	a.mu.Lock()
+	cancel := a.reflectionCancel
+	a.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 // GetLoadedState returns the currently loaded descriptor state plus saved connection
@@ -420,15 +448,20 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 // returning the app to a clean state as if it were freshly installed.
 func (a *App) ClearLoadedProtos() {
 	a.mu.Lock()
-	if a.protoset != nil {
-		a.protoset.Close()
-	}
+	old := a.protoset
 	a.protoset = nil
 	a.loadedProtosetPaths = nil
 	a.loadedProtoFiles = nil
 	a.loadImportPaths = nil
 	a.loadReflection = false
 	a.mu.Unlock()
+
+	if old != nil {
+		go func() {
+			time.Sleep(5 * time.Second)
+			old.Close()
+		}()
+	}
 
 	go a.saveSettings(func(s *storage.AppSettings) {
 		s.ProtoLoadMode = ""
@@ -453,7 +486,7 @@ func (a *App) ReloadProtos() ([]rpc.ServiceInfo, error) {
 	if len(protosets) == 0 && len(protoFiles) == 0 && !withReflection {
 		return nil, fmt.Errorf("nothing to reload")
 	}
-	pd, err := a.rebuildDescriptor(protosets, importPaths, protoFiles, withReflection, conn)
+	pd, err := a.rebuildDescriptor(a.ctx, protosets, importPaths, protoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +522,7 @@ func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
 		a.ClearLoadedProtos()
 		return []rpc.ServiceInfo{}, nil
 	}
-	pd, err := a.rebuildDescriptor(remainingProtosets, importPaths, remainingProtoFiles, withReflection, conn)
+	pd, err := a.rebuildDescriptor(a.ctx, remainingProtosets, importPaths, remainingProtoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}

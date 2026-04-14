@@ -33,6 +33,7 @@ declare global {
           InvokeStream(req: InvokeRequest): Promise<void>;
           CancelUnary(): Promise<void>;
           CancelStream(): Promise<void>;
+          CancelReflection(): Promise<void>;
           ListCollections(): Promise<Collection[]>;
           SaveCollection(col: Collection): Promise<void>;
           DeleteCollection(id: string): Promise<void>;
@@ -56,8 +57,8 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number }>;
-          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number }): Promise<void>;
+          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
+          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
         };
       };
     };
@@ -76,6 +77,7 @@ export const api = {
   invokeStream: (req: InvokeRequest) => window.go.main.App.InvokeStream(req),
   cancelUnary: () => window.go.main.App.CancelUnary(),
   cancelStream: () => window.go.main.App.CancelStream(),
+  cancelReflection: () => window.go.main.App.CancelReflection(),
   listCollections: () => window.go.main.App.ListCollections(),
   saveCollection: (col: Collection) => window.go.main.App.SaveCollection(col),
   deleteCollection: (id: string) => window.go.main.App.DeleteCollection(id),
@@ -100,8 +102,20 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
   getUserSettings: () => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
+
+// Persist all user settings from the current store state.
+function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'theme' | 'customTheme' | 'fontSize' | 'sidebarWidth' | 'panelSplit'>) {
+  api.saveUserSettings({
+    confirmDeletes: s.confirmDeletes,
+    theme: s.theme,
+    customTheme: s.customTheme as Record<string, string>,
+    fontSize: s.fontSize,
+    sidebarWidth: s.sidebarWidth,
+    panelSplit: s.panelSplit,
+  }).catch(() => {});
+}
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
 
@@ -207,6 +221,7 @@ interface AppState {
   loadProtosets: (paths: string[]) => Promise<void>;
   loadProtoFiles: (importPaths: string[], protoFiles: string[]) => Promise<void>;
   loadViaReflection: () => Promise<void>;
+  cancelReflection: () => void;
   clearLoadedProtos: () => Promise<void>;
   reloadProtos: () => Promise<void>;
   removeProtoPath: (path: string) => Promise<void>;
@@ -234,7 +249,6 @@ interface AppState {
   cancelStream: () => void;
   loadHistory: (methodPath: string) => Promise<void>;
   clearHistory: (methodPath: string) => Promise<void>;
-  restoreFromHistory: (entry: HistoryEntry) => void;
 
   // Collections
   collections: Collection[];
@@ -268,6 +282,12 @@ interface AppState {
   fontSize: number;
   setFontSize: (size: number) => void;
   loadUserSettings: () => Promise<void>;
+
+  // Layout
+  sidebarWidth: number;
+  panelSplit: number;
+  setSidebarWidth: (w: number) => void;
+  setPanelSplit: (s: number) => void;
 
   // Confirm dialog (used by all delete operations)
   confirmDialog: { message: string; resolve: (yes: boolean) => void } | null;
@@ -323,6 +343,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set(applyLoadedState(state));
     } catch { /* non-fatal */ }
+    // If the backend is already connected, start polling
+    try {
+      const connState = await api.getConnectionState();
+      if (connState !== 'disconnected') {
+        set({ isConnected: true, connectionStatus: connState as AppState['connectionStatus'] });
+        startConnPoll();
+      }
+    } catch { /* non-fatal */ }
     // Load user preferences in parallel (non-fatal)
     get().loadUserSettings().catch(() => {});
   },
@@ -353,16 +381,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(applyLoadedState(state));
   },
 
+  cancelReflection: () => {
+    api.cancelReflection().catch(() => {});
+  },
+
   clearLoadedProtos: async () => {
     await api.clearLoadedProtos();
-    const blankTabPatch: Partial<Tab> = {
-      selectedMethod: null, requestSchema: [], requestJson: '{}',
-      response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
-    };
-    set((s) => ({
-      services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '',
-      tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
-    }));
+    // Close all tabs that had a method selected (they're all orphaned now)
+    set((s) => {
+      const orphanedIds = new Set(s.tabs.filter((t) => t.selectedMethod).map((t) => t.id));
+      if (orphanedIds.size === 0) {
+        return { services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '' };
+      }
+      let remaining = s.tabs.filter((t) => !orphanedIds.has(t.id));
+      if (remaining.length === 0) remaining = [makeTab()];
+      const newActive = orphanedIds.has(s.activeTabId)
+        ? remaining[remaining.length - 1].id
+        : s.activeTabId;
+      const newStreaming = s.streamingTabId && orphanedIds.has(s.streamingTabId) ? null : s.streamingTabId;
+      return {
+        services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '',
+        tabs: remaining, activeTabId: newActive, streamingTabId: newStreaming,
+      };
+    });
   },
 
   reloadProtos: async () => {
@@ -374,20 +415,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeProtoPath: async (path) => {
     const services = await api.removeProtoPath(path);
     const state = await api.getLoadedState();
-    set({ ...applyLoadedState(state), services: services ?? state?.services ?? [] });
-    if (!(services ?? []).length) {
-      const blankTabPatch: Partial<Tab> = {
-        selectedMethod: null, requestSchema: [], requestJson: '{}',
-        response: null, streamMessages: [], isInvoking: false, isStreaming: false, invokeError: null,
-      };
-      set((s) => ({
-        loadMode: '',
-        protoImportPaths: [],
-        loadedProtosetPaths: [],
-        loadedProtoFilePaths: [],
-        tabs: s.tabs.map((t) => ({ ...t, ...blankTabPatch })),
-      }));
+    const newServices = services ?? state?.services ?? [];
+
+    // Build set of valid methods after removal
+    const validMethods = new Set<string>();
+    for (const svc of newServices) {
+      for (const m of svc.methods ?? []) {
+        validMethods.add(m.fullName);
+      }
     }
+
+    // Apply loaded state and close orphaned tabs in one atomic update
+    set((s) => {
+      const base = { ...applyLoadedState(state), services: newServices };
+      const invalidTabs = s.tabs.filter((t) => t.selectedMethod && !validMethods.has(t.selectedMethod.fullName));
+      if (invalidTabs.length === 0) return base;
+      const closedIds = new Set(invalidTabs.map((t) => t.id));
+      let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
+      if (remaining.length === 0) remaining = [makeTab()];
+      const newActive = closedIds.has(s.activeTabId)
+        ? remaining[remaining.length - 1].id
+        : s.activeTabId;
+      const newStreaming = s.streamingTabId && closedIds.has(s.streamingTabId) ? null : s.streamingTabId;
+      return { ...base, tabs: remaining, activeTabId: newActive, streamingTabId: newStreaming };
+    });
   },
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
@@ -403,14 +454,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeTab: (id) => {
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id);
+      const clearStreaming = s.streamingTabId === id ? null : s.streamingTabId;
       if (remaining.length === 0) {
         const fresh = makeTab();
-        return { tabs: [fresh], activeTabId: fresh.id };
+        return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: clearStreaming };
       }
       const newActive = s.activeTabId === id
         ? (remaining[remaining.length - 1]?.id ?? remaining[0].id)
         : s.activeTabId;
-      return { tabs: remaining, activeTabId: newActive };
+      return { tabs: remaining, activeTabId: newActive, streamingTabId: clearStreaming };
     });
   },
 
@@ -606,18 +658,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
   },
 
-  restoreFromHistory: (entry) => {
-    const { activeTabId } = get();
-    set((s) => ({
-      tabs: patchTab(s.tabs, activeTabId, {
-        requestJson: entry.requestJson,
-        requestMetadata: entry.metadata ?? [],
-        response: entry.response ?? null,
-        invokeError: null,
-      }),
-    }));
-  },
-
   // ── Collections ─────────────────────────────────────────────────────────────
   collections: [],
 
@@ -778,9 +818,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     const requestIds = new Set((col?.requests ?? []).map((r) => r.id));
     await api.deleteCollection(id);
     await get().loadCollections();
-    get().tabs
-      .filter((t) => t.savedRequestId && requestIds.has(t.savedRequestId))
-      .forEach((t) => get().closeTab(t.id));
+    // Batch-close all linked tabs in a single state update
+    set((s) => {
+      const closedIds = new Set(
+        s.tabs.filter((t) => t.savedRequestId && requestIds.has(t.savedRequestId)).map((t) => t.id)
+      );
+      if (closedIds.size === 0) return {};
+      let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
+      if (remaining.length === 0) remaining = [makeTab()];
+      const newActive = closedIds.has(s.activeTabId)
+        ? remaining[remaining.length - 1].id
+        : s.activeTabId;
+      const newStreaming = s.streamingTabId && closedIds.has(s.streamingTabId) ? null : s.streamingTabId;
+      return { tabs: remaining, activeTabId: newActive, streamingTabId: newStreaming };
+    });
   },
 
   exportCollection: async (id) => {
@@ -835,13 +886,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   fontSize: 16,
   confirmDialog: null,
 
+  // ── Layout ──────────────────────────────────────────────────────────────
+  sidebarWidth: 256,
+  panelSplit: 0.5,
+
   loadUserSettings: async () => {
     try {
       const s = await api.getUserSettings();
       const themeId = (s.theme as ThemeId) || 'nimbus';
       const custom = (s.customTheme as Partial<ThemeTokens>) ?? {};
       const fontSize = s.fontSize ?? 14;
-      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom, fontSize });
+      const sidebarWidth = s.sidebarWidth ?? 256;
+      const panelSplit = s.panelSplit ?? 0.5;
+      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom, fontSize, sidebarWidth, panelSplit });
       applyTheme(resolveTheme(themeId, custom));
       applyFontSize(fontSize);
     } catch { /* use defaults */ }
@@ -849,8 +906,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
-    const { theme, customTheme, fontSize } = get();
-    api.saveUserSettings({ confirmDeletes: v, theme, customTheme: customTheme as Record<string, string>, fontSize }).catch(() => {});
+    saveAllSettings(get());
   },
 
   setTheme: (id, custom) => {
@@ -858,15 +914,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     const customTheme = id === 'custom' ? (custom ?? {}) : {};
     set({ theme: id, customTheme });
     applyTheme(resolved);
-    const { confirmDeletes, fontSize } = get();
-    api.saveUserSettings({ confirmDeletes, theme: id, customTheme: customTheme as Record<string, string>, fontSize }).catch(() => {});
+    saveAllSettings(get());
   },
 
   setFontSize: (size) => {
     set({ fontSize: size });
     applyFontSize(size);
-    const { confirmDeletes, theme, customTheme } = get();
-    api.saveUserSettings({ confirmDeletes, theme, customTheme: customTheme as Record<string, string>, fontSize: size }).catch(() => {});
+    saveAllSettings(get());
+  },
+
+  setSidebarWidth: (w) => {
+    set({ sidebarWidth: w });
+    saveAllSettings(get());
+  },
+
+  setPanelSplit: (s) => {
+    set({ panelSplit: s });
+    saveAllSettings(get());
   },
 
   showConfirm: (message) => {

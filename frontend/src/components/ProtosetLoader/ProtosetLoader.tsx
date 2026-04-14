@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle, FolderOpen } from 'lucide-react';
@@ -10,7 +10,7 @@ export default function ProtosetLoader() {
     protosetPaths, protoImportPaths, loadMode,
     loadProtosets, loadProtoFiles, loadViaReflection,
     clearLoadedProtos, reloadProtos, removeProtoPath,
-    isConnected, showConfirm,
+    isConnected, showConfirm, cancelReflection,
   } = useAppStore();
   const [tab, setTab] = useState<LoadMode>('protoset');
   const [dragging, setDragging] = useState(false);
@@ -18,6 +18,7 @@ export default function ProtosetLoader() {
   const [loading, setLoading] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const cancelledRef = useRef(false);
   // Extra import paths the user has added for multi-root proto setups.
   const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
 
@@ -98,6 +99,26 @@ export default function ProtosetLoader() {
   const canReload = loadMode === 'protoset' || loadMode === 'proto' || loadMode === 'mixed';
   const hasLoaded = loadMode === 'reflection' || protosetPaths.length > 0;
 
+  const handleReflect = async () => {
+    setError(null);
+    setLoading(true);
+    cancelledRef.current = false;
+    try {
+      await loadViaReflection();
+    } catch (e: unknown) {
+      if (!cancelledRef.current) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelReflection = () => {
+    cancelledRef.current = true;
+    cancelReflection();
+  };
+
   return (
     <div className="p-3 border-b border-c-border">
       {/* Mode tabs */}
@@ -120,14 +141,25 @@ export default function ProtosetLoader() {
       </div>
 
       {tab === 'reflection' ? (
-        <button
-          onClick={() => withLoading(loadViaReflection)}
-          disabled={!isConnected || loading}
-          className="flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-accent hover:text-c-text disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Loading…' : isConnected ? 'Load from server reflection' : 'Connect first'}
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={handleReflect}
+            disabled={!isConnected || loading}
+            className="flex items-center justify-center gap-2 flex-1 py-2 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-accent hover:text-c-text disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Loading…' : isConnected ? 'Load from server reflection' : 'Connect first'}
+          </button>
+          {loading && (
+            <button
+              onClick={handleCancelReflection}
+              className="flex items-center justify-center px-2 py-2 rounded border border-c-accent/50 text-xs text-c-accent hover:bg-c-accent/10"
+              title="Cancel reflection"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       ) : (
         <>
           <div

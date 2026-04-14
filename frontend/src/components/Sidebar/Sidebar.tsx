@@ -325,7 +325,7 @@ export default function Sidebar() {
   const { services } = useAppStore();
 
   return (
-    <aside className="flex flex-col h-full bg-c-panel border-r border-c-border w-64 shrink-0 overflow-hidden">
+    <aside className="flex flex-col h-full bg-c-panel overflow-hidden">
       <ProtosetLoader />
       <div className="flex-1 overflow-y-auto py-1 space-y-0.5">
         {services.length === 0 ? (

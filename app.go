@@ -14,8 +14,9 @@ import (
 type App struct {
 	ctx context.Context
 
-	mu        sync.Mutex
-	conn      *rpc.Connection
+	mu         sync.Mutex
+	settingsMu sync.Mutex
+	conn       *rpc.Connection
 	protoset  *rpc.ProtosetDescriptor
 	store     *storage.Store
 	envStore  *storage.EnvStore
@@ -35,6 +36,9 @@ type App struct {
 
 	// unaryCancel cancels the currently in-flight unary invocation, if any.
 	unaryCancel context.CancelFunc
+
+	// reflectionCancel cancels the currently in-flight reflection load, if any.
+	reflectionCancel context.CancelFunc
 }
 
 // NewApp creates the App instance. Called once at startup.

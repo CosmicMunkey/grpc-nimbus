@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { Clock, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Square, History, RotateCcw } from 'lucide-react';
+import { Clock, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Square, History } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { MetadataEntry, StreamEvent } from '../../types';
+import { MetadataEntry, StreamEvent, HistoryEntry } from '../../types';
 
 // Subscribe to Wails stream events (injected at runtime)
 declare global {
@@ -123,13 +123,116 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
   return null;
 }
 
+function formatJson(s: string | null | undefined): string {
+  if (!s) return '';
+  try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+}
+
+function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border-b border-c-border">
+      <div
+        className="flex items-center gap-1.5 px-3 py-2 cursor-pointer hover:bg-c-hover select-none"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {expanded ? <ChevronDown size={11} className="shrink-0 text-c-text3" /> : <ChevronRight size={11} className="shrink-0 text-c-text3" />}
+        <span className="text-[10px] text-c-text3 shrink-0">
+          {new Date(entry.invokedAt).toLocaleTimeString()}
+        </span>
+        {entry.response && (
+          <span className={`text-[10px] font-medium shrink-0 ${entry.response.statusCode === 0 ? 'text-green-400' : 'text-c-accent'}`}>
+            {entry.response.statusCode} {entry.response.status} · {entry.response.durationMs}ms
+          </span>
+        )}
+        <pre className="text-[10px] text-c-text3 truncate flex-1 font-mono" title={entry.requestJson ?? undefined}>
+          {entry.requestJson?.slice(0, 80)}
+        </pre>
+      </div>
+
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2 text-xs">
+          {/* Request */}
+          <div>
+            <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Request</span>
+            <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
+              {formatJson(entry.requestJson)}
+            </pre>
+          </div>
+
+          {/* Metadata */}
+          {entry.metadata && entry.metadata.length > 0 && (
+            <div>
+              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Metadata</span>
+              <div className="mt-0.5 space-y-0.5">
+                {entry.metadata.map((m, i) => (
+                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                    <span className="text-c-text2">{m.key}:</span>
+                    <span className="text-c-text3 break-all">{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Response */}
+          {entry.response && (
+            <div>
+              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Response</span>
+              {entry.response.responseJson != null && (
+                <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                  {formatJson(entry.response.responseJson)}
+                </pre>
+              )}
+              {entry.response.error && (
+                <p className="mt-0.5 text-[10px] text-c-accent">{entry.response.error}</p>
+              )}
+            </div>
+          )}
+
+          {/* Headers */}
+          {entry.response?.headers && entry.response.headers.length > 0 && (
+            <div>
+              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Headers</span>
+              <div className="mt-0.5 space-y-0.5">
+                {entry.response.headers.map((h, i) => (
+                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                    <span className="text-c-text2">{h.key}:</span>
+                    <span className="text-c-text3 break-all">{h.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Trailers */}
+          {entry.response?.trailers && entry.response.trailers.length > 0 && (
+            <div>
+              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Trailers</span>
+              <div className="mt-0.5 space-y-0.5">
+                {entry.response.trailers.map((t, i) => (
+                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                    <span className="text-c-text2">{t.key}:</span>
+                    <span className="text-c-text3 break-all">{t.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoryPanel() {
   const { selectedMethod, history } = useActiveTab();
-  const { loadHistory, clearHistory, restoreFromHistory } = useAppStore();
+  const { loadHistory, clearHistory } = useAppStore();
 
   useEffect(() => {
     if (selectedMethod) loadHistory(selectedMethod.fullName);
-  }, [selectedMethod?.fullName]);
+  }, [selectedMethod?.fullName, loadHistory]);
 
   if (!selectedMethod) return null;
 
@@ -151,30 +254,7 @@ function HistoryPanel() {
           <p className="p-4 text-xs text-c-text3 text-center">No history yet</p>
         ) : (
           history.map((entry) => (
-            <div key={entry.id} className="border-b border-c-border px-3 py-2 hover:bg-c-hover group">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-c-text3">
-                  {new Date(entry.invokedAt).toLocaleTimeString()}
-                </span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                  <button
-                    onClick={() => restoreFromHistory(entry)}
-                    className="flex items-center gap-1 text-[10px] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
-                    title="Restore this request"
-                  >
-                    <RotateCcw size={10} /> Restore
-                  </button>
-                </div>
-              </div>
-              {entry.response && (
-                <span className={`text-[10px] font-medium ${entry.response.statusCode === 0 ? 'text-green-400' : 'text-c-accent'}`}>
-                  {entry.response.statusCode} {entry.response.status} · {entry.response.durationMs}ms
-                </span>
-              )}
-              <pre className="text-[10px] text-c-text2 truncate mt-0.5 font-mono" title={entry.requestJson ?? undefined}>
-                {entry.requestJson?.slice(0, 80)}
-              </pre>
-            </div>
+            <HistoryEntryRow key={entry.id} entry={entry} />
           ))
         )}
       </div>

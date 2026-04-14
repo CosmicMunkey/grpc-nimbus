@@ -1,8 +1,19 @@
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 
 export default function ConfirmDialog() {
   const { confirmDialog, resolveConfirm } = useAppStore();
+
+  useEffect(() => {
+    if (!confirmDialog) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') resolveConfirm(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [confirmDialog, resolveConfirm]);
+
   if (!confirmDialog) return null;
 
   return createPortal(

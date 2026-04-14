@@ -85,7 +85,9 @@ func (c *Connection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn != nil {
-		return c.conn.Close()
+		err := c.conn.Close()
+		c.conn = nil
+		return err
 	}
 	return nil
 }

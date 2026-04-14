@@ -80,7 +80,12 @@ func (s *HistoryStore) write(methodPath string, entries []HistoryEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.filePath(methodPath), data, 0o644)
+	path := s.filePath(methodPath)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {

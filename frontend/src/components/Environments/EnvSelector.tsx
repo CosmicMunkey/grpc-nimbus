@@ -251,7 +251,7 @@ export default function EnvSelector() {
   const { open, toggle, close, triggerRef, menuRef, menuStyle } = usePortalMenu('right');
   const [showManager, setShowManager] = useState(false);
 
-  useEffect(() => { loadEnvironments(); }, []);
+  useEffect(() => { loadEnvironments(); }, [loadEnvironments]);
 
   const active = environments.find((e) => e.id === activeEnvironmentId);
 

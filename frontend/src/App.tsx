@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import Sidebar from './components/Sidebar/Sidebar';
 import ConnectionBar from './components/ConnectionBar/ConnectionBar';
@@ -17,7 +17,9 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
 
   // Keep selection in sync if collections load after mount
   useEffect(() => {
-    if (!selectedId && collections[0]) setSelectedId(collections[0].id);
+    if (!selectedId || !collections.find(c => c.id === selectedId)) {
+      if (collections[0]) setSelectedId(collections[0].id);
+    }
   }, [collections, selectedId]);
 
   const handleExport = async () => {
@@ -97,9 +99,65 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ColumnResizer({ onDrag }: { onDrag: (startX: number, currentX: number, phase: 'start' | 'move' | 'end') => void }) {
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => { cleanupRef.current?.(); };
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    onDrag(startX, startX, 'start');
+    const onMove = (ev: PointerEvent) => onDrag(startX, ev.clientX, 'move');
+    const cleanup = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      cleanupRef.current = null;
+    };
+    const onUp = (ev: PointerEvent) => {
+      cleanup();
+      onDrag(startX, ev.clientX, 'end');
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    cleanupRef.current = cleanup;
+  };
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      className="w-1 shrink-0 cursor-col-resize bg-c-border hover:bg-c-accent/30 transition-colors"
+    />
+  );
+}
+
 export default function App() {
-  const { restoreLoadedState, importCollection } = useAppStore();
+  const { restoreLoadedState, importCollection, sidebarWidth, panelSplit, setSidebarWidth, setPanelSplit } = useAppStore();
   const [showExportModal, setShowExportModal] = useState(false);
+  const sidebarStartRef = useRef(0);
+  const splitStartRef = useRef(0);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleSidebarDrag = useCallback((startX: number, currentX: number, phase: 'start' | 'move' | 'end') => {
+    if (phase === 'start') sidebarStartRef.current = useAppStore.getState().sidebarWidth;
+    const newWidth = Math.max(180, Math.min(500, sidebarStartRef.current + (currentX - startX)));
+    useAppStore.setState({ sidebarWidth: newWidth });
+    if (phase === 'end') setSidebarWidth(newWidth);
+  }, [setSidebarWidth]);
+
+  const handlePanelDrag = useCallback((startX: number, currentX: number, phase: 'start' | 'move' | 'end') => {
+    if (phase === 'start') splitStartRef.current = useAppStore.getState().panelSplit;
+    const containerWidth = splitContainerRef.current?.offsetWidth ?? 1;
+    const newSplit = Math.max(0.2, Math.min(0.8, splitStartRef.current + (currentX - startX) / containerWidth));
+    useAppStore.setState({ panelSplit: newSplit });
+    if (phase === 'end') setPanelSplit(newSplit);
+  }, [setPanelSplit]);
 
   useEffect(() => {
     restoreLoadedState();
@@ -135,11 +193,13 @@ export default function App() {
     });
     const offNextTab  = rt.EventsOn('menu:nextTab',  () => {
       const { tabs: t, activeTabId: aid, setActiveTab: sat } = getState();
+      if (t.length === 0) return;
       const idx = t.findIndex((tab) => tab.id === aid);
       sat(t[(idx + 1) % t.length].id);
     });
     const offPrevTab  = rt.EventsOn('menu:prevTab',  () => {
       const { tabs: t, activeTabId: aid, setActiveTab: sat } = getState();
+      if (t.length === 0) return;
       const idx = t.findIndex((tab) => tab.id === aid);
       sat(t[(idx - 1 + t.length) % t.length].id);
     });
@@ -160,19 +220,27 @@ export default function App() {
       {/* Main content area */}
       <div className="flex flex-1 min-h-0">
         {/* Left: sidebar (service tree + collections) */}
-        <Sidebar />
+        <div style={{ width: sidebarWidth }} className="shrink-0 min-w-0">
+          <Sidebar />
+        </div>
+
+        {/* Sidebar resize handle */}
+        <ColumnResizer onDrag={handleSidebarDrag} />
 
         {/* Right: tab bar + request/response split pane */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           <TabBar />
-          <div className="flex flex-1 min-h-0 divide-x divide-c-border">
-            {/* Request panel (left half) */}
-            <div className="flex flex-col flex-1 min-w-0">
+          <div ref={splitContainerRef} className="flex flex-1 min-h-0">
+            {/* Request panel */}
+            <div style={{ flex: panelSplit }} className="flex flex-col min-w-0">
               <RequestPanel />
             </div>
 
-            {/* Response panel (right half) */}
-            <div className="flex flex-col flex-1 min-w-0">
+            {/* Panel split resize handle */}
+            <ColumnResizer onDrag={handlePanelDrag} />
+
+            {/* Response panel */}
+            <div style={{ flex: 1 - panelSplit }} className="flex flex-col min-w-0">
               <ResponsePanel />
             </div>
           </div>

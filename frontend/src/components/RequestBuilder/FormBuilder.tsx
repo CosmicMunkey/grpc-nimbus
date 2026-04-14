@@ -163,6 +163,7 @@ function NumberEditor({ value, onChange, type }: { value: unknown; onChange: (v:
           setRaw(s);
           const n = isFloat ? parseFloat(s) : parseInt(s, 10);
           if (!isNaN(n)) onChange(n);
+          else if (s === '') onChange(0);
         }
       }}
       onBlur={() => {
@@ -312,6 +313,13 @@ function OneofGroup({
   const activeField = fields.find(f => value[f.jsonName] !== null && value[f.jsonName] !== undefined);
   const [selected, setSelected] = useState<string>(activeField?.jsonName ?? fields[0]?.jsonName ?? '');
 
+  // Sync local selection when the active field changes externally (e.g. JSON tab edit)
+  useEffect(() => {
+    const ext = fields.find(f => value[f.jsonName] !== null && value[f.jsonName] !== undefined);
+    if (ext && ext.jsonName !== selected) setSelected(ext.jsonName);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   const handleSelect = (jsonName: string) => {
     setSelected(jsonName);
     const updates: FormVal = {};
@@ -441,6 +449,7 @@ function MapEditor({
 
   const updateKey = (oldKey: string, newKey: string) => {
     if (oldKey === newKey) return;
+    if (newKey in value) return; // prevent overwriting existing entry
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { [oldKey]: val, ...rest } = value;
     onChange({ ...rest, [newKey]: val });

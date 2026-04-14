@@ -14,9 +14,9 @@ type ConnStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_
 
 const STATUS_DOT: Record<ConnStatus, { color: string; title: string; pulse?: boolean }> = {
   disconnected:      { color: 'bg-c-text3',  title: 'Not connected' },
-  idle:              { color: 'bg-yellow-400',  title: 'Connected (idle)', pulse: true },
+  idle:              { color: 'bg-green-400',   title: 'Connected' },
   connecting:        { color: 'bg-yellow-400',  title: 'Connecting…',     pulse: true },
-  ready:             { color: 'bg-green-400',   title: 'Connected and ready' },
+  ready:             { color: 'bg-green-400',   title: 'Connected' },
   transient_failure: { color: 'bg-red-400',     title: 'Connection failed — retrying' },
 };
 
@@ -44,6 +44,7 @@ export default function ConnectionBar() {
   const [tlsOpen, setTlsOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+  const tlsRef = useRef<HTMLDivElement>(null);
   const selectedTls = TLS_OPTIONS.find((o) => o.value === connectionConfig.tls) ?? TLS_OPTIONS[0];
 
   useEffect(() => {
@@ -57,6 +58,17 @@ export default function ConnectionBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [errorOpen]);
 
+  useEffect(() => {
+    if (!tlsOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tlsRef.current && !tlsRef.current.contains(e.target as Node)) {
+        setTlsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [tlsOpen]);
+
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-c-panel border-b border-c-border">
       {/* Target input */}
@@ -65,7 +77,7 @@ export default function ConnectionBar() {
           type="text"
           value={connectionConfig.target}
           onChange={(e) => setConnectionConfig({ target: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && !isConnected && connect()}
+          onKeyDown={(e) => e.key === 'Enter' && !useAppStore.getState().isConnected && connect()}
           placeholder="host:port"
           className="flex-1 bg-transparent text-c-text placeholder-c-text3 text-sm outline-none font-mono"
           spellCheck={false}
@@ -73,7 +85,7 @@ export default function ConnectionBar() {
       </div>
 
       {/* TLS dropdown */}
-      <div className="relative">
+      <div ref={tlsRef} className="relative">
         <button
           onClick={() => setTlsOpen((v) => !v)}
           className="flex items-center gap-1 px-2 py-1 bg-c-bg border border-c-border rounded text-xs text-c-text2 hover:border-c-text3 whitespace-nowrap"

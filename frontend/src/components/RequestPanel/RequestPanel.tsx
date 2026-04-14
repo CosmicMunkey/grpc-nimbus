@@ -115,7 +115,7 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSave(); } }}
             placeholder="Request name"
             className="w-full bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
           />
@@ -278,62 +278,67 @@ export default function RequestPanel() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Method header bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-c-border bg-c-panel">
-        <span className="text-xs font-mono text-c-accent truncate flex-1" title={selectedMethod.fullName}>
-          {selectedMethod.fullName}
-        </span>
-        {/* Timeout */}
-        <div className="flex items-center gap-1 text-xs text-c-text2">
-          <span>Timeout</span>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={timeoutSeconds || ''}
-            onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
-            placeholder="∞"
-            className="w-16 bg-c-bg border border-c-border rounded pl-1.5 pr-0.5 py-0.5 text-xs text-c-text outline-none focus:border-c-accent"
-          />
-          <span>s</span>
-        </div>
-        {/* Save — if tab is linked to a saved request, update in-place; otherwise open dialog */}
-        {savedRequestId ? (
-          <div className="flex items-center gap-0.5">
+      <div className="flex flex-col border-b border-c-border bg-c-panel">
+        <div className="flex items-center gap-2 px-3 pt-2 pb-1">
+          <span className="text-xs font-semibold text-c-text truncate flex-1">
+            {selectedMethod.methodName}
+          </span>
+          {/* Timeout */}
+          <div className="flex items-center gap-1 text-xs text-c-text2">
+            <span>Timeout</span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={timeoutSeconds || ''}
+              onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
+              placeholder="∞"
+              className="w-16 bg-c-bg border border-c-border rounded pl-1.5 pr-0.5 py-0.5 text-xs text-c-text outline-none focus:border-c-accent"
+            />
+            <span>s</span>
+          </div>
+          {/* Save — if tab is linked to a saved request, update in-place; otherwise open dialog */}
+          {savedRequestId ? (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => updateSavedRequest()}
+                title={`Save over "${savedRequestName}"`}
+                className="flex items-center gap-1 text-xs px-2 py-1 border border-c-border rounded text-c-text2 hover:bg-c-hover hover:text-c-text"
+              >
+                <Save size={12} /> Save
+              </button>
+              <button
+                onClick={() => setShowSave(true)}
+                title="Save as a new request…"
+                className="flex items-center text-xs px-1.5 py-1 border border-c-border rounded-r text-c-text3 hover:bg-c-hover hover:text-c-text2 border-l-0 -ml-px"
+              >
+                <Plus size={11} />
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => updateSavedRequest()}
-              title={`Save over "${savedRequestName}"`}
+              onClick={() => setShowSave(true)}
               className="flex items-center gap-1 text-xs px-2 py-1 border border-c-border rounded text-c-text2 hover:bg-c-hover hover:text-c-text"
             >
               <Save size={12} /> Save
             </button>
-            <button
-              onClick={() => setShowSave(true)}
-              title="Save as a new request…"
-              className="flex items-center text-xs px-1.5 py-1 border border-c-border rounded-r text-c-text3 hover:bg-c-hover hover:text-c-text2 border-l-0 -ml-px"
-            >
-              <Plus size={11} />
-            </button>
-          </div>
-        ) : (
+          )}
+          {/* Send / Cancel */}
           <button
-            onClick={() => setShowSave(true)}
-            className="flex items-center gap-1 text-xs px-2 py-1 border border-c-border rounded text-c-text2 hover:bg-c-hover hover:text-c-text"
+            onClick={isInvoking ? cancelInvoke : invoke}
+            className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${
+              isInvoking
+                ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-white'
+                : 'bg-c-accent text-white hover:bg-c-accent2'
+            }`}
           >
-            <Save size={12} /> Save
+            {isInvoking ? <Square size={11} /> : <Play size={12} />}
+            {isInvoking ? 'Cancel' : 'Send'}
           </button>
-        )}
-        {/* Send / Cancel */}
-        <button
-          onClick={isInvoking ? cancelInvoke : invoke}
-          className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${
-            isInvoking
-              ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-white'
-              : 'bg-c-accent text-white hover:bg-c-accent2'
-          }`}
-        >
-          {isInvoking ? <Square size={11} /> : <Play size={12} />}
-          {isInvoking ? 'Cancel' : 'Send'}
-        </button>
+        </div>
+        <span className="text-[10px] font-mono text-c-text3 truncate px-3 pb-1.5" title={selectedMethod.fullName}>
+          {selectedMethod.fullName}
+        </span>
       </div>
 
       {/* Tabs */}
