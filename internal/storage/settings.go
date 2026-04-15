@@ -18,6 +18,9 @@ type AppSettings struct {
 	LastTarget string `json:"lastTarget,omitempty"` // e.g. "localhost:50051"
 	LastTLS    string `json:"lastTLS,omitempty"`    // e.g. "none", "system", "insecure_skip"
 
+	// Active environment
+	ActiveEnvironmentID string `json:"activeEnvironmentId,omitempty"`
+
 	// User preferences
 	ConfirmDeletes *bool `json:"confirmDeletes,omitempty"` // nil → default true
 
@@ -46,7 +49,15 @@ func NewSettingsStore() (*SettingsStore, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-	return &SettingsStore{path: filepath.Join(dir, "settings.json")}, nil
+	return NewSettingsStoreAt(filepath.Join(dir, "settings.json"))
+}
+
+// NewSettingsStoreAt creates a SettingsStore using the given file path.
+func NewSettingsStoreAt(path string) (*SettingsStore, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
+	}
+	return &SettingsStore{path: path}, nil
 }
 
 // Load reads settings from disk. Returns empty settings if the file doesn't exist.

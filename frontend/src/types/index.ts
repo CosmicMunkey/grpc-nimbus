@@ -85,6 +85,8 @@ export interface Collection {
 export interface Environment {
   id: string;
   name: string;
+  target?: string;
+  tls?: string;
   headers: { key: string; value: string }[];
   createdAt: string;
   updatedAt: string;
@@ -128,6 +130,7 @@ export interface LoadedState {
   protoImportPaths: string[];
   lastTarget: string;
   lastTLS: string;
+  activeEnvironmentId?: string;
 }
 
 // Represents one open request tab — all per-request state is scoped here.

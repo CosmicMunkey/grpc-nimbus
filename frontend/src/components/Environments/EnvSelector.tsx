@@ -2,8 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Environment } from '../../types';
-import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings } from 'lucide-react';
+import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings, Lock, Unlock } from 'lucide-react';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
+
+const TLS_OPTIONS = [
+  { value: 'none',          label: 'No TLS',        Icon: Unlock },
+  { value: 'system',        label: 'TLS (System)',   Icon: Lock   },
+  { value: 'insecure_skip', label: 'TLS (No Verify)', Icon: Lock   },
+] as const;
 
 // ─── Environment Editor Modal ────────────────────────────────────────────────
 
@@ -15,6 +21,8 @@ interface EnvEditorProps {
 function EnvEditor({ initial, onClose }: EnvEditorProps) {
   const { saveEnvironment } = useAppStore();
   const [name, setName] = useState(initial?.name ?? '');
+  const [target, setTarget] = useState(initial?.target ?? '');
+  const [tls, setTls] = useState<string>(initial?.tls ?? 'none');
   const [rows, setRows] = useState<string[]>(
     initial?.headers?.length
       ? initial.headers.map((h) => `${h.key}: ${h.value}`)
@@ -41,6 +49,8 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
     await saveEnvironment({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
+      target: target.trim() || undefined,
+      tls: target.trim() ? tls : undefined,
       headers: rows.map(parseRow).filter((h): h is { key: string; value: string } => h !== null),
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
@@ -67,6 +77,29 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
           placeholder="Environment name (e.g. Production)"
           className="bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
         />
+
+        {/* Optional connection config */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-c-text2 font-medium">Connection <span className="text-c-text3 font-normal">(optional — applied when environment is activated)</span></span>
+          <div className="flex gap-2">
+            <input
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="host:port (optional)"
+              className="flex-1 bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
+            />
+            <select
+              value={tls}
+              onChange={(e) => setTls(e.target.value)}
+              disabled={!target.trim()}
+              className="bg-c-bg border border-c-border rounded px-2 py-2 text-xs text-c-text outline-none focus:border-c-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {TLS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-2 min-h-0">
           <div className="flex items-center justify-between">
@@ -172,7 +205,14 @@ function EnvManager({ onClose }: EnvManagerProps) {
                     )}
                   </div>
                   <p className="text-[10px] text-c-text3 mt-0.5">
-                    {headerCount === 0 ? 'No headers' : `${headerCount} header${headerCount !== 1 ? 's' : ''}`}
+                    {[
+                      env.target && <span key="target" className="font-mono">{env.target}</span>,
+                      headerCount > 0 && `${headerCount} header${headerCount !== 1 ? 's' : ''}`,
+                    ].filter(Boolean).reduce<React.ReactNode[]>((acc, item, i) => {
+                      if (i > 0) acc.push(' · ');
+                      acc.push(item);
+                      return acc;
+                    }, []) || 'No connection or headers'}
                   </p>
                 </div>
 

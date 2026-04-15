@@ -23,6 +23,7 @@ type LoadedState struct {
 	ProtoImportPaths []string          `json:"protoImportPaths"` // effective import paths for loaded .proto files
 	LastTarget       string            `json:"lastTarget"`       // last-used connection target
 	LastTLS          string            `json:"lastTLS"`
+	ActiveEnvironmentID string         `json:"activeEnvironmentId"` // active environment ID (empty = none)
 }
 
 func dedupeStrings(values []string) []string {
@@ -439,6 +440,7 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 		if saved, err := a.settings.Load(); err == nil && saved != nil {
 			state.LastTarget = saved.LastTarget
 			state.LastTLS = saved.LastTLS
+			state.ActiveEnvironmentID = saved.ActiveEnvironmentID
 		}
 	}
 	return state, nil

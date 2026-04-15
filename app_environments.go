@@ -19,7 +19,17 @@ func (a *App) SaveEnvironment(env storage.Environment) error {
 	if a.envStore == nil {
 		return fmt.Errorf("environment store unavailable")
 	}
-	return a.envStore.SaveEnvironment(env)
+	if err := a.envStore.SaveEnvironment(env); err != nil {
+		return err
+	}
+	// If this is the active environment, refresh the in-memory copy so that
+	// subsequent RPCs pick up any header/target changes immediately.
+	a.mu.Lock()
+	if a.activeEnv != nil && a.activeEnv.ID == env.ID {
+		a.activeEnv = &env
+	}
+	a.mu.Unlock()
+	return nil
 }
 
 // DeleteEnvironment removes an environment by ID.
@@ -36,6 +46,9 @@ func (a *App) SetActiveEnvironment(id string) error {
 		a.mu.Lock()
 		a.activeEnv = nil
 		a.mu.Unlock()
+		a.saveSettings(func(s *storage.AppSettings) {
+			s.ActiveEnvironmentID = ""
+		})
 		return nil
 	}
 	if a.envStore == nil {
@@ -48,5 +61,8 @@ func (a *App) SetActiveEnvironment(id string) error {
 	a.mu.Lock()
 	a.activeEnv = env
 	a.mu.Unlock()
+	a.saveSettings(func(s *storage.AppSettings) {
+		s.ActiveEnvironmentID = id
+	})
 	return nil
 }

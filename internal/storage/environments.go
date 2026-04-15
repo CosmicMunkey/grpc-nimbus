@@ -15,10 +15,13 @@ type EnvHeader struct {
 	Value string `json:"value"`
 }
 
-// Environment holds a named set of default headers sent on every request.
+// Environment holds a named set of default headers sent on every request,
+// and optionally a target host:port and TLS mode to apply when activated.
 type Environment struct {
 	ID        string      `json:"id"`
 	Name      string      `json:"name"`
+	Target    string      `json:"target,omitempty"`
+	TLS       string      `json:"tls,omitempty"`
 	Headers   []EnvHeader `json:"headers,omitempty"`
 	CreatedAt string      `json:"createdAt"`
 	UpdatedAt string      `json:"updatedAt"`
@@ -35,7 +38,11 @@ func NewEnvStore() (*EnvStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("locating config dir: %w", err)
 	}
-	dir := filepath.Join(configDir, appDirName, "environments")
+	return NewEnvStoreAt(filepath.Join(configDir, appDirName, "environments"))
+}
+
+// NewEnvStoreAt creates an EnvStore using the given directory path.
+func NewEnvStoreAt(dir string) (*EnvStore, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating environments dir: %w", err)
 	}

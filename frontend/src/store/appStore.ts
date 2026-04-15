@@ -342,6 +342,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         }));
       }
       set(applyLoadedState(state));
+      // Restore active environment (loads env list first, then activates)
+      if (state.activeEnvironmentId) {
+        try {
+          await get().loadEnvironments();
+          await get().setActiveEnvironment(state.activeEnvironmentId);
+        } catch { /* non-fatal — env may have been deleted */ }
+      }
     } catch { /* non-fatal */ }
     // If the backend is already connected, start polling
     try {
@@ -876,7 +883,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveEnvironment: async (id) => {
     await api.setActiveEnvironment(id);
-    set({ activeEnvironmentId: id });
+    const env = get().environments.find((e) => e.id === id);
+    set((s) => {
+      if (!id) {
+        return {
+          activeEnvironmentId: '',
+          connectionConfig: { ...s.connectionConfig, target: '', tls: 'none' },
+        };
+      }
+      if (!env?.target) return { activeEnvironmentId: id };
+      return {
+        activeEnvironmentId: id,
+        connectionConfig: {
+          ...s.connectionConfig,
+          target: env.target,
+          ...(env.tls ? { tls: env.tls as ConnectionConfig['tls'] } : {}),
+        },
+      };
+    });
   },
 
   // ── Settings ─────────────────────────────────────────────────────────────
