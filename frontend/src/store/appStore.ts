@@ -885,12 +885,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     await api.setActiveEnvironment(id);
     const env = get().environments.find((e) => e.id === id);
     set((s) => {
-      if (!id) {
-        return {
-          activeEnvironmentId: '',
-          connectionConfig: { ...s.connectionConfig, target: '', tls: 'none' },
-        };
-      }
       if (!env?.target) return { activeEnvironmentId: id };
       return {
         activeEnvironmentId: id,
