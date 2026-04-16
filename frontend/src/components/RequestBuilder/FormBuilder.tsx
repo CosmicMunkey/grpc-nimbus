@@ -225,15 +225,14 @@ function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: st
 
   // Convert RFC 3339 UTC string to datetime-local input value (strips trailing Z/millis)
   const toInputValue = (rfc: string): string => {
-    // Handle "2006-01-02T15:04:05Z" → "2006-01-02T15:04:05"
-    // Handle "2006-01-02T15:04:05.999Z" → "2006-01-02T15:04:05"
-    return rfc.replace(/\.\d+Z$/, 'Z').replace(/Z$/, '').slice(0, 19);
+    // Handle "2006-01-02T15:04:05Z" or "2006-01-02T15:04:05.999Z" → "2006-01-02T15:04:05"
+    return rfc.replace(/(\.\d+)?Z$/, '').slice(0, 19);
   };
 
   // Convert datetime-local value back to RFC 3339 UTC string
   const toRfc3339 = (local: string): string => {
     if (!local) return '';
-    // datetime-local gives "YYYY-MM-DDTHH:MM:SS" (or shorter), treat as UTC
+    // datetime-local gives "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DDTHH:MM" (16 chars without seconds)
     const padded = local.length === 16 ? local + ':00' : local;
     return padded + 'Z';
   };
