@@ -110,7 +110,7 @@ export interface FieldSchema {
   name: string;
   jsonName: string;
   number: number;
-  type: 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double' | 'enum' | 'message' | 'map';
+  type: 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double' | 'enum' | 'message' | 'map' | 'timestamp';
   isRepeated: boolean;
   isMap: boolean;
   oneofName?: string;

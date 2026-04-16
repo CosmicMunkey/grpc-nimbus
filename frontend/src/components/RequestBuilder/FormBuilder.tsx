@@ -22,6 +22,7 @@ function defaultFor(schema: FieldSchema): unknown {
     case 'float':  case 'double': return 0;
     case 'enum':   return schema.enumValues?.[0]?.name ?? '';
     case 'message': return null; // null = absent / not set
+    case 'timestamp': return null; // null = absent / not set
     case 'map':    return {};
     default:       return '';
   }
@@ -85,18 +86,19 @@ function TypeBadge({ schema }: { schema: FieldSchema }) {
   } else {
     label = schema.type;
     cls = ({
-      string:  'text-sky-400 bg-sky-900/20',
-      bytes:   'text-yellow-400 bg-yellow-900/20',
-      bool:    'text-green-400 bg-green-900/20',
-      int32:   'text-violet-400 bg-violet-900/20',
-      int64:   'text-violet-400 bg-violet-900/20',
-      uint32:  'text-violet-400 bg-violet-900/20',
-      uint64:  'text-violet-400 bg-violet-900/20',
-      float:   'text-fuchsia-400 bg-fuchsia-900/20',
-      double:  'text-fuchsia-400 bg-fuchsia-900/20',
-      enum:    'text-orange-400 bg-orange-900/20',
-      message: 'text-slate-400 bg-slate-800/40',
-      map:     'text-cyan-400 bg-cyan-900/20',
+      string:    'text-sky-400 bg-sky-900/20',
+      bytes:     'text-yellow-400 bg-yellow-900/20',
+      bool:      'text-green-400 bg-green-900/20',
+      int32:     'text-violet-400 bg-violet-900/20',
+      int64:     'text-violet-400 bg-violet-900/20',
+      uint32:    'text-violet-400 bg-violet-900/20',
+      uint64:    'text-violet-400 bg-violet-900/20',
+      float:     'text-fuchsia-400 bg-fuchsia-900/20',
+      double:    'text-fuchsia-400 bg-fuchsia-900/20',
+      enum:      'text-orange-400 bg-orange-900/20',
+      message:   'text-slate-400 bg-slate-800/40',
+      map:       'text-cyan-400 bg-cyan-900/20',
+      timestamp: 'text-teal-400 bg-teal-900/20',
     } as Record<string, string>)[schema.type] ?? 'text-slate-400 bg-slate-800/40';
   }
   return (
@@ -213,6 +215,70 @@ function EnumEditor({ schema, value, onChange }: { schema: FieldSchema; value: u
         <option key={ev.name} value={ev.name}>{ev.name} ({ev.number})</option>
       ))}
     </select>
+  );
+}
+
+// ─── Timestamp editor ─────────────────────────────────────────────────────────
+
+function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: string | null) => void }) {
+  const isSet = typeof value === 'string' && value !== '';
+
+  // Convert RFC 3339 UTC string to datetime-local input value (strips trailing Z/millis)
+  const toInputValue = (rfc: string): string => {
+    // Handle "2006-01-02T15:04:05Z" → "2006-01-02T15:04:05"
+    // Handle "2006-01-02T15:04:05.999Z" → "2006-01-02T15:04:05"
+    return rfc.replace(/\.\d+Z$/, 'Z').replace(/Z$/, '').slice(0, 19);
+  };
+
+  // Convert datetime-local value back to RFC 3339 UTC string
+  const toRfc3339 = (local: string): string => {
+    if (!local) return '';
+    // datetime-local gives "YYYY-MM-DDTHH:MM:SS" (or shorter), treat as UTC
+    const padded = local.length === 16 ? local + ':00' : local;
+    return padded + 'Z';
+  };
+
+  const setNow = () => {
+    const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    onChange(now);
+  };
+
+  if (!isSet) {
+    return (
+      <button
+        onClick={setNow}
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-2 py-0.5 rounded border border-dashed border-c-border hover:border-c-text3"
+      >
+        <Plus size={10} /> Set
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-1 min-w-0">
+      <input
+        type="datetime-local"
+        step="1"
+        value={toInputValue(value as string)}
+        onChange={e => onChange(toRfc3339(e.target.value))}
+        className={`${inputCls} flex-1`}
+      />
+      <span className="text-[10px] text-c-text3 shrink-0">UTC</span>
+      <button
+        onClick={setNow}
+        className="shrink-0 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded border border-c-border hover:border-c-text3"
+        title="Set to current time"
+      >
+        Now
+      </button>
+      <button
+        onClick={() => onChange(null)}
+        className="shrink-0 text-c-text3 hover:text-c-accent p-0.5 rounded"
+        title="Remove field"
+      >
+        <X size={11} />
+      </button>
+    </div>
   );
 }
 
@@ -602,6 +668,8 @@ function FieldEditor({ schema, value, onChange, depth }: FieldEditorProps) {
       return <NumberEditor value={value} type={schema.type} onChange={onChange as (v: number) => void} />;
     case 'enum':
       return <EnumEditor schema={schema} value={value} onChange={onChange as (v: string) => void} />;
+    case 'timestamp':
+      return <TimestampEditor value={value} onChange={onChange as (v: string | null) => void} />;
     case 'message':
       return <InlineMessageEditor schema={schema} value={value} onChange={onChange} depth={depth} />;
     default:

@@ -123,6 +123,8 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 					fs.MapValueType = scalarTypeName(vType)
 				}
 			}
+		} else if mt := fd.GetMessageType(); mt != nil && mt.GetFullyQualifiedName() == "google.protobuf.Timestamp" {
+			fs.Type = "timestamp"
 		} else {
 			fs.Type = "message"
 			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
