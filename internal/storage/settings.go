@@ -22,7 +22,8 @@ type AppSettings struct {
 	ActiveEnvironmentID string `json:"activeEnvironmentId,omitempty"`
 
 	// User preferences
-	ConfirmDeletes *bool `json:"confirmDeletes,omitempty"` // nil → default true
+	ConfirmDeletes      *bool `json:"confirmDeletes,omitempty"`      // nil → default true
+	TimestampInputLocal *bool `json:"timestampInputLocal,omitempty"` // nil → default false (UTC input)
 
 	// Appearance
 	Theme       string            `json:"theme,omitempty"`       // "nimbus" | "dracula" | "light" | "custom"; nil → "nimbus"

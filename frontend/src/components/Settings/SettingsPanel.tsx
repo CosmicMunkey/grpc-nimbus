@@ -12,13 +12,13 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors ${
         checked ? 'bg-c-accent' : 'bg-c-border'
       }`}
     >
       <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-1'
+        className={`h-4 w-4 shrink-0 rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
@@ -104,7 +104,7 @@ function CustomEditor({
 
 export default function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const { confirmDeletes, setConfirmDeletes, theme, customTheme, setTheme, fontSize, setFontSize } = useAppStore();
+  const { confirmDeletes, setConfirmDeletes, timestampInputLocal, setTimestampInputLocal, theme, customTheme, setTheme, fontSize, setFontSize } = useAppStore();
 
   // Local draft so colour picker changes apply live while custom is active
   const [draftCustom, setDraftCustom] = useState<Partial<ThemeTokens>>(customTheme);
@@ -135,9 +135,9 @@ export default function SettingsPanel() {
       {open && createPortal(
         <div className="fixed inset-0 z-[9000] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl w-[420px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl w-[520px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-c-border sticky top-0 bg-c-panel z-10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-c-border sticky top-0 bg-c-panel z-10">
               <h2 className="text-sm font-semibold text-c-text">Settings</h2>
               <button
                 onClick={() => setOpen(false)}
@@ -147,10 +147,10 @@ export default function SettingsPanel() {
               </button>
             </div>
 
-            <div className="px-4 py-4 space-y-6">
+            <div className="px-6 py-5 space-y-6">
               {/* Appearance section */}
               <div>
-                <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-3">Appearance</p>
+                <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Appearance</p>
                 <div className="grid grid-cols-4 gap-2">
                   {THEME_META.map(({ id, label }) => (
                     <ThemeCard
@@ -165,10 +165,10 @@ export default function SettingsPanel() {
                 {theme === 'custom' && (
                   <CustomEditor tokens={draftCustom} onChange={handleCustomChange} />
                 )}
-                <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center justify-between mt-3">
                   <div>
-                    <p className="text-sm text-c-text">Font size</p>
-                    <p className="text-xs text-c-text3 mt-0.5">Controls the base text size throughout the app.</p>
+                    <p className="text-xs font-medium text-c-text">Font size</p>
+                    <p className="text-[11px] text-c-text3 mt-0.5">Controls the base text size throughout the app.</p>
                   </div>
                   <div className="flex gap-1">
                     {FONT_SIZE_PRESETS.map(({ label, value }) => (
@@ -190,15 +190,22 @@ export default function SettingsPanel() {
 
               {/* Behavior section */}
               <div>
-                <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-3">Behavior</p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-c-text">Confirm before delete</p>
-                    <p className="text-xs text-c-text3 mt-0.5">
-                      Show a confirmation dialog before deleting requests, collections, and environments.
-                    </p>
+                <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Behavior</p>
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between py-3">
+                    <div className="pr-4">
+                      <p className="text-xs font-medium text-c-text">Confirm before delete</p>
+                      <p className="text-[11px] text-c-text3 mt-0.5">Show a confirmation dialog before deleting requests, collections, and environments.</p>
+                    </div>
+                    <Toggle checked={confirmDeletes} onChange={setConfirmDeletes} />
                   </div>
-                  <Toggle checked={confirmDeletes} onChange={setConfirmDeletes} />
+                  <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+                    <div className="pr-4">
+                      <p className="text-xs font-medium text-c-text">Enter timestamps in local time</p>
+                      <p className="text-[11px] text-c-text3 mt-0.5">When on, timestamp fields accept local time and convert to UTC. When off, enter UTC directly.</p>
+                    </div>
+                    <Toggle checked={timestampInputLocal} onChange={setTimestampInputLocal} />
+                  </div>
                 </div>
               </div>
             </div>

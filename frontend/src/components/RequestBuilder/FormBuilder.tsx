@@ -221,25 +221,56 @@ function EnumEditor({ schema, value, onChange }: { schema: FieldSchema; value: u
 // ─── Timestamp editor ─────────────────────────────────────────────────────────
 
 function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: string | null) => void }) {
+  const timestampInputLocal = useAppStore(s => s.timestampInputLocal);
   const isSet = typeof value === 'string' && value !== '';
 
-  // Convert RFC 3339 UTC string to datetime-local input value (strips trailing Z/millis)
-  const toInputValue = (rfc: string): string => {
-    // Handle "2006-01-02T15:04:05Z" or "2006-01-02T15:04:05.999Z" → "2006-01-02T15:04:05"
-    return rfc.replace(/(\.\d+)?Z$/, '').slice(0, 19);
+  const splitRfc = (rfc: string): { date: string; time: string } => {
+    const bare = rfc.replace(/(\.\d+)?Z$/, '').slice(0, 19);
+    const [date = '', time = ''] = bare.split('T');
+    return { date, time };
   };
 
-  // Convert datetime-local value back to RFC 3339 UTC string
-  const toRfc3339 = (local: string): string => {
-    if (!local) return '';
-    // datetime-local gives "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DDTHH:MM" (16 chars without seconds)
-    const padded = local.length === 16 ? local + ':00' : local;
-    return padded + 'Z';
+  // In local mode we display the stored UTC value converted to local date/time.
+  const toLocalParts = (rfc: string): { date: string; time: string } => {
+    const d = new Date(rfc);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return { date, time };
+  };
+
+  const { date: initDate, time: initTime } = isSet
+    ? (timestampInputLocal ? toLocalParts(value as string) : splitRfc(value as string))
+    : { date: '', time: '' };
+
+  const [dateText, setDateText] = useState(initDate);
+  const [timeText, setTimeText] = useState(initTime);
+
+  // Sync when the stored value or mode changes (e.g. "Now", mode toggle, external update)
+  useEffect(() => {
+    if (isSet) {
+      const parts = timestampInputLocal ? toLocalParts(value as string) : splitRfc(value as string);
+      setDateText(parts.date);
+      setTimeText(parts.time);
+    }
+  }, [value, timestampInputLocal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const tryEmit = (d: string, t: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    if (!/^\d{2}:\d{2}(:\d{2})?$/.test(t)) return;
+    const padded = t.length === 5 ? t + ':00' : t;
+    if (timestampInputLocal) {
+      // Treat the entered date+time as local — new Date without Z interprets as local.
+      const utc = new Date(`${d}T${padded}`);
+      if (isNaN(utc.getTime())) return;
+      onChange(utc.toISOString().replace(/\.\d+Z$/, 'Z'));
+    } else {
+      onChange(`${d}T${padded}Z`);
+    }
   };
 
   const setNow = () => {
-    const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-    onChange(now);
+    onChange(new Date().toISOString().replace(/\.\d+Z$/, 'Z'));
   };
 
   if (!isSet) {
@@ -253,30 +284,71 @@ function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: st
     );
   }
 
+  // Hint shows the "other" representation: local when UTC mode, UTC when local mode.
+  const hint = (() => {
+    try {
+      if (timestampInputLocal) {
+        // Reconstruct the current UTC value from local inputs to show its UTC form.
+        const padded = timeText.length === 5 ? timeText + ':00' : timeText;
+        const utc = new Date(`${dateText}T${padded}`);
+        if (isNaN(utc.getTime())) return null;
+        return utc.toISOString().replace(/\.\d+Z$/, '') + ' UTC';
+      } else {
+        return new Date(value as string).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          second: '2-digit', timeZoneName: 'short',
+        });
+      }
+    } catch { return null; }
+  })();
+
   return (
-    <div className="flex items-center gap-1 flex-1 min-w-0">
-      <input
-        type="datetime-local"
-        step="1"
-        value={toInputValue(value as string)}
-        onChange={e => onChange(toRfc3339(e.target.value))}
-        className={`${inputCls} flex-1`}
-      />
-      <span className="text-[10px] text-c-text3 shrink-0">UTC</span>
-      <button
-        onClick={setNow}
-        className="shrink-0 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded border border-c-border hover:border-c-text3"
-        title="Set to current time"
-      >
-        Now
-      </button>
-      <button
-        onClick={() => onChange(null)}
-        className="shrink-0 text-c-text3 hover:text-c-accent p-0.5 rounded"
-        title="Remove field"
-      >
-        <X size={11} />
-      </button>
+    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+      <div className="flex items-center gap-1">
+        <input
+          type="date"
+          value={dateText}
+          onChange={e => { setDateText(e.target.value); tryEmit(e.target.value, timeText); }}
+          className={`${inputCls} w-36 shrink-0`}
+        />
+        {timestampInputLocal ? (
+          <input
+            type="time"
+            step="1"
+            value={timeText}
+            onChange={e => { setTimeText(e.target.value); tryEmit(dateText, e.target.value); }}
+            className={`${inputCls} w-28 shrink-0`}
+          />
+        ) : (
+          <>
+            <input
+              type="text"
+              value={timeText}
+              placeholder="HH:MM:SS"
+              onChange={e => { setTimeText(e.target.value); tryEmit(dateText, e.target.value); }}
+              className={`${inputCls} w-24 shrink-0`}
+            />
+            <span className="text-[10px] text-c-text3 shrink-0">Z</span>
+          </>
+        )}
+        <button
+          onClick={setNow}
+          className="shrink-0 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded border border-c-border hover:border-c-text3"
+          title="Set to current time"
+        >
+          Now
+        </button>
+        <button
+          onClick={() => onChange(null)}
+          className="shrink-0 text-c-text3 hover:text-c-accent p-0.5 rounded"
+          title="Remove field"
+        >
+          <X size={11} />
+        </button>
+      </div>
+      {hint && (
+        <span className="text-[10px] text-c-text3 pl-0.5">{hint}</span>
+      )}
     </div>
   );
 }

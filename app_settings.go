@@ -8,12 +8,13 @@ import (
 
 // UserSettings holds user-configurable preferences exposed to the frontend.
 type UserSettings struct {
-	ConfirmDeletes bool              `json:"confirmDeletes"`
-	Theme          string            `json:"theme"`
-	CustomTheme    map[string]string `json:"customTheme,omitempty"`
-	FontSize       int               `json:"fontSize"`
-	SidebarWidth   float64           `json:"sidebarWidth"`
-	PanelSplit     float64           `json:"panelSplit"`
+	ConfirmDeletes      bool              `json:"confirmDeletes"`
+	TimestampInputLocal bool              `json:"timestampInputLocal"`
+	Theme               string            `json:"theme"`
+	CustomTheme         map[string]string `json:"customTheme,omitempty"`
+	FontSize            int               `json:"fontSize"`
+	SidebarWidth        float64           `json:"sidebarWidth"`
+	PanelSplit          float64           `json:"panelSplit"`
 }
 
 // GetUserSettings returns the current user preference settings.
@@ -29,6 +30,9 @@ func (a *App) GetUserSettings() UserSettings {
 	result := defaults
 	if saved.ConfirmDeletes != nil {
 		result.ConfirmDeletes = *saved.ConfirmDeletes
+	}
+	if saved.TimestampInputLocal != nil {
+		result.TimestampInputLocal = *saved.TimestampInputLocal
 	}
 	if saved.Theme != "" {
 		result.Theme = saved.Theme
@@ -52,6 +56,7 @@ func (a *App) GetUserSettings() UserSettings {
 func (a *App) SaveUserSettings(s UserSettings) {
 	go a.saveSettings(func(settings *storage.AppSettings) {
 		settings.ConfirmDeletes = &s.ConfirmDeletes
+		settings.TimestampInputLocal = &s.TimestampInputLocal
 		settings.Theme = s.Theme
 		settings.CustomTheme = s.CustomTheme
 		settings.FontSize = &s.FontSize

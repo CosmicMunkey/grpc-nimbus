@@ -57,8 +57,8 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
-          SaveUserSettings(s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
+          GetUserSettings(): Promise<{ confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
+          SaveUserSettings(s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
         };
       };
     };
@@ -102,13 +102,14 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
   getUserSettings: () => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  saveUserSettings: (s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // Persist all user settings from the current store state.
-function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'theme' | 'customTheme' | 'fontSize' | 'sidebarWidth' | 'panelSplit'>) {
+function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'timestampInputLocal' | 'theme' | 'customTheme' | 'fontSize' | 'sidebarWidth' | 'panelSplit'>) {
   api.saveUserSettings({
     confirmDeletes: s.confirmDeletes,
+    timestampInputLocal: s.timestampInputLocal,
     theme: s.theme,
     customTheme: s.customTheme as Record<string, string>,
     fontSize: s.fontSize,
@@ -276,6 +277,8 @@ interface AppState {
   // Settings
   confirmDeletes: boolean;
   setConfirmDeletes: (v: boolean) => void;
+  timestampInputLocal: boolean;
+  setTimestampInputLocal: (v: boolean) => void;
   theme: ThemeId;
   customTheme: Partial<ThemeTokens>;
   setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
@@ -899,6 +902,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Settings ─────────────────────────────────────────────────────────────
   confirmDeletes: true,
+  timestampInputLocal: false,
   theme: 'nimbus' as ThemeId,
   customTheme: {},
   fontSize: 16,
@@ -916,7 +920,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const fontSize = s.fontSize ?? 14;
       const sidebarWidth = s.sidebarWidth ?? 256;
       const panelSplit = s.panelSplit ?? 0.5;
-      set({ confirmDeletes: s.confirmDeletes, theme: themeId, customTheme: custom, fontSize, sidebarWidth, panelSplit });
+      set({ confirmDeletes: s.confirmDeletes, timestampInputLocal: s.timestampInputLocal ?? false, theme: themeId, customTheme: custom, fontSize, sidebarWidth, panelSplit });
       applyTheme(resolveTheme(themeId, custom));
       applyFontSize(fontSize);
     } catch { /* use defaults */ }
@@ -924,6 +928,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
+    saveAllSettings(get());
+  },
+
+  setTimestampInputLocal: (v) => {
+    set({ timestampInputLocal: v });
     saveAllSettings(get());
   },
 
