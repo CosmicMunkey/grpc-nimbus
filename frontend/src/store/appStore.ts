@@ -15,7 +15,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
-import { ThemeId, ThemeTokens, applyTheme, applyFontSize, resolveTheme } from '../themes';
+import { ThemeId, ThemeTokens, applyTheme, applyFontSize, resolveTheme, isColorDark } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -280,6 +280,7 @@ interface AppState {
   timestampInputLocal: boolean;
   setTimestampInputLocal: (v: boolean) => void;
   theme: ThemeId;
+  isDark: boolean;
   customTheme: Partial<ThemeTokens>;
   setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
   fontSize: number;
@@ -904,6 +905,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   confirmDeletes: true,
   timestampInputLocal: false,
   theme: 'nimbus' as ThemeId,
+  isDark: true,
   customTheme: {},
   fontSize: 16,
   confirmDialog: null,
@@ -920,7 +922,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const fontSize = s.fontSize ?? 14;
       const sidebarWidth = s.sidebarWidth ?? 256;
       const panelSplit = s.panelSplit ?? 0.5;
-      set({ confirmDeletes: s.confirmDeletes, timestampInputLocal: s.timestampInputLocal ?? false, theme: themeId, customTheme: custom, fontSize, sidebarWidth, panelSplit });
+      set({ confirmDeletes: s.confirmDeletes, timestampInputLocal: s.timestampInputLocal ?? false, theme: themeId, isDark: isColorDark(resolveTheme(themeId, custom).bg), customTheme: custom, fontSize, sidebarWidth, panelSplit });
       applyTheme(resolveTheme(themeId, custom));
       applyFontSize(fontSize);
     } catch { /* use defaults */ }
@@ -939,7 +941,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTheme: (id, custom) => {
     const resolved = resolveTheme(id, custom);
     const customTheme = id === 'custom' ? (custom ?? {}) : {};
-    set({ theme: id, customTheme });
+    set({ theme: id, isDark: isColorDark(resolved.bg), customTheme });
     applyTheme(resolved);
     saveAllSettings(get());
   },

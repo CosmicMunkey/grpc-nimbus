@@ -17,9 +17,13 @@ declare global {
 }
 
 function StatusBadge({ code, text }: { code: number; text: string }) {
+  const isDark = useAppStore(s => s.isDark);
   const isOk = code === 0;
+  const cls = isOk
+    ? (isDark ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700')
+    : (isDark ? 'bg-red-900/40 text-c-accent'    : 'bg-red-100 text-red-600');
   return (
-    <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${isOk ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-c-accent'}`}>
+    <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${cls}`}>
       {isOk ? <CheckCircle size={11} /> : <AlertCircle size={11} />}
       {code} {text}
     </div>
@@ -94,6 +98,7 @@ function StreamPanel() {
 }
 
 function StreamMessage({ evt }: { evt: StreamEvent }) {
+  const isDark = useAppStore(s => s.isDark);
   const pretty = (() => {
     if (!evt.json) return '';
     try { return JSON.stringify(JSON.parse(evt.json), null, 2); } catch { return evt.json; }
@@ -108,17 +113,21 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
     );
   }
   if (evt.type === 'trailer') {
+    const statusCls = evt.statusCode === 0
+      ? (isDark ? 'text-green-400' : 'text-green-600')
+      : 'text-c-accent';
     return (
       <div className="border border-c-border rounded px-2 py-1 text-[10px]">
         <span className="text-c-text2">trailer </span>
-        <span className={`font-medium ${evt.statusCode === 0 ? 'text-green-400' : 'text-c-accent'}`}>
+        <span className={`font-medium ${statusCls}`}>
           {evt.statusCode} {evt.status}
         </span>
       </div>
     );
   }
   if (evt.type === 'error') {
-    return <div className="text-c-accent px-2 py-1 border border-red-900/40 rounded">{evt.error}</div>;
+    const borderCls = isDark ? 'border-red-900/40' : 'border-red-300';
+    return <div className={`text-c-accent px-2 py-1 border ${borderCls} rounded`}>{evt.error}</div>;
   }
   return null;
 }
@@ -129,7 +138,9 @@ function formatJson(s: string | null | undefined): string {
 }
 
 function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+  const isDark = useAppStore(s => s.isDark);
   const [expanded, setExpanded] = useState(false);
+  const successCls = isDark ? 'text-green-400' : 'text-green-600';
 
   return (
     <div className="border-b border-c-border">
@@ -142,7 +153,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {new Date(entry.invokedAt).toLocaleTimeString()}
         </span>
         {entry.response && (
-          <span className={`text-[10px] font-medium shrink-0 ${entry.response.statusCode === 0 ? 'text-green-400' : 'text-c-accent'}`}>
+          <span className={`text-[10px] font-medium shrink-0 ${entry.response.statusCode === 0 ? successCls : 'text-c-accent'}`}>
             {entry.response.statusCode} {entry.response.status} · {entry.response.durationMs}ms
           </span>
         )}
@@ -267,6 +278,7 @@ function HistoryPanel() {
 export default function ResponsePanel() {
   const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
   const { appendStreamEvent } = useAppStore();
+  const isDark = useAppStore(s => s.isDark);
   const [tab, setTab] = useState<'response' | 'headers' | 'history'>('response');
 
   // Subscribe to Wails stream events
@@ -390,7 +402,7 @@ export default function ResponsePanel() {
                 )}
               </div>
             ) : (
-              <CodeMirror value={prettyJson} theme={oneDark} extensions={[json()]} readOnly className="h-full"
+              <CodeMirror value={prettyJson} theme={isDark ? oneDark : undefined} extensions={[json()]} readOnly className="h-full"
                 basicSetup={{ lineNumbers: true, foldGutter: true }} />
             )}
           </div>

@@ -108,7 +108,7 @@ export function applyTheme(tokens: ThemeTokens): void {
 }
 
 // Rough luminance check: returns true if the hex colour is dark.
-function isColorDark(hex: string): boolean {
+export function isColorDark(hex: string): boolean {
   const clean = hex.replace('#', '');
   const r = parseInt(clean.slice(0, 2), 16);
   const g = parseInt(clean.slice(2, 4), 16);

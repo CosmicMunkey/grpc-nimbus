@@ -10,13 +10,14 @@ import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
 
 function StreamBadge({ method }: { method: MethodInfo }) {
+  const isDark = useAppStore(s => s.isDark);
   if (method.clientStreaming && method.serverStreaming)
-    return <span title="Bidirectional streaming"><ArrowLeftRight size={11} className="text-purple-400 shrink-0" /></span>;
+    return <span title="Bidirectional streaming"><ArrowLeftRight size={11} className={isDark ? 'text-purple-400 shrink-0' : 'text-purple-600 shrink-0'} /></span>;
   if (method.clientStreaming)
-    return <span title="Client streaming"><ArrowUp size={11} className="text-blue-400 shrink-0" /></span>;
+    return <span title="Client streaming"><ArrowUp size={11} className={isDark ? 'text-blue-400 shrink-0' : 'text-blue-600 shrink-0'} /></span>;
   if (method.serverStreaming)
-    return <span title="Server streaming"><ArrowDown size={11} className="text-green-400 shrink-0" /></span>;
-  return <span title="Unary"><Zap size={11} className="text-yellow-400 shrink-0" /></span>;
+    return <span title="Server streaming"><ArrowDown size={11} className={isDark ? 'text-green-400 shrink-0' : 'text-green-600 shrink-0'} /></span>;
+  return <span title="Unary"><Zap size={11} className={isDark ? 'text-yellow-400 shrink-0' : 'text-yellow-600 shrink-0'} /></span>;
 }
 
 function ServiceNode({ svc }: { svc: ServiceInfo }) {

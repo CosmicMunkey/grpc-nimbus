@@ -75,17 +75,21 @@ export function fromJson(json: string): FormVal {
 // ─── Type badge ──────────────────────────────────────────────────────────────
 
 function TypeBadge({ schema }: { schema: FieldSchema }) {
+  const isDark = useAppStore(s => s.isDark);
   let label: string;
-  let cls: string;
+  let darkCls: string;
+  let lightCls: string;
   if (schema.isMap) {
     label = `map<${schema.mapKeyType ?? '?'},${schema.mapValueType ?? '?'}>`;
-    cls = 'text-cyan-400 bg-cyan-900/20';
+    darkCls = 'text-cyan-400 bg-cyan-900/20';
+    lightCls = 'text-cyan-700 bg-cyan-100';
   } else if (schema.isRepeated) {
     label = `[]${schema.type}`;
-    cls = 'text-blue-300 bg-blue-900/20';
+    darkCls = 'text-blue-300 bg-blue-900/20';
+    lightCls = 'text-blue-700 bg-blue-100';
   } else {
     label = schema.type;
-    cls = ({
+    const darkMap: Record<string, string> = {
       string:    'text-sky-400 bg-sky-900/20',
       bytes:     'text-yellow-400 bg-yellow-900/20',
       bool:      'text-green-400 bg-green-900/20',
@@ -99,8 +103,26 @@ function TypeBadge({ schema }: { schema: FieldSchema }) {
       message:   'text-slate-400 bg-slate-800/40',
       map:       'text-cyan-400 bg-cyan-900/20',
       timestamp: 'text-teal-400 bg-teal-900/20',
-    } as Record<string, string>)[schema.type] ?? 'text-slate-400 bg-slate-800/40';
+    };
+    const lightMap: Record<string, string> = {
+      string:    'text-sky-700 bg-sky-100',
+      bytes:     'text-yellow-700 bg-yellow-100',
+      bool:      'text-green-700 bg-green-100',
+      int32:     'text-violet-700 bg-violet-100',
+      int64:     'text-violet-700 bg-violet-100',
+      uint32:    'text-violet-700 bg-violet-100',
+      uint64:    'text-violet-700 bg-violet-100',
+      float:     'text-fuchsia-700 bg-fuchsia-100',
+      double:    'text-fuchsia-700 bg-fuchsia-100',
+      enum:      'text-orange-700 bg-orange-100',
+      message:   'text-slate-600 bg-slate-200',
+      map:       'text-cyan-700 bg-cyan-100',
+      timestamp: 'text-teal-700 bg-teal-100',
+    };
+    darkCls  = darkMap[schema.type]  ?? 'text-slate-400 bg-slate-800/40';
+    lightCls = lightMap[schema.type] ?? 'text-slate-600 bg-slate-200';
   }
+  const cls = isDark ? darkCls : lightCls;
   return (
     <span className={`shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded ${cls}`}>
       {label}
