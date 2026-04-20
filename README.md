@@ -153,8 +153,20 @@ Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify
 | Wails CLI | v2.x (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`) |
 
 On macOS you also need Xcode Command Line Tools (`xcode-select --install`).  
-On Linux you need `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (Ubuntu 22.04 / Debian 11 or earlier), and `pkg-config`.  
 On Windows you need the WebView2 runtime (ships with Windows 11; downloadable for Windows 10).
+
+On Linux you need GCC, pkg-config, and the GTK/WebKit development libraries.
+Install them with the command for your distro:
+
+| Distro | Command |
+|---|---|
+| Ubuntu 20.04 / 22.04, Debian 11 | `sudo apt install gcc pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev` |
+| Ubuntu 24.04+, Debian 12 | `sudo apt install gcc pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Fedora / RHEL | `sudo dnf install gcc pkg-config gtk3-devel webkit2gtk4.1-devel` |
+| Arch Linux | `sudo pacman -S base-devel gtk3 webkit2gtk` |
+
+> **Note:** Ubuntu 24.04 ships WebKitGTK 4.1 (`-4.1-dev`). The `4.0` package is available in
+> the `jammy` repos if you need to build on an older toolchain.
 
 ### Build
 
@@ -166,6 +178,27 @@ wails build
 
 The output binary is placed in `build/bin/`.
 
+On Linux the binary is a standalone executable. To install system-wide:
+
+```bash
+sudo cp build/bin/grpc-nimbus /usr/local/bin/
+```
+
+### Build the MCP server
+
+```bash
+make mcp
+# → bin/grpc-nimbus-mcp
+```
+
+Or directly:
+
+```bash
+go build -o bin/grpc-nimbus-mcp ./cmd/mcp-server
+```
+
+The MCP server binary has no UI dependency — it is pure Go and requires no Wails, Node.js, or WebView2 runtime.
+
 ### Development mode (hot-reload)
 
 ```bash
@@ -176,10 +209,84 @@ This starts the backend in watch mode and opens the UI in a native window with V
 
 ---
 
+## MCP Server
+
+`grpc-nimbus-mcp` is a standalone [Model Context Protocol](https://modelcontextprotocol.io) server that exposes grpc-nimbus capabilities to any MCP-compatible AI assistant (Claude Desktop, Cursor, VS Code Copilot, etc.).
+
+It reads the **same configuration directory** as the desktop app, so all saved environments and collections are immediately available without any extra setup.
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `connect` | Connect to a gRPC server (target, TLS mode, optional mTLS cert/key) |
+| `connect_with_environment` | Connect using a saved environment's target and TLS, and activate it |
+| `disconnect` | Close the current connection |
+| `get_connection_state` | Return connectivity state |
+| `list_environments` | List all saved environments (name, target, active status, header count) |
+| `set_active_environment` | Activate a saved environment by name or ID |
+| `load_protoset` | Load a `.protoset` file by path |
+| `load_via_reflection` | Discover services via server reflection |
+| `list_services` | List all loaded services and methods |
+| `get_request_schema` | Get the JSON field schema for a method's input message |
+| `list_collections` | List saved request collections |
+| `get_collection` | Get a collection and all its saved requests |
+| `invoke_unary` | Invoke any unary RPC with a JSON request body |
+| `invoke_saved_request` | Run a single named saved request from a collection |
+| `run_collection` | Run all requests in a collection and return a pass/fail report |
+
+### Regression testing workflow
+
+The typical flow for an LLM-orchestrated regression test:
+
+1. `list_environments` → pick the target environment
+2. `connect_with_environment` → connect and activate headers
+3. `load_via_reflection` or `load_protoset` → discover services
+4. `run_collection` → run all saved requests, get per-request status / response / duration
+5. Repeat across environments or collections to cover multiple services
+
+### Registering with Claude Desktop
+
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "grpc-nimbus": {
+      "command": "/path/to/bin/grpc-nimbus-mcp"
+    }
+  }
+}
+```
+
+Replace `/path/to/bin/grpc-nimbus-mcp` with the absolute path to the built binary.
+
+### Registering with Cursor or VS Code
+
+In `.cursor/mcp.json` or `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "grpc-nimbus": {
+      "type": "stdio",
+      "command": "/path/to/bin/grpc-nimbus-mcp"
+    }
+  }
+}
+```
+
+---
+
 ## Project structure
 
 ```
 grpc-nimbus/
+├── cmd/
+│   └── mcp-server/           # Standalone MCP server (grpc-nimbus-mcp)
+│       ├── main.go           # MCP server entry point and tool registration
+│       ├── engine.go         # MCPEngine struct (connection/descriptor/store state)
+│       └── tools.go          # MCP tool handler implementations
 ├── main.go                   # Wails entry point, app menu
 ├── app.go                    # App struct, startup/shutdown
 ├── app_invoke.go             # Invoke / streaming backend methods

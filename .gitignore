@@ -34,6 +34,9 @@ go.work.sum
 # Wails build artifacts
 build/bin/
 
+# MCP server binary (built by `make mcp`)
+bin/
+
 # Frontend build output (embedded via go:embed at build time)
 frontend/dist/
 

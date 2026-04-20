@@ -304,7 +304,7 @@ function CollectionsPanel() {
           {/* Import button at bottom */}
           <button
             onClick={() => importCollection()}
-            className="flex items-center gap-1.5 mx-2 mt-1 px-2 py-1 rounded border border-dashed border-c-border text-xs text-c-text3 hover:border-c-text3 hover:text-c-text2 w-[calc(100%-16px)]"
+            className="flex items-center gap-1.5 mx-2 mt-1 px-2 py-1 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-text2 hover:text-c-text w-[calc(100%-16px)]"
           >
             <Upload size={11} /> Import collection…
           </button>

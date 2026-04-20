@@ -1,4 +1,4 @@
-.PHONY: build dev clean
+.PHONY: build dev clean mcp
 
 # Strip macOS extended attributes (iCloud/Finder detritus) before building
 # to avoid codesign failures on local machines.
@@ -11,5 +11,9 @@ build:
 dev:
 	wails dev
 
+# Build the standalone MCP server binary.
+mcp:
+	go build -o bin/grpc-nimbus-mcp ./cmd/mcp-server
+
 clean:
-	rm -rf build/bin
+	rm -rf build/bin bin
