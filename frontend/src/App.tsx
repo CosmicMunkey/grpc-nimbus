@@ -7,6 +7,8 @@ import RequestPanel from './components/RequestPanel/RequestPanel';
 import ResponsePanel from './components/ResponsePanel/ResponsePanel';
 import ConfirmDialog from './components/ConfirmDialog/ConfirmDialog';
 import SettingsPanel from './components/Settings/SettingsPanel';
+import AboutDialog from './components/AboutDialog/AboutDialog';
+import HelpDialog from './components/HelpDialog/HelpDialog';
 import { useAppStore } from './store/appStore';
 
 function ExportCollectionModal({ onClose }: { onClose: () => void }) {
@@ -140,6 +142,8 @@ function ColumnResizer({ onDrag }: { onDrag: (startX: number, currentX: number, 
 export default function App() {
   const { restoreLoadedState, importCollection, sidebarWidth, panelSplit, setSidebarWidth, setPanelSplit } = useAppStore();
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
   const sidebarStartRef = useRef(0);
   const splitStartRef = useRef(0);
   const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -204,10 +208,14 @@ export default function App() {
       sat(t[(idx - 1 + t.length) % t.length].id);
     });
 
+    const offAbout = rt.EventsOn('menu:about', () => setShowAboutDialog(true));
+    const offHelp  = rt.EventsOn('menu:help',  () => setShowHelpDialog(true));
+
     return () => {
       offImport(); offExport();
       offZoomIn(); offZoomOut(); offZoomReset();
       offNewTab(); offCloseTab(); offNextTab(); offPrevTab();
+      offAbout(); offHelp();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -248,6 +256,8 @@ export default function App() {
       </div>
 
       {showExportModal && <ExportCollectionModal onClose={() => setShowExportModal(false)} />}
+      {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}
+      {showHelpDialog  && <HelpDialog  onClose={() => setShowHelpDialog(false)} />}
       <ConfirmDialog />
     </div>
   );

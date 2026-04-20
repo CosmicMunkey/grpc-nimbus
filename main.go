@@ -100,5 +100,14 @@ func buildAppMenu(app *App) *menu.Menu {
 		app.TriggerMenuPrevTab()
 	})
 
+	helpMenu := m.AddSubmenu("Help")
+	helpMenu.AddText("Documentation", keys.Combo("/", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		app.TriggerMenuHelp()
+	})
+	helpMenu.AddSeparator()
+	helpMenu.AddText("About GRPC Nimbus", nil, func(_ *menu.CallbackData) {
+		app.TriggerMenuAbout()
+	})
+
 	return m
 }

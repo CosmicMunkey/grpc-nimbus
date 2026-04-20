@@ -1,0 +1,82 @@
+name: Update Homebrew Tap
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+jobs:
+  update-tap:
+    name: Update cask formula
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Get release version
+        id: version
+        run: |
+          # Strip the leading 'v' for the cask version field
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          # workflow_run head_branch may be the tag; fall back to head_commit
+          # Use the GitHub API to find the release tag
+          RELEASE_TAG=$(gh release view --repo ${{ github.repository }} --json tagName --jq '.tagName' 2>/dev/null || echo "")
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download release assets
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          gh release download "${TAG}" \
+            --repo ${{ github.repository }} \
+            --pattern "*-darwin-arm64.zip" \
+            --pattern "*-darwin-amd64.zip" \
+            --dir /tmp/assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          ARM64=$(shasum -a 256 /tmp/assets/*-darwin-arm64.zip | awk '{print $1}')
+          AMD64=$(shasum -a 256 /tmp/assets/*-darwin-amd64.zip | awk '{print $1}')
+          echo "arm64=${ARM64}" >> "$GITHUB_OUTPUT"
+          echo "amd64=${AMD64}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v5
+        with:
+          repository: CosmicMunkey/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update cask formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARM64="${{ steps.sha.outputs.arm64 }}"
+          AMD64="${{ steps.sha.outputs.amd64 }}"
+          CASK="tap/Casks/grpc-nimbus.rb"
+
+          # Update version
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" "${CASK}"
+
+          # Update arm sha256
+          sed -i "s/arm:   \"[a-f0-9]*\"/arm:   \"${ARM64}\"/" "${CASK}"
+
+          # Update intel sha256
+          sed -i "s/intel: \"[a-f0-9]*\"/intel: \"${AMD64}\"/" "${CASK}"
+
+          echo "Updated cask to version ${VERSION}"
+          cat "${CASK}"
+
+      - name: Commit and push
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/grpc-nimbus.rb
+          git commit -m "Update grpc-nimbus to v${{ steps.version.outputs.version }}"
+          git push

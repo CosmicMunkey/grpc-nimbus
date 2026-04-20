@@ -10,6 +10,27 @@ A cross-platform desktop gRPC client with first-class support for **protoset fil
 
 ---
 
+## Install
+
+**macOS (Homebrew)**
+
+```bash
+brew install --cask CosmicMunkey/tap/grpc-nimbus
+```
+
+**Direct downloads**
+
+Visit the [Releases page](https://github.com/CosmicMunkey/grpc-nimbus/releases/latest) to download the latest version for your platform:
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `grpc-nimbus-vX.Y.Z-darwin-arm64.zip` |
+| macOS (Intel) | `grpc-nimbus-vX.Y.Z-darwin-amd64.zip` |
+| Windows (x64) | `grpc-nimbus-vX.Y.Z-windows-amd64.zip` |
+| Linux (x64) | `grpc-nimbus-vX.Y.Z-linux-amd64.tar.gz` |
+
+---
+
 ## macOS: allowing the app to run
 
 macOS Gatekeeper will block GRPC Nimbus from launching because the app is not notarized with an Apple Developer certificate. You'll see a message like *"GRPC Nimbus.app cannot be opened because the developer cannot be verified."*
