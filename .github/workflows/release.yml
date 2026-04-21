@@ -9,6 +9,8 @@ jobs:
   build-macos:
     name: macOS (${{ matrix.arch }})
     runs-on: macos-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         include:
@@ -37,7 +39,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: wails build -platform darwin/${{ matrix.goarch }} -o grpc-nimbus
+        run: wails build -platform darwin/${{ matrix.goarch }} -o grpc-nimbus -ldflags "-X main.Version=${{ github.ref_name }}"
         env:
           CGO_ENABLED: '1'
           GOARCH: ${{ matrix.goarch }}
@@ -56,6 +58,8 @@ jobs:
   build-windows:
     name: Windows (amd64)
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -77,7 +81,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: wails build -platform windows/amd64 -o grpc-nimbus.exe
+        run: wails build -platform windows/amd64 -o grpc-nimbus.exe -ldflags "-X main.Version=${{ github.ref_name }}"
 
       - name: Zip binary
         shell: pwsh
@@ -94,6 +98,8 @@ jobs:
   build-linux:
     name: Linux (amd64)
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -120,7 +126,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: wails build -platform linux/amd64 -o grpc-nimbus
+        run: wails build -platform linux/amd64 -o grpc-nimbus -ldflags "-X main.Version=${{ github.ref_name }}"
         env:
           CGO_ENABLED: '1'
 

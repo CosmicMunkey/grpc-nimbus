@@ -110,3 +110,9 @@ func (a *App) TriggerMenuNextTab() { runtime.EventsEmit(a.ctx, "menu:nextTab") }
 
 // TriggerMenuPrevTab tells the frontend to switch to the previous tab.
 func (a *App) TriggerMenuPrevTab() { runtime.EventsEmit(a.ctx, "menu:prevTab") }
+
+// TriggerMenuAbout opens the About dialog in the frontend.
+func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu:about") }
+
+// TriggerMenuHelp opens the searchable Help dialog in the frontend.
+func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu:help") }

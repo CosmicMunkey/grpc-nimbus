@@ -59,6 +59,7 @@ declare global {
           GetConnectionState(): Promise<string>;
           GetUserSettings(): Promise<{ confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
           SaveUserSettings(s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
+          GetVersion(): Promise<string>;
         };
       };
     };
