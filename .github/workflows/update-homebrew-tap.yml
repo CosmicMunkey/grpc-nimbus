@@ -34,7 +34,7 @@ jobs:
           gh release download "${TAG}" \
             --repo ${{ github.repository }} \
             --pattern "*-darwin-arm64.zip" \
-            --pattern "*-darwin-amd64.zip" \
+            --pattern "*-darwin-x86_64.zip" \
             --dir /tmp/assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,9 +43,9 @@ jobs:
         id: sha
         run: |
           ARM64=$(shasum -a 256 /tmp/assets/*-darwin-arm64.zip | awk '{print $1}')
-          AMD64=$(shasum -a 256 /tmp/assets/*-darwin-amd64.zip | awk '{print $1}')
+          X86_64=$(shasum -a 256 /tmp/assets/*-darwin-x86_64.zip | awk '{print $1}')
           echo "arm64=${ARM64}" >> "$GITHUB_OUTPUT"
-          echo "amd64=${AMD64}" >> "$GITHUB_OUTPUT"
+          echo "amd64=${X86_64}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew tap
         uses: actions/checkout@v5
@@ -64,11 +64,11 @@ jobs:
           # Update version
           sed -i "s/version \".*\"/version \"${VERSION}\"/" "${CASK}"
 
-          # Update arm sha256
-          sed -i "s/arm:   \"[a-f0-9]*\"/arm:   \"${ARM64}\"/" "${CASK}"
+          # Update arm64 sha256 (anchored by trailing comment)
+          sed -i "s/sha256 \"[a-f0-9]*\"  # arm64/sha256 \"${ARM64}\"  # arm64/" "${CASK}"
 
-          # Update intel sha256
-          sed -i "s/intel: \"[a-f0-9]*\"/intel: \"${AMD64}\"/" "${CASK}"
+          # Update x86_64 sha256 (anchored by trailing comment)
+          sed -i "s/sha256 \"[a-f0-9]*\"  # x86_64/sha256 \"${AMD64}\"  # x86_64/" "${CASK}"
 
           echo "Updated cask to version ${VERSION}"
           cat "${CASK}"
