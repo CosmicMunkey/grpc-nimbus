@@ -33,6 +33,12 @@ type AppSettings struct {
 	// Layout
 	SidebarWidth *float64 `json:"sidebarWidth,omitempty"` // sidebar width in px; nil → 256
 	PanelSplit   *float64 `json:"panelSplit,omitempty"`   // request/response split fraction; nil → 0.5
+
+	// Window state
+	WindowWidth  *int `json:"windowWidth,omitempty"`  // window width in px
+	WindowHeight *int `json:"windowHeight,omitempty"` // window height in px
+	WindowX      *int `json:"windowX,omitempty"`      // window X position in px
+	WindowY      *int `json:"windowY,omitempty"`      // window Y position in px
 }
 
 // SettingsStore persists AppSettings as a single JSON file.

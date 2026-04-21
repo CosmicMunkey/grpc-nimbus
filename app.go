@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"grpc-nimbus/internal/rpc"
 	"grpc-nimbus/internal/storage"
 )
@@ -141,4 +142,18 @@ func (a *App) GetConnectionState() string {
 		return "disconnected"
 	}
 	return a.conn.GetState()
+}
+
+// SaveWindowState captures the current window size and position and persists them.
+// Called on application shutdown via the Wails BeforeClose hook.
+func (a *App) SaveWindowState(ctx context.Context) {
+	width, height := runtime.WindowGetSize(ctx)
+	x, y := runtime.WindowGetPosition(ctx)
+
+	go a.saveSettings(func(s *storage.AppSettings) {
+		s.WindowWidth = &width
+		s.WindowHeight = &height
+		s.WindowX = &x
+		s.WindowY = &y
+	})
 }

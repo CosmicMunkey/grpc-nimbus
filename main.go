@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	goruntime "runtime"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"grpc-nimbus/internal/storage"
 )
 
 //go:embed all:frontend/dist
@@ -22,16 +25,56 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 
+	// Load saved window dimensions
+	var windowWidth, windowHeight, windowX, windowY int
+	settingsStore, err := storage.NewSettingsStore()
+	if err == nil {
+		if saved, err := settingsStore.Load(); err == nil && saved != nil {
+			if saved.WindowWidth != nil {
+				windowWidth = *saved.WindowWidth
+			} else {
+				windowWidth = 1280
+			}
+			if saved.WindowHeight != nil {
+				windowHeight = *saved.WindowHeight
+			} else {
+				windowHeight = 800
+			}
+			if saved.WindowX != nil {
+				windowX = *saved.WindowX
+			}
+			if saved.WindowY != nil {
+				windowY = *saved.WindowY
+			}
+		} else {
+			windowWidth = 1280
+			windowHeight = 800
+		}
+	} else {
+		windowWidth = 1280
+		windowHeight = 800
+	}
+
+	// Create a startup wrapper that restores window position after init
+	startupWithRestore := func(ctx context.Context) {
+		app.startup(ctx)
+		// Only restore position if non-zero (indicating a saved state)
+		if windowX != 0 || windowY != 0 {
+			runtime.WindowSetPosition(ctx, windowX, windowY)
+		}
+	}
+
 	// Create application with options
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:  "GRPC Nimbus",
-		Width:  1280,
-		Height: 800,
+		Width:  windowWidth,
+		Height: windowHeight,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
+		OnStartup:        startupWithRestore,
+		OnBeforeClose:    func(ctx context.Context) bool { app.SaveWindowState(ctx); return false },
 		Menu:             buildAppMenu(app),
 		Linux: &linux.Options{
 			Icon:             appIcon,

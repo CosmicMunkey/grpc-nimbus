@@ -15,11 +15,15 @@ type UserSettings struct {
 	FontSize            int               `json:"fontSize"`
 	SidebarWidth        float64           `json:"sidebarWidth"`
 	PanelSplit          float64           `json:"panelSplit"`
+	WindowWidth         int               `json:"windowWidth"`
+	WindowHeight        int               `json:"windowHeight"`
+	WindowX             int               `json:"windowX"`
+	WindowY             int               `json:"windowY"`
 }
 
 // GetUserSettings returns the current user preference settings.
 func (a *App) GetUserSettings() UserSettings {
-	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus", FontSize: 16, SidebarWidth: 256, PanelSplit: 0.5}
+	defaults := UserSettings{ConfirmDeletes: true, Theme: "nimbus", FontSize: 16, SidebarWidth: 256, PanelSplit: 0.5, WindowWidth: 1280, WindowHeight: 800, WindowX: 0, WindowY: 0}
 	if a.settings == nil {
 		return defaults
 	}
@@ -49,6 +53,18 @@ func (a *App) GetUserSettings() UserSettings {
 	if saved.PanelSplit != nil {
 		result.PanelSplit = *saved.PanelSplit
 	}
+	if saved.WindowWidth != nil {
+		result.WindowWidth = *saved.WindowWidth
+	}
+	if saved.WindowHeight != nil {
+		result.WindowHeight = *saved.WindowHeight
+	}
+	if saved.WindowX != nil {
+		result.WindowX = *saved.WindowX
+	}
+	if saved.WindowY != nil {
+		result.WindowY = *saved.WindowY
+	}
 	return result
 }
 
@@ -62,6 +78,10 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.FontSize = &s.FontSize
 		settings.SidebarWidth = &s.SidebarWidth
 		settings.PanelSplit = &s.PanelSplit
+		settings.WindowWidth = &s.WindowWidth
+		settings.WindowHeight = &s.WindowHeight
+		settings.WindowX = &s.WindowX
+		settings.WindowY = &s.WindowY
 	})
 }
 
