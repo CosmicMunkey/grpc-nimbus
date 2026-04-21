@@ -24,10 +24,10 @@ Visit the [Releases page](https://github.com/CosmicMunkey/grpc-nimbus/releases/l
 
 | Platform | File |
 |----------|------|
-| macOS (Apple Silicon) | `grpc-nimbus-vX.Y.Z-darwin-arm64.zip` |
-| macOS (Intel) | `grpc-nimbus-vX.Y.Z-darwin-amd64.zip` |
-| Windows (x64) | `grpc-nimbus-vX.Y.Z-windows-amd64.zip` |
-| Linux (x64) | `grpc-nimbus-vX.Y.Z-linux-amd64.tar.gz` |
+| macOS (Apple Silicon) | `grpc-nimbus-vYYYY.WW.N-darwin-arm64.zip` |
+| macOS (Intel) | `grpc-nimbus-vYYYY.WW.N-darwin-x86_64.zip` |
+| Windows (x64) | `grpc-nimbus-vYYYY.WW.N-windows-amd64.zip` |
+| Linux (x64) | `grpc-nimbus-vYYYY.WW.N-linux-amd64.tar.gz` |
 
 ---
 
