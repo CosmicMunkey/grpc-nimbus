@@ -17,13 +17,14 @@ jobs:
         id: version
         run: |
           # Strip the leading 'v' for the cask version field
-          TAG="${{ github.event.workflow_run.head_branch }}"
+          TAG="$HEAD_BRANCH"
           # workflow_run head_branch may be the tag; fall back to head_commit
           # Use the GitHub API to find the release tag
           RELEASE_TAG=$(gh release view --repo ${{ github.repository }} --json tagName --jq '.tagName' 2>/dev/null || echo "")
           echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
         env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download release assets
