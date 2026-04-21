@@ -53,3 +53,5 @@ frontend/wailsjs/
 .github/project-context.md
 
 .DS_Store
+.copilot-instructions
+/mcp-server
