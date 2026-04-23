@@ -192,11 +192,13 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {entry.response && (
             <div>
               <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Response</span>
-              {entry.response.responseJson != null && (
+              {entry.response.responseJson?.trim() ? (
                 <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
                   {formatJson(entry.response.responseJson)}
                 </pre>
-              )}
+              ) : entry.response.statusCode !== 0 && entry.response.statusMessage ? (
+                <p className="mt-0.5 text-[10px] text-c-accent font-mono">{entry.response.statusMessage}</p>
+              ) : null}
               {entry.response.error && (
                 <p className="mt-0.5 text-[10px] text-c-accent">{entry.response.error}</p>
               )}

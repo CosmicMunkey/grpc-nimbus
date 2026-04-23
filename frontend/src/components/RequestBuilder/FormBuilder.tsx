@@ -574,6 +574,62 @@ function RepeatedEditor({
 
 // ─── Map editor ──────────────────────────────────────────────────────────────
 
+interface MapEntryRowProps {
+  mapKey: string;
+  mapValue: unknown;
+  schema: FieldSchema;
+  valueSchema: FieldSchema;
+  onKeyChange: (oldKey: string, newKey: string) => void;
+  onValueChange: (key: string, val: unknown) => void;
+  onRemove: (key: string) => void;
+  depth: number;
+}
+
+function MapEntryRow({ mapKey, mapValue, valueSchema, onKeyChange, onValueChange, onRemove, depth }: MapEntryRowProps) {
+  // Keep a local copy of the key so re-renders from parent map changes don't
+  // snap the cursor back or remount the input while the user is typing.
+  const [localKey, setLocalKey] = useState(mapKey);
+
+  // Sync if the key was changed externally (e.g. loading a saved request).
+  useEffect(() => {
+    setLocalKey(mapKey);
+  }, [mapKey]);
+
+  const commitKey = () => {
+    const trimmed = localKey.trim();
+    if (trimmed && trimmed !== mapKey) onKeyChange(mapKey, trimmed);
+    else if (!trimmed) setLocalKey(mapKey); // revert if blank
+  };
+
+  return (
+    <div className="flex items-start gap-1">
+      <input
+        value={localKey}
+        onChange={e => setLocalKey(e.target.value)}
+        onBlur={commitKey}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitKey(); } }}
+        className="w-24 bg-c-input border border-c-border rounded px-1.5 py-0.5 text-xs font-mono text-c-accent placeholder-c-text3 outline-none focus:border-c-accent"
+        placeholder="key"
+      />
+      <span className="text-c-text3 text-xs mt-0.5">→</span>
+      <div className="flex-1 min-w-0">
+        <FieldEditor
+          schema={valueSchema}
+          value={mapValue}
+          onChange={nv => onValueChange(mapKey, nv)}
+          depth={depth}
+        />
+      </div>
+      <button
+        onClick={() => onRemove(mapKey)}
+        className="shrink-0 mt-0.5 text-c-text3 hover:text-c-accent p-0.5 rounded"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  );
+}
+
 function MapEditor({
   schema, value, onChange, depth,
 }: {
@@ -618,30 +674,18 @@ function MapEditor({
 
   return (
     <div className="w-full space-y-1">
-      {entries.map(([k, v]) => (
-        <div key={k} className="flex items-start gap-1">
-          <input
-            value={k}
-            onChange={e => updateKey(k, e.target.value)}
-            className="w-24 bg-c-input border border-c-border rounded px-1.5 py-0.5 text-xs font-mono text-c-accent placeholder-c-text3 outline-none focus:border-c-accent"
-            placeholder="key"
-          />
-          <span className="text-c-text3 text-xs mt-0.5">→</span>
-          <div className="flex-1 min-w-0">
-            <FieldEditor
-              schema={valueSchema}
-              value={v}
-              onChange={nv => updateValue(k, nv)}
-              depth={depth}
-            />
-          </div>
-          <button
-            onClick={() => removeEntry(k)}
-            className="shrink-0 mt-0.5 text-c-text3 hover:text-c-accent p-0.5 rounded"
-          >
-            <X size={11} />
-          </button>
-        </div>
+      {entries.map(([k, v], i) => (
+        <MapEntryRow
+          key={i}
+          mapKey={k}
+          mapValue={v}
+          schema={schema}
+          valueSchema={valueSchema}
+          onKeyChange={updateKey}
+          onValueChange={updateValue}
+          onRemove={removeEntry}
+          depth={depth}
+        />
       ))}
       <button
         onClick={addEntry}

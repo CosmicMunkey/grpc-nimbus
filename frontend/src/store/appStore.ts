@@ -878,6 +878,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveEnvironment: async (env) => {
     await api.saveEnvironment(env);
     await get().loadEnvironments();
+    // If the saved environment is currently active and has a target, keep the
+    // connection bar in sync so the URL/TLS fields reflect the saved values.
+    if (get().activeEnvironmentId === env.id && env.target) {
+      set((s) => ({
+        connectionConfig: {
+          ...s.connectionConfig,
+          target: env.target!,
+          ...(env.tls ? { tls: env.tls as ConnectionConfig['tls'] } : {}),
+        },
+      }));
+    }
   },
 
   deleteEnvironment: async (id) => {
