@@ -259,10 +259,13 @@ export default function RequestPanel() {
     requestJson,
     timeoutSeconds,
     isInvoking,
+    isStreaming,
     savedRequestId,
     savedRequestName,
   } = useActiveTab();
-  const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest } = useAppStore();
+  const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest, streamingTabId } = useAppStore();
+  const hasOtherActiveStream = streamingTabId !== null && streamingTabId !== tabId;
+  const showCancel = isInvoking || isStreaming;
 
   const [tab, setTab] = useState<'form' | 'body' | 'metadata' | 'grpcurl'>('form');
   const [showSave, setShowSave] = useState(false);
@@ -325,15 +328,17 @@ export default function RequestPanel() {
           )}
           {/* Send / Cancel */}
           <button
-            onClick={isInvoking ? cancelInvoke : invoke}
+            onClick={() => { void (showCancel ? cancelInvoke() : invoke()); }}
+            disabled={!showCancel && hasOtherActiveStream}
+            title={!showCancel && hasOtherActiveStream ? 'Another tab is currently streaming' : undefined}
             className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${
-              isInvoking
+              showCancel
                 ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-white'
-                : 'bg-c-accent text-white hover:bg-c-accent2'
+                : 'bg-c-accent text-white hover:bg-c-accent2 disabled:opacity-40 disabled:cursor-not-allowed'
             }`}
           >
-            {isInvoking ? <Square size={11} /> : <Play size={12} />}
-            {isInvoking ? 'Cancel' : 'Send'}
+            {showCancel ? <Square size={11} /> : <Play size={12} />}
+            {showCancel ? 'Cancel' : 'Send'}
           </button>
         </div>
         <span className="text-[10px] font-mono text-c-text3 truncate px-3 pb-1.5" title={selectedMethod.fullName}>

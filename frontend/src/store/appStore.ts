@@ -122,6 +122,21 @@ function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'timestampInputLoc
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
 
 let _tabSeq = 0;
+type ConnectionStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
+
+const CONNECTION_STATUS_SET: ReadonlySet<ConnectionStatus> = new Set([
+  'disconnected',
+  'idle',
+  'connecting',
+  'ready',
+  'transient_failure',
+]);
+
+function normalizeConnectionStatus(status: unknown): ConnectionStatus {
+  return typeof status === 'string' && CONNECTION_STATUS_SET.has(status as ConnectionStatus)
+    ? (status as ConnectionStatus)
+    : 'disconnected';
+}
 
 // Module-level handle so polling survives re-renders
 let _connPollInterval: ReturnType<typeof setInterval> | null = null;
@@ -131,8 +146,8 @@ function startConnPoll() {
   _connPollInterval = setInterval(async () => {
     try {
       const raw = await api.getConnectionState();
-      const status = raw as AppState['connectionStatus'];
-      useAppStore.setState({ connectionStatus: status });
+      const status = normalizeConnectionStatus(raw);
+      useAppStore.setState({ connectionStatus: status, isConnected: status !== 'disconnected' });
     } catch {
       // backend unavailable — leave status unchanged
     }
@@ -196,6 +211,114 @@ function includesAll(current: string[], expected: string[] = []): boolean {
   return expected.every((value) => loaded.has(value));
 }
 
+function normalizeMetadataEntries(entries: unknown): MetadataEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.reduce<MetadataEntry[]>((acc, entry) => {
+    if (!entry || typeof entry !== 'object') return acc;
+    const key = 'key' in entry && typeof entry.key === 'string' ? entry.key : '';
+    const value = 'value' in entry && typeof entry.value === 'string' ? entry.value : '';
+    acc.push({ key, value });
+    return acc;
+  }, []);
+}
+
+function normalizeStringArray(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
+function normalizeConnectionConfig(config: unknown): ConnectionConfig {
+  const raw = config && typeof config === 'object' ? (config as Partial<ConnectionConfig>) : {};
+  const tls: ConnectionConfig['tls'] =
+    raw.tls === 'system' || raw.tls === 'insecure_skip' || raw.tls === 'none' ? raw.tls : 'none';
+  return {
+    target: typeof raw.target === 'string' ? raw.target : '',
+    tls,
+    ...(typeof raw.clientCert === 'string' ? { clientCert: raw.clientCert } : {}),
+    ...(typeof raw.clientKey === 'string' ? { clientKey: raw.clientKey } : {}),
+  };
+}
+
+function normalizeInvokeResponse(response: InvokeResponse): InvokeResponse {
+  return {
+    ...response,
+    responseJson: typeof response.responseJson === 'string' ? response.responseJson : '',
+    status: typeof response.status === 'string' ? response.status : '',
+    statusCode: typeof response.statusCode === 'number' ? response.statusCode : 0,
+    statusMessage: typeof response.statusMessage === 'string' ? response.statusMessage : '',
+    headers: normalizeMetadataEntries(response.headers),
+    trailers: normalizeMetadataEntries(response.trailers),
+    durationMs: typeof response.durationMs === 'number' ? response.durationMs : 0,
+    ...(typeof response.error === 'string' ? { error: response.error } : {}),
+    ...(typeof response.streaming === 'boolean' ? { streaming: response.streaming } : {}),
+  };
+}
+
+function normalizeHistoryEntries(entries: HistoryEntry[]): HistoryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry) => ({
+    ...entry,
+    requestJson: typeof entry.requestJson === 'string' ? entry.requestJson : '{}',
+    metadata: normalizeMetadataEntries(entry.metadata),
+    response: entry.response ? normalizeInvokeResponse(entry.response) : undefined,
+    invokedAt: typeof entry.invokedAt === 'string' ? entry.invokedAt : new Date(0).toISOString(),
+  }));
+}
+
+function normalizeSavedRequest(request: SavedRequest): SavedRequest {
+  return {
+    ...request,
+    methodPath: typeof request.methodPath === 'string' ? request.methodPath : '',
+    requestJson: typeof request.requestJson === 'string' ? request.requestJson : '{}',
+    metadata: normalizeMetadataEntries(request.metadata),
+    connection: normalizeConnectionConfig(request.connection),
+  };
+}
+
+function normalizeCollection(collection: Collection): Collection {
+  return {
+    ...collection,
+    protosetPaths: normalizeStringArray(collection.protosetPaths),
+    protoFilePaths: normalizeStringArray(collection.protoFilePaths),
+    protoImportPaths: normalizeStringArray(collection.protoImportPaths),
+    requests: Array.isArray(collection.requests) ? collection.requests.map(normalizeSavedRequest) : [],
+  };
+}
+
+function normalizeCollections(collections: Collection[]): Collection[] {
+  if (!Array.isArray(collections)) return [];
+  return collections.map(normalizeCollection);
+}
+
+function normalizeEnvironment(environment: Environment): Environment {
+  return {
+    ...environment,
+    headers: normalizeMetadataEntries(environment.headers),
+  };
+}
+
+function normalizeEnvironments(environments: Environment[]): Environment[] {
+  if (!Array.isArray(environments)) return [];
+  return environments.map(normalizeEnvironment);
+}
+
+function normalizeStreamEvent(event: StreamEvent): StreamEvent | null {
+  const type = event?.type;
+  if (type !== 'message' && type !== 'header' && type !== 'trailer' && type !== 'error') {
+    return null;
+  }
+
+  const normalized: StreamEvent = { type };
+  if (typeof event.json === 'string') normalized.json = event.json;
+  if (typeof event.status === 'string') normalized.status = event.status;
+  if (type === 'trailer' && typeof normalized.status !== 'string') normalized.status = 'OK';
+  if (typeof event.statusCode === 'number') normalized.statusCode = event.statusCode;
+  if (type === 'trailer' && typeof normalized.statusCode !== 'number') normalized.statusCode = 0;
+  if (typeof event.error === 'string') normalized.error = event.error;
+  if (type === 'header' || type === 'trailer') normalized.metadata = normalizeMetadataEntries(event.metadata);
+  return normalized;
+}
+
 const INITIAL_TAB = makeTab();
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -204,11 +327,11 @@ interface AppState {
   // Connection
   connectionConfig: ConnectionConfig;
   isConnected: boolean;
-  connectionStatus: 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
+  connectionStatus: ConnectionStatus;
   connectionError: string | null;
   setConnectionConfig: (cfg: Partial<ConnectionConfig>) => void;
   connect: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 
   // Startup state restoration
   restoreLoadedState: () => Promise<void>;
@@ -233,10 +356,10 @@ interface AppState {
   activeTabId: string;
   streamingTabId: string | null;
   newTab: () => void;
-  closeTab: (id: string) => void;
+  closeTab: (id: string) => Promise<void>;
   setActiveTab: (id: string) => void;
   duplicateTab: (id: string) => void;
-  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[], savedRequestId?: string, savedRequestName?: string) => void;
+  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[] | null, savedRequestId?: string, savedRequestName?: string) => void;
 
   // Per-tab actions (operate on the active tab)
   selectMethod: (method: MethodInfo | null) => void;
@@ -245,10 +368,10 @@ interface AppState {
   setTimeoutSeconds: (t: number) => void;
   loadRequestSchema: (methodPath: string) => Promise<void>;
   invoke: () => Promise<void>;
-  cancelInvoke: () => void;
+  cancelInvoke: () => Promise<void>;
   appendStreamEvent: (evt: StreamEvent) => void;
   clearStream: () => void;
-  cancelStream: () => void;
+  cancelStream: () => Promise<void>;
   loadHistory: (methodPath: string) => Promise<void>;
   clearHistory: (methodPath: string) => Promise<void>;
 
@@ -317,18 +440,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   connect: async () => {
     const { connectionConfig } = get();
+    set({ connectionStatus: 'connecting', connectionError: null });
     try {
       await api.connect(connectionConfig);
-      set({ isConnected: true, connectionStatus: 'connecting', connectionError: null });
+      const status = normalizeConnectionStatus(await api.getConnectionState().catch(() => 'connecting'));
+      set({ isConnected: status !== 'disconnected', connectionStatus: status, connectionError: null });
       startConnPoll();
     } catch (e: unknown) {
       set({ isConnected: false, connectionStatus: 'disconnected', connectionError: e instanceof Error ? e.message : String(e) });
     }
   },
 
-  disconnect: () => {
+  disconnect: async () => {
     stopConnPoll();
-    api.disconnect().catch(() => {});
+    try {
+      await api.disconnect();
+    } catch {
+      // best-effort disconnect
+    }
     set({ isConnected: false, connectionStatus: 'disconnected' });
   },
 
@@ -357,9 +486,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* non-fatal */ }
     // If the backend is already connected, start polling
     try {
-      const connState = await api.getConnectionState();
+      const connState = normalizeConnectionStatus(await api.getConnectionState());
+      set({ isConnected: connState !== 'disconnected', connectionStatus: connState });
       if (connState !== 'disconnected') {
-        set({ isConnected: true, connectionStatus: connState as AppState['connectionStatus'] });
         startConnPoll();
       }
     } catch { /* non-fatal */ }
@@ -398,6 +527,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearLoadedProtos: async () => {
+    const { streamingTabId, tabs } = get();
+    if (streamingTabId && tabs.some((t) => t.id === streamingTabId && t.selectedMethod)) {
+      await get().cancelStream();
+    }
     await api.clearLoadedProtos();
     // Close all tabs that had a method selected (they're all orphaned now)
     set((s) => {
@@ -437,6 +570,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
+    const current = get();
+    const closingIds = new Set(
+      current.tabs
+        .filter((t) => t.selectedMethod && !validMethods.has(t.selectedMethod.fullName))
+        .map((t) => t.id)
+    );
+    if (current.streamingTabId && closingIds.has(current.streamingTabId)) {
+      await get().cancelStream();
+    }
+
     // Apply loaded state and close orphaned tabs in one atomic update
     set((s) => {
       const base = { ...applyLoadedState(state), services: newServices };
@@ -463,7 +606,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
   },
 
-  closeTab: (id) => {
+  closeTab: async (id) => {
+    if (get().streamingTabId === id) {
+      await get().cancelStream();
+    }
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id);
       const clearStreaming = s.streamingTabId === id ? null : s.streamingTabId;
@@ -514,11 +660,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Reuse a pristine blank tab rather than opening a redundant one.
     const active = tabs.find((t) => t.id === activeTabId);
     const label = savedRequestName ?? method.methodName;
+    const normalizedRequestJson = typeof requestJson === 'string' ? requestJson : '{}';
+    const normalizedMetadata = normalizeMetadataEntries(metadata);
     const patch: Partial<Tab> = {
       selectedMethod: method, label,
       savedRequestId: savedRequestId ?? null,
       savedRequestName: savedRequestName ?? null,
-      requestJson, requestMetadata: metadata,
+      requestJson: normalizedRequestJson, requestMetadata: normalizedMetadata,
       response: null, streamMessages: [], history: [],
       requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
     };
@@ -555,7 +703,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setRequestMetadata: (md) => {
     const { activeTabId } = get();
-    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: md }) }));
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: normalizeMetadataEntries(md) }) }));
   },
 
   setTimeoutSeconds: (t) => {
@@ -574,10 +722,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   invoke: async () => {
-    const { tabs, activeTabId } = get();
+    const { tabs, activeTabId, streamingTabId } = get();
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab?.selectedMethod) return;
+
+    if (streamingTabId) {
+      const owner = tabs.find((t) => t.id === streamingTabId);
+      const msg = owner
+        ? `A stream is active in "${owner.label}". Cancel it before sending another request.`
+        : 'A stream is already active. Cancel it before sending another request.';
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { invokeError: msg }) }));
+      return;
+    }
+
     const { selectedMethod, requestJson, requestMetadata, timeoutSeconds } = tab;
+    const metadata = normalizeMetadataEntries(requestMetadata);
 
     set((s) => ({
       tabs: patchTab(s.tabs, activeTabId, {
@@ -591,10 +750,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, activeTabId, { isStreaming: true, isInvoking: false }),
           streamingTabId: activeTabId,
         }));
-        await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
+        await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata, timeoutSeconds });
       } else {
-        const resp = await api.invokeUnary({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
-        set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { response: resp, isInvoking: false }) }));
+        const resp = await api.invokeUnary({ methodPath: selectedMethod.fullName, requestJson, metadata, timeoutSeconds });
+        set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { response: normalizeInvokeResponse(resp), isInvoking: false }) }));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -606,17 +765,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   appendStreamEvent: (evt) => {
+    const normalized = normalizeStreamEvent(evt);
+    if (!normalized) return;
     const { streamingTabId } = get();
     if (!streamingTabId) return;
-    const isDone = evt.type === 'trailer' || evt.type === 'error';
+    const isDone = normalized.type === 'trailer' || normalized.type === 'error';
     set((s) => {
       const streamTab = s.tabs.find((t) => t.id === streamingTabId);
-      if (!streamTab) return {};
+      if (!streamTab) return { streamingTabId: null };
+      if (!streamTab.selectedMethod || (!streamTab.selectedMethod.serverStreaming && !streamTab.selectedMethod.clientStreaming)) {
+        return { streamingTabId: null, tabs: patchTab(s.tabs, streamingTabId, { isStreaming: false }) };
+      }
+      if (!streamTab.isStreaming && normalized.type !== 'error' && normalized.type !== 'trailer') {
+        return {};
+      }
+      const nextMessages = normalized.type === 'header' && (normalized.metadata?.length ?? 0) === 0
+        ? streamTab.streamMessages
+        : [...streamTab.streamMessages, normalized];
       const patch: Partial<Tab> = {
-        streamMessages: [...streamTab.streamMessages, evt],
+        streamMessages: nextMessages,
         isStreaming: !isDone,
       };
-      if (evt.type === 'error') patch.invokeError = evt.error ?? null;
+      if (normalized.type === 'error') patch.invokeError = normalized.error ?? 'Stream ended with an error';
       return {
         tabs: patchTab(s.tabs, streamingTabId, patch),
         streamingTabId: isDone ? null : streamingTabId,
@@ -629,28 +799,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { streamMessages: [], isStreaming: false }) }));
   },
 
-  cancelStream: () => {
-    api.cancelStream().catch(() => {});
-    const id = get().streamingTabId ?? get().activeTabId;
+  cancelStream: async () => {
+    const id = get().streamingTabId;
+    if (!id) return;
+    try {
+      await api.cancelStream();
+    } catch {
+      // best-effort cancellation
+    }
     set((s) => ({
       tabs: patchTab(s.tabs, id, { isStreaming: false }),
       streamingTabId: null,
     }));
   },
 
-  cancelInvoke: () => {
+  cancelInvoke: async () => {
     const { tabs, activeTabId, streamingTabId } = get();
     const tab = tabs.find((t) => t.id === activeTabId);
     if (tab?.isInvoking) {
-      api.cancelUnary().catch(() => {});
+      try {
+        await api.cancelUnary();
+      } catch {
+        // best-effort cancellation
+      }
       set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { isInvoking: false }) }));
     } else if (streamingTabId) {
-      api.cancelStream().catch(() => {});
-      const id = streamingTabId;
-      set((s) => ({
-        tabs: patchTab(s.tabs, id, { isStreaming: false }),
-        streamingTabId: null,
-      }));
+      await get().cancelStream();
     }
   },
 
@@ -658,7 +832,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeTabId } = get();
     try {
       const entries = await api.getHistory(methodPath);
-      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: entries ?? [] }) }));
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: normalizeHistoryEntries(entries ?? []) }) }));
     } catch {
       set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
     }
@@ -676,23 +850,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadCollections: async () => {
     try {
       const cols = await api.listCollections();
-      set({ collections: cols ?? [] });
+      set({ collections: normalizeCollections(cols ?? []) });
     } catch { set({ collections: [] }); }
   },
 
   loadCollectionDescriptors: async (collection) => {
+    const normalized = normalizeCollection(collection);
     const { loadedProtosetPaths, loadedProtoFilePaths, protoImportPaths } = get();
-    const needsProtosets = (collection.protosetPaths?.length ?? 0) > 0
-      && !includesAll(loadedProtosetPaths, collection.protosetPaths);
-    const needsProtoFiles = (collection.protoFilePaths?.length ?? 0) > 0
-      && (!includesAll(loadedProtoFilePaths, collection.protoFilePaths)
-        || !includesAll(protoImportPaths, collection.protoImportPaths ?? []));
+    const needsProtosets = normalized.protosetPaths.length > 0
+      && !includesAll(loadedProtosetPaths, normalized.protosetPaths);
+    const needsProtoFiles = normalized.protoFilePaths.length > 0
+      && (!includesAll(loadedProtoFilePaths, normalized.protoFilePaths)
+        || !includesAll(protoImportPaths, normalized.protoImportPaths));
 
     if (needsProtosets) {
-      await get().loadProtosets(collection.protosetPaths);
+      await get().loadProtosets(normalized.protosetPaths);
     }
     if (needsProtoFiles) {
-      await get().loadProtoFiles(collection.protoImportPaths ?? [], collection.protoFilePaths);
+      await get().loadProtoFiles(normalized.protoImportPaths, normalized.protoFilePaths);
     }
   },
 
@@ -706,7 +881,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const req = {
       id: newReqId, name, collectionId,
       methodPath: selectedMethod.fullName, requestJson,
-      metadata: requestMetadata, connection: connectionConfig,
+      metadata: normalizeMetadataEntries(requestMetadata), connection: normalizeConnectionConfig(connectionConfig),
       createdAt: now, updatedAt: now,
     };
     let col = collections.find((c) => c.id === collectionId);
@@ -739,13 +914,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openSavedRequest: async (collection, request) => {
-    let method = findMethodByPath(get().services, request.methodPath);
+    const normalizedRequest = normalizeSavedRequest(request);
+    let method = findMethodByPath(get().services, normalizedRequest.methodPath);
     if (!method) {
       await get().loadCollectionDescriptors(collection);
-      method = findMethodByPath(get().services, request.methodPath);
+      method = findMethodByPath(get().services, normalizedRequest.methodPath);
     }
     if (!method) return;
-    get().openMethodInNewTab(method, request.requestJson, request.metadata, request.id, request.name);
+    get().openMethodInNewTab(method, normalizedRequest.requestJson, normalizedRequest.metadata, normalizedRequest.id, normalizedRequest.name);
   },
 
   renameCollection: async (collectionId, newName) => {
@@ -768,7 +944,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const updatedRequests = col.requests.map((r) =>
       r.id === savedRequestId
-        ? { ...r, requestJson, metadata: requestMetadata, connection: connectionConfig, updatedAt: now }
+        ? {
+            ...r,
+            requestJson,
+            metadata: normalizeMetadataEntries(requestMetadata),
+            connection: normalizeConnectionConfig(connectionConfig),
+            updatedAt: now,
+          }
         : r
     );
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
@@ -786,7 +968,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
     const linkedTab = get().tabs.find((t) => t.savedRequestId === requestId);
-    if (linkedTab) get().closeTab(linkedTab.id);
+    if (linkedTab) await get().closeTab(linkedTab.id);
   },
 
   renameRequest: async (tabId, newName) => {
@@ -828,6 +1010,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
     if (!confirmed) return;
     const requestIds = new Set((col?.requests ?? []).map((r) => r.id));
+    const streamOwner = get().tabs.find((t) => t.id === get().streamingTabId);
+    if (streamOwner?.savedRequestId && requestIds.has(streamOwner.savedRequestId)) {
+      await get().cancelStream();
+    }
     await api.deleteCollection(id);
     await get().loadCollections();
     // Batch-close all linked tabs in a single state update
@@ -856,11 +1042,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   importCollection: async () => {
     const srcPath = await api.pickImportFile();
     if (srcPath) {
-      const imported = await api.importCollection(srcPath);
+      const imported = normalizeCollection(await api.importCollection(srcPath));
       await get().loadCollections();
-      if (imported) {
-        await get().loadCollectionDescriptors(imported);
-      }
+      await get().loadCollectionDescriptors(imported);
     }
   },
 
@@ -871,12 +1055,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadEnvironments: async () => {
     try {
       const envs = await api.listEnvironments();
-      set({ environments: envs ?? [] });
+      set({ environments: normalizeEnvironments(envs ?? []) });
     } catch { set({ environments: [] }); }
   },
 
   saveEnvironment: async (env) => {
-    await api.saveEnvironment(env);
+    await api.saveEnvironment(normalizeEnvironment(env));
     await get().loadEnvironments();
     // If the saved environment is currently active and has a target, keep the
     // connection bar in sync so the URL/TLS fields reflect the saved values.

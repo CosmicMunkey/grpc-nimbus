@@ -113,16 +113,48 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
       </div>
     );
   }
+  if (evt.type === 'header') {
+    const entries = evt.metadata ?? [];
+    if (entries.length === 0) return null;
+    return (
+      <div className="border border-c-border rounded overflow-hidden">
+        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">header</div>
+        <div className="p-2 space-y-0.5">
+          {entries.map((entry, i) => (
+            <div key={i} className="flex gap-2 text-[10px]">
+              <span className="text-c-text2">{entry.key}:</span>
+              <span className="text-c-text break-all">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (evt.type === 'trailer') {
-    const statusCls = evt.statusCode === 0
+    const statusCode = typeof evt.statusCode === 'number' ? evt.statusCode : 0;
+    const statusText = evt.status ?? (statusCode === 0 ? 'OK' : 'UNKNOWN');
+    const trailerMetadata = evt.metadata ?? [];
+    const statusCls = statusCode === 0
       ? (isDark ? 'text-green-400' : 'text-green-600')
       : 'text-c-accent';
     return (
-      <div className="border border-c-border rounded px-2 py-1 text-[10px]">
-        <span className="text-c-text2">trailer </span>
-        <span className={`font-medium ${statusCls}`}>
-          {evt.statusCode} {evt.status}
-        </span>
+      <div className="border border-c-border rounded overflow-hidden">
+        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">trailer</div>
+        <div className="px-2 py-1 text-[10px]">
+          <span className={`font-medium ${statusCls}`}>
+            {statusCode} {statusText}
+          </span>
+          {trailerMetadata.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {trailerMetadata.map((entry, i) => (
+                <div key={i} className="flex gap-2">
+                  <span className="text-c-text2">{entry.key}:</span>
+                  <span className="text-c-text break-all">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -299,9 +331,10 @@ export default function ResponsePanel() {
   }, [appendStreamEvent]);
 
   if (!selectedMethod) return null;
+  const isStreamingMethod = selectedMethod.serverStreaming || selectedMethod.clientStreaming;
 
   // Show streaming panel if streaming is active or we have stream messages
-  if (isStreaming || (selectedMethod.serverStreaming && streamMessages.length > 0)) {
+  if (isStreaming || (isStreamingMethod && streamMessages.length > 0)) {
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex border-b border-c-border">

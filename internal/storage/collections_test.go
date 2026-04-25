@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"grpc-nimbus/internal/rpc"
@@ -98,5 +99,85 @@ func TestPortableExportImportPreservesProtoSources(t *testing.T) {
 	}
 	if secondImported.ProtoImportPaths[0] != imported.ProtoImportPaths[0] {
 		t.Fatalf("expected repeated import to reuse extracted import root, got %q vs %q", secondImported.ProtoImportPaths[0], imported.ProtoImportPaths[0])
+	}
+}
+
+func TestSaveCollectionRejectsEmptyID(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	err := store.SaveCollection(Collection{ID: "   ", Name: "bad"})
+	if err == nil {
+		t.Fatal("expected error for empty collection id")
+	}
+}
+
+func TestExportPortableFailsForUnreadableProtoset(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	col := Collection{
+		ID:            "col-unreadable",
+		Name:          "Unreadable",
+		ProtosetPaths: []string{filepath.Join(t.TempDir(), "missing.protoset")},
+	}
+	if err := store.SaveCollection(col); err != nil {
+		t.Fatalf("save collection: %v", err)
+	}
+
+	err := store.ExportPortable(col.ID, filepath.Join(t.TempDir(), "out.json"))
+	if err == nil {
+		t.Fatal("expected export to fail for unreadable protoset")
+	}
+	if !strings.Contains(err.Error(), "reading protoset") {
+		t.Fatalf("expected protoset read error, got %v", err)
+	}
+}
+
+func TestImportPortableRejectsPathTraversalProtoAsset(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	exp := PortableExport{
+		Version: 1,
+		Collection: Collection{
+			ID:             "col",
+			Name:           "bad",
+			ProtoFilePaths: []string{"../escape.proto"},
+		},
+		ProtoFiles: []EmbeddedProtoFile{
+			{Path: "../escape.proto", Data: []byte("syntax = \"proto3\";")},
+		},
+	}
+	raw, err := json.Marshal(exp)
+	if err != nil {
+		t.Fatalf("marshal export: %v", err)
+	}
+	_, err = store.importPortable(raw)
+	if err == nil {
+		t.Fatal("expected traversal import error")
+	}
+	if !strings.Contains(err.Error(), "invalid proto asset path") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestImportPortableRejectsAbsoluteProtosetName(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	exp := PortableExport{
+		Version: 1,
+		Collection: Collection{
+			ID:            "col",
+			Name:          "bad",
+			ProtosetPaths: []string{"/bad.protoset"},
+		},
+		Protosets: []EmbeddedProtoset{
+			{Name: "/bad.protoset", Data: []byte("x")},
+		},
+	}
+	raw, err := json.Marshal(exp)
+	if err != nil {
+		t.Fatalf("marshal export: %v", err)
+	}
+	_, err = store.importPortable(raw)
+	if err == nil {
+		t.Fatal("expected absolute path import error")
+	}
+	if !strings.Contains(err.Error(), "invalid protoset asset name") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

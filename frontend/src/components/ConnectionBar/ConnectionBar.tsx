@@ -33,13 +33,13 @@ function StatusDot({ status }: { status: ConnStatus }) {
 export default function ConnectionBar() {
   const {
     connectionConfig,
-    isConnected,
     connectionStatus,
     connectionError,
     setConnectionConfig,
     connect,
     disconnect,
   } = useAppStore();
+  const effectiveConnected = connectionStatus !== 'disconnected';
 
   const [tlsOpen, setTlsOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -52,7 +52,7 @@ export default function ConnectionBar() {
 
   // Snapshot config on connect; clear on disconnect
   useEffect(() => {
-    if (isConnected) {
+    if (effectiveConnected) {
       connectedConfigRef.current = { target: connectionConfig.target, tls: connectionConfig.tls };
       setIsStale(false);
     } else {
@@ -60,16 +60,16 @@ export default function ConnectionBar() {
       setIsStale(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected]);
+  }, [effectiveConnected]);
 
   // Check staleness whenever config changes while connected
   useEffect(() => {
-    if (!isConnected || !connectedConfigRef.current) return;
+    if (!effectiveConnected || !connectedConfigRef.current) return;
     const { target, tls } = connectedConfigRef.current;
     setIsStale(connectionConfig.target !== target || connectionConfig.tls !== tls);
-  }, [connectionConfig.target, connectionConfig.tls, isConnected]);
+  }, [connectionConfig.target, connectionConfig.tls, effectiveConnected]);
 
-  const handleReconnect = async () => { await disconnect(); connect(); };
+  const handleReconnect = async () => { await disconnect(); await connect(); };
 
   const selectedTls = TLS_OPTIONS.find((o) => o.value === connectionConfig.tls) ?? TLS_OPTIONS[0];
 
@@ -105,8 +105,8 @@ export default function ConnectionBar() {
           onChange={(e) => setConnectionConfig({ target: e.target.value })}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return;
-            if (isStale) { handleReconnect(); }
-            else if (!useAppStore.getState().isConnected) { connect(); }
+            if (isStale) { void handleReconnect(); }
+            else if (!effectiveConnected) { void connect(); }
           }}
           placeholder="host:port"
           className="flex-1 bg-transparent text-c-text placeholder-c-text3 text-sm outline-none font-mono"
@@ -142,21 +142,23 @@ export default function ConnectionBar() {
       {/* Connect / Disconnect / Reconnect */}
       {isStale ? (
         <button
-          onClick={handleReconnect}
+          onClick={() => { void handleReconnect(); }}
           title="Settings changed — click to reconnect with new config"
+          disabled={connectionStatus === 'connecting'}
           className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/30"
         >
           <RefreshCw size={13} /> Reconnect
         </button>
       ) : (
         <button
-          onClick={() => isConnected ? disconnect() : connect()}
+          onClick={() => { void (effectiveConnected ? disconnect() : connect()); }}
+          disabled={connectionStatus === 'connecting'}
           className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-            isConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
+            effectiveConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
           }`}
         >
-          {isConnected ? <WifiOff size={13} /> : <Wifi size={13} />}
-          {isConnected ? 'Disconnect' : 'Connect'}
+          {effectiveConnected ? <WifiOff size={13} /> : <Wifi size={13} />}
+          {effectiveConnected ? 'Disconnect' : 'Connect'}
         </button>
       )}
 

@@ -18,12 +18,12 @@ type App struct {
 	mu         sync.Mutex
 	settingsMu sync.Mutex
 	conn       *rpc.Connection
-	protoset  *rpc.ProtosetDescriptor
-	store     *storage.Store
-	envStore  *storage.EnvStore
-	histStore *storage.HistoryStore
-	settings  *storage.SettingsStore
-	activeEnv *storage.Environment
+	protoset   *rpc.ProtosetDescriptor
+	store      *storage.Store
+	envStore   *storage.EnvStore
+	histStore  *storage.HistoryStore
+	settings   *storage.SettingsStore
+	activeEnv  *storage.Environment
 
 	// Loaded descriptor state is tracked by source family so proto files,
 	// protosets, and reflection can coexist.
@@ -33,13 +33,16 @@ type App struct {
 	loadReflection      bool
 
 	// streamCancel cancels the active streaming invocation, if any.
-	streamCancel context.CancelFunc
+	streamCancel    context.CancelFunc
+	streamCancelSeq uint64
 
 	// unaryCancel cancels the currently in-flight unary invocation, if any.
-	unaryCancel context.CancelFunc
+	unaryCancel    context.CancelFunc
+	unaryCancelSeq uint64
 
 	// reflectionCancel cancels the currently in-flight reflection load, if any.
-	reflectionCancel context.CancelFunc
+	reflectionCancel    context.CancelFunc
+	reflectionCancelSeq uint64
 }
 
 // NewApp creates the App instance. Called once at startup.
@@ -150,7 +153,7 @@ func (a *App) SaveWindowState(ctx context.Context) {
 	width, height := runtime.WindowGetSize(ctx)
 	x, y := runtime.WindowGetPosition(ctx)
 
-	go a.saveSettings(func(s *storage.AppSettings) {
+	a.saveSettings(func(s *storage.AppSettings) {
 		s.WindowWidth = &width
 		s.WindowHeight = &height
 		s.WindowX = &x

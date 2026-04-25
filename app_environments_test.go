@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"grpc-nimbus/internal/rpc"
 	"grpc-nimbus/internal/storage"
 )
 
@@ -77,8 +78,8 @@ func TestSaveEnvironmentDoesNotTouchOtherActiveEnv(t *testing.T) {
 	a := newTestApp(t)
 
 	active := storage.Environment{
-		ID:   "active",
-		Name: "active",
+		ID:      "active",
+		Name:    "active",
 		Headers: []storage.EnvHeader{{Key: "x-custom", Value: "active-value"}},
 	}
 	other := storage.Environment{ID: "other", Name: "other"}
@@ -178,5 +179,38 @@ func TestGetLoadedStateIncludesActiveEnvironmentID(t *testing.T) {
 	}
 	if state.ActiveEnvironmentID != "env42" {
 		t.Errorf("expected ActiveEnvironmentID %q, got %q", "env42", state.ActiveEnvironmentID)
+	}
+}
+
+func TestInterpolateRequestRequestMetadataOverridesEnvHeadersCaseInsensitive(t *testing.T) {
+	env := &storage.Environment{
+		ID:   "env1",
+		Name: "prod",
+		Headers: []storage.EnvHeader{
+			{Key: "authorization", Value: "Bearer env"},
+			{Key: "x-tenant", Value: "env-tenant"},
+		},
+	}
+
+	req := rpc.InvokeRequest{
+		Metadata: []rpc.MetadataEntry{
+			{Key: "Authorization", Value: "Bearer request"},
+			{Key: "x-trace", Value: "trace-1"},
+		},
+	}
+
+	got := interpolateRequest(req, env)
+	if len(got.Metadata) != 3 {
+		t.Fatalf("expected 3 metadata entries, got %d", len(got.Metadata))
+	}
+
+	if got.Metadata[0].Key != "x-tenant" || got.Metadata[0].Value != "env-tenant" {
+		t.Fatalf("expected non-overridden env header first, got %+v", got.Metadata[0])
+	}
+	if got.Metadata[1].Key != "Authorization" || got.Metadata[1].Value != "Bearer request" {
+		t.Fatalf("expected request authorization header preserved, got %+v", got.Metadata[1])
+	}
+	if got.Metadata[2].Key != "x-trace" || got.Metadata[2].Value != "trace-1" {
+		t.Fatalf("expected request metadata preserved, got %+v", got.Metadata[2])
 	}
 }

@@ -47,7 +47,7 @@ func handleConnect(e *MCPEngine) func(context.Context, mcp.CallToolRequest) (*mc
 			ClientCert: req.GetString("client_cert", ""),
 			ClientKey:  req.GetString("client_key", ""),
 		}
-		if err := e.Connect(cfg); err != nil {
+		if err := e.Connect(ctx, cfg); err != nil {
 			return toolError("connection failed: %v", err)
 		}
 		return toolText(fmt.Sprintf("Connected to %s (TLS: %s)", target, tlsMode))
@@ -99,14 +99,14 @@ func handleConnectWithEnvironment(e *MCPEngine) func(context.Context, mcp.CallTo
 			tlsMode = rpc.TLSModeNone
 		}
 		cfg := rpc.ConnectionConfig{Target: env.Target, TLS: tlsMode}
-		if err := e.Connect(cfg); err != nil {
+		if err := e.Connect(ctx, cfg); err != nil {
 			return toolError("connection to %s failed: %v", env.Target, err)
 		}
 
-		// Activate the environment so its headers are applied to subsequent requests.
-		e.mu.Lock()
-		e.activeEnv = env
-		e.mu.Unlock()
+		// Persist and activate so headers survive process restarts.
+		if err := e.SetActiveEnvironment(env.ID); err != nil {
+			return toolError("setting active environment: %v", err)
+		}
 
 		return toolText(fmt.Sprintf("Connected to %s using environment %q (TLS: %s)", env.Target, env.Name, tlsMode))
 	}
@@ -203,7 +203,7 @@ func handleLoadProtoset(e *MCPEngine) func(context.Context, mcp.CallToolRequest)
 		if path == "" {
 			return toolError("path is required")
 		}
-		services, err := e.LoadProtosets([]string{path})
+		services, err := e.LoadProtosets(ctx, []string{path})
 		if err != nil {
 			return toolError("loading protoset: %v", err)
 		}
@@ -217,7 +217,7 @@ func handleLoadProtoset(e *MCPEngine) func(context.Context, mcp.CallToolRequest)
 
 func handleLoadViaReflection(e *MCPEngine) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		services, err := e.LoadViaReflection()
+		services, err := e.LoadViaReflection(ctx)
 		if err != nil {
 			return toolError("reflection failed: %v", err)
 		}
@@ -326,7 +326,10 @@ func handleInvokeUnary(e *MCPEngine) func(context.Context, mcp.CallToolRequest) 
 			return toolError("method_path is required")
 		}
 		requestJSON := req.GetString("request_json", "{}")
-		timeoutSeconds := req.GetFloat("timeout_seconds", 30)
+		timeoutSeconds := req.GetFloat("timeout_seconds", defaultInvokeTimeoutSeconds)
+		if err := validateTimeoutSeconds(timeoutSeconds); err != nil {
+			return toolError("%v", err)
+		}
 
 		invokeReq := rpc.InvokeRequest{
 			MethodPath:     methodPath,
@@ -334,20 +337,20 @@ func handleInvokeUnary(e *MCPEngine) func(context.Context, mcp.CallToolRequest) 
 			TimeoutSeconds: timeoutSeconds,
 		}
 
-		resp, err := e.InvokeUnary(invokeReq)
+		resp, err := e.InvokeUnary(ctx, invokeReq)
 		if err != nil {
 			return toolError("invoke failed: %v", err)
 		}
 
 		type result struct {
-			Status        string             `json:"status"`
-			StatusCode    int                `json:"statusCode"`
-			StatusMessage string             `json:"statusMessage,omitempty"`
-			ResponseJSON  string             `json:"responseJson"`
-			DurationMs    int64              `json:"durationMs"`
+			Status        string              `json:"status"`
+			StatusCode    int                 `json:"statusCode"`
+			StatusMessage string              `json:"statusMessage,omitempty"`
+			ResponseJSON  string              `json:"responseJson"`
+			DurationMs    int64               `json:"durationMs"`
 			Headers       []rpc.MetadataEntry `json:"headers,omitempty"`
 			Trailers      []rpc.MetadataEntry `json:"trailers,omitempty"`
-			Error         string             `json:"error,omitempty"`
+			Error         string              `json:"error,omitempty"`
 		}
 		return toolJSON(result{
 			Status:        resp.Status,
@@ -412,26 +415,30 @@ func handleInvokeSavedRequest(e *MCPEngine) func(context.Context, mcp.CallToolRe
 			return toolError("no request with ID %q in collection %q", requestID, col.Name)
 		}
 
+		if err := e.EnsureCollectionDescriptors(ctx, col); err != nil {
+			return toolError("%v", err)
+		}
+
 		invokeReq := rpc.InvokeRequest{
 			MethodPath:     saved.MethodPath,
 			RequestJSON:    saved.RequestJSON,
 			Metadata:       saved.Metadata,
-			TimeoutSeconds: 30,
+			TimeoutSeconds: defaultInvokeTimeoutSeconds,
 		}
 
-		resp, err := e.InvokeUnary(invokeReq)
+		resp, err := e.InvokeUnary(ctx, invokeReq)
 		if err != nil {
 			return toolError("invoke failed: %v", err)
 		}
 
 		type result struct {
-			RequestName   string             `json:"requestName"`
-			MethodPath    string             `json:"methodPath"`
-			Status        string             `json:"status"`
-			StatusCode    int                `json:"statusCode"`
-			ResponseJSON  string             `json:"responseJson"`
-			DurationMs    int64              `json:"durationMs"`
-			Error         string             `json:"error,omitempty"`
+			RequestName  string `json:"requestName"`
+			MethodPath   string `json:"methodPath"`
+			Status       string `json:"status"`
+			StatusCode   int    `json:"statusCode"`
+			ResponseJSON string `json:"responseJson"`
+			DurationMs   int64  `json:"durationMs"`
+			Error        string `json:"error,omitempty"`
 		}
 		return toolJSON(result{
 			RequestName:  saved.Name,
@@ -485,6 +492,9 @@ func handleRunCollection(e *MCPEngine) func(context.Context, mcp.CallToolRequest
 		if len(col.Requests) == 0 {
 			return toolText(fmt.Sprintf("Collection %q has no saved requests", col.Name))
 		}
+		if err := e.EnsureCollectionDescriptors(ctx, col); err != nil {
+			return toolError("%v", err)
+		}
 
 		type requestResult struct {
 			Name       string `json:"name"`
@@ -504,10 +514,10 @@ func handleRunCollection(e *MCPEngine) func(context.Context, mcp.CallToolRequest
 				MethodPath:     saved.MethodPath,
 				RequestJSON:    saved.RequestJSON,
 				Metadata:       saved.Metadata,
-				TimeoutSeconds: 30,
+				TimeoutSeconds: defaultInvokeTimeoutSeconds,
 			}
 
-			resp, err := e.InvokeUnary(invokeReq)
+			resp, err := e.InvokeUnary(ctx, invokeReq)
 			r := requestResult{
 				Name:       saved.Name,
 				MethodPath: saved.MethodPath,

@@ -85,6 +85,10 @@ func (s *Store) GetCollection(id string) (*Collection, error) {
 
 // SaveCollection persists a collection to disk (create or update).
 func (s *Store) SaveCollection(col Collection) error {
+	if strings.TrimSpace(col.ID) == "" {
+		return fmt.Errorf("collection id is required")
+	}
+
 	now := time.Now().Format(time.RFC3339Nano)
 	if col.CreatedAt == "" {
 		col.CreatedAt = now
@@ -271,7 +275,10 @@ func (s *Store) ExportPortable(id, destPath string) error {
 	for _, p := range col.ProtosetPaths {
 		name := filepath.Base(p)
 		data, readErr := os.ReadFile(p)
-		if readErr == nil && !seen[name] {
+		if readErr != nil {
+			return fmt.Errorf("reading protoset %s: %w", p, readErr)
+		}
+		if !seen[name] {
 			exp.Protosets = append(exp.Protosets, EmbeddedProtoset{Name: name, Data: data})
 			seen[name] = true
 		}
@@ -352,7 +359,13 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 
 		nameToAbs := make(map[string]string, len(exp.Protosets))
 		for _, ps := range exp.Protosets {
-			abs := filepath.Join(protosetDir, ps.Name)
+			if err := validatePortableAssetPath(ps.Name); err != nil {
+				return nil, fmt.Errorf("invalid protoset asset name %q: %w", ps.Name, err)
+			}
+			abs, err := joinUnderRoot(protosetDir, filepath.FromSlash(ps.Name))
+			if err != nil {
+				return nil, fmt.Errorf("invalid protoset asset path %q: %w", ps.Name, err)
+			}
 			if err := os.WriteFile(abs, ps.Data, 0o644); err != nil {
 				return nil, fmt.Errorf("extracting %s: %w", ps.Name, err)
 			}
@@ -380,7 +393,13 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 			return nil, fmt.Errorf("creating proto source dir: %w", err)
 		}
 		for _, pf := range exp.ProtoFiles {
-			abs := filepath.Join(protoDir, filepath.FromSlash(pf.Path))
+			if err := validatePortableAssetPath(pf.Path); err != nil {
+				return nil, fmt.Errorf("invalid proto asset path %q: %w", pf.Path, err)
+			}
+			abs, err := joinUnderRoot(protoDir, filepath.FromSlash(pf.Path))
+			if err != nil {
+				return nil, fmt.Errorf("invalid proto asset path %q: %w", pf.Path, err)
+			}
 			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 				return nil, fmt.Errorf("creating proto source path: %w", err)
 			}
@@ -390,12 +409,26 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 		}
 		resolvedFiles := make([]string, 0, len(col.ProtoFilePaths))
 		for _, rel := range col.ProtoFilePaths {
-			resolvedFiles = append(resolvedFiles, filepath.Join(protoDir, filepath.FromSlash(rel)))
+			if err := validatePortableAssetPath(rel); err != nil {
+				return nil, fmt.Errorf("invalid proto entry path %q: %w", rel, err)
+			}
+			abs, err := joinUnderRoot(protoDir, filepath.FromSlash(rel))
+			if err != nil {
+				return nil, fmt.Errorf("invalid proto entry path %q: %w", rel, err)
+			}
+			resolvedFiles = append(resolvedFiles, abs)
 		}
 		col.ProtoFilePaths = resolvedFiles
 		resolvedImports := make([]string, 0, len(col.ProtoImportPaths))
 		for _, rel := range col.ProtoImportPaths {
-			resolvedImports = append(resolvedImports, filepath.Join(protoDir, filepath.FromSlash(rel)))
+			if err := validatePortableAssetPath(rel); err != nil {
+				return nil, fmt.Errorf("invalid proto import path %q: %w", rel, err)
+			}
+			abs, err := joinUnderRoot(protoDir, filepath.FromSlash(rel))
+			if err != nil {
+				return nil, fmt.Errorf("invalid proto import path %q: %w", rel, err)
+			}
+			resolvedImports = append(resolvedImports, abs)
 		}
 		col.ProtoImportPaths = resolvedImports
 	}
@@ -422,4 +455,41 @@ func (s *Store) loadFile(path string) (*Collection, error) {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
 	return &col, nil
+}
+
+func validatePortableAssetPath(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("path is empty")
+	}
+	if filepath.IsAbs(name) {
+		return fmt.Errorf("absolute paths are not allowed")
+	}
+
+	clean := path.Clean(filepath.ToSlash(name))
+	if clean == "." {
+		return fmt.Errorf("path is empty")
+	}
+	if strings.HasPrefix(clean, "../") || clean == ".." {
+		return fmt.Errorf("path traversal is not allowed")
+	}
+	for _, part := range strings.Split(clean, "/") {
+		if part == ".." {
+			return fmt.Errorf("path traversal is not allowed")
+		}
+	}
+	return nil
+}
+
+func joinUnderRoot(root, rel string) (string, error) {
+	base := filepath.Clean(root)
+	candidate := filepath.Join(base, rel)
+	relative, err := filepath.Rel(base, candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes root")
+	}
+	return candidate, nil
 }

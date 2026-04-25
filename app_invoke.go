@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -19,13 +20,17 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	pd := a.protoset
 	env := a.activeEnv
 	ctx, cancel := context.WithCancel(a.ctx)
+	a.unaryCancelSeq++
+	cancelSeq := a.unaryCancelSeq
 	a.unaryCancel = cancel
 	a.mu.Unlock()
 
 	defer func() {
 		cancel()
 		a.mu.Lock()
-		a.unaryCancel = nil
+		if a.unaryCancelSeq == cancelSeq {
+			a.unaryCancel = nil
+		}
 		a.mu.Unlock()
 	}()
 
@@ -81,6 +86,8 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 		a.streamCancel()
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
+	a.streamCancelSeq++
+	cancelSeq := a.streamCancelSeq
 	a.streamCancel = cancel
 	a.mu.Unlock()
 
@@ -99,7 +106,9 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 		defer func() {
 			cancel()
 			a.mu.Lock()
-			a.streamCancel = nil
+			if a.streamCancelSeq == cancelSeq {
+				a.streamCancel = nil
+			}
 			a.mu.Unlock()
 		}()
 		err := rpc.InvokeStream(ctx, conn, pd, req, func(evt rpc.StreamEvent) {
@@ -131,14 +140,30 @@ func interpolateRequest(req rpc.InvokeRequest, env *storage.Environment) rpc.Inv
 		return req
 	}
 
-	// Prepend environment-level headers so per-request metadata can override.
-	envMeta := make([]rpc.MetadataEntry, 0, len(env.Headers))
-	for _, h := range env.Headers {
-		if h.Key == "" {
+	requestKeys := make(map[string]bool, len(req.Metadata))
+	for _, entry := range req.Metadata {
+		key := strings.TrimSpace(entry.Key)
+		if key == "" {
 			continue
 		}
+		requestKeys[strings.ToLower(key)] = true
+	}
+
+	// Prepend environment-level headers that are not overridden by request metadata.
+	envMeta := make([]rpc.MetadataEntry, 0, len(env.Headers))
+	envKeys := make(map[string]bool, len(env.Headers))
+	for _, h := range env.Headers {
+		key := strings.TrimSpace(h.Key)
+		if key == "" {
+			continue
+		}
+		lower := strings.ToLower(key)
+		if requestKeys[lower] || envKeys[lower] {
+			continue
+		}
+		envKeys[lower] = true
 		envMeta = append(envMeta, rpc.MetadataEntry{
-			Key:   h.Key,
+			Key:   key,
 			Value: h.Value,
 		})
 	}

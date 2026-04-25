@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"grpc-nimbus/internal/rpc"
 )
@@ -24,6 +25,7 @@ type HistoryEntry struct {
 // HistoryStore manages per-method request/response history on disk.
 type HistoryStore struct {
 	dir string
+	mu  sync.Mutex
 }
 
 // NewHistoryStore creates a HistoryStore backed by the OS user config directory.
@@ -41,16 +43,28 @@ func NewHistoryStore() (*HistoryStore, error) {
 
 // Add appends an entry to the history for its method, capping at maxHistoryPerMethod.
 func (s *HistoryStore) Add(entry HistoryEntry) error {
-	existing, _ := s.GetHistory(entry.MethodPath)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, err := s.getHistoryLocked(entry.MethodPath)
+	if err != nil {
+		return fmt.Errorf("reading history: %w", err)
+	}
 	entries := append([]HistoryEntry{entry}, existing...)
 	if len(entries) > maxHistoryPerMethod {
 		entries = entries[:maxHistoryPerMethod]
 	}
-	return s.write(entry.MethodPath, entries)
+	return s.writeLocked(entry.MethodPath, entries)
 }
 
 // GetHistory returns the history entries for a given method path (newest first).
 func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.getHistoryLocked(methodPath)
+}
+
+func (s *HistoryStore) getHistoryLocked(methodPath string) ([]HistoryEntry, error) {
 	path := s.filePath(methodPath)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -68,6 +82,9 @@ func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
 
 // ClearHistory deletes all history for a method path.
 func (s *HistoryStore) ClearHistory(methodPath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	path := s.filePath(methodPath)
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
@@ -75,17 +92,31 @@ func (s *HistoryStore) ClearHistory(methodPath string) error {
 	return nil
 }
 
-func (s *HistoryStore) write(methodPath string, entries []HistoryEntry) error {
+func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) error {
 	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		return err
 	}
 	path := s.filePath(methodPath)
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {

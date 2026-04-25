@@ -170,8 +170,8 @@ Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify
 | Tool | Version |
 |---|---|
 | Go | 1.21+ |
-| Node.js | 18+ |
-| Wails CLI | v2.x (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`) |
+| Node.js | 24.x (matches CI/release workflows) |
+| Wails CLI | v2.12.0 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0`) |
 
 On macOS you also need Xcode Command Line Tools (`xcode-select --install`).  
 On Windows you need the WebView2 runtime (ships with Windows 11; downloadable for Windows 10).
