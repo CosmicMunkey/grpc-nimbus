@@ -50,7 +50,7 @@ type AppSettings struct {
 
 	// Request defaults
 	DefaultTimeoutSeconds *float64            `json:"defaultTimeoutSeconds,omitempty"` // nil → 0 (no timeout)
-	HistoryLimit          *int                `json:"historyLimit,omitempty"`          // nil → 50; 0 = unlimited
+	HistoryLimit          *int                `json:"historyLimit,omitempty"`          // nil → 50; 0 = use default; negative = unlimited
 	AutoConnectOnStartup  *bool               `json:"autoConnectOnStartup,omitempty"`  // nil → false
 	AllowShellCommands    *bool               `json:"allowShellCommands,omitempty"`    // nil → false
 	MaxStreamMessages     *int                `json:"maxStreamMessages,omitempty"`     // nil → 200; 0 = unlimited

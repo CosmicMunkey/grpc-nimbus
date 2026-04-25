@@ -34,8 +34,8 @@ func resolveHeaderValue(val string, allowShell bool) string {
 	}
 
 	if allowShell && hasShellCmd {
-		// Resolve $(command) first so inner ${VAR} substitutions in command output
-		// are not re-evaluated.
+		// Resolve $(command) first. Note: env-var substitution below will run on the full
+		// result, so any ${VAR} in command output will be evaluated in the second pass.
 		val = reShellCmd.ReplaceAllStringFunc(val, func(match string) string {
 			cmd := reShellCmd.FindStringSubmatch(match)[1]
 			out, err := runShellCommand(cmd)

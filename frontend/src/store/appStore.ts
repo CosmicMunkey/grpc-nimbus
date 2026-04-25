@@ -561,11 +561,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const state = await api.getLoadedState();
       if (!state) return;
       if (state.lastTarget) {
+        // Normalize lastTLS to allowed values; fallback to 'none' for invalid/removed modes
+        const normalizedTls: ConnectionConfig['tls'] = (state.lastTLS === 'system' ? 'system' : 'none');
         set((s) => ({
           connectionConfig: {
             ...s.connectionConfig,
             target: state.lastTarget,
-            tls: (state.lastTLS === 'system' ? 'system' : 'none'),
+            tls: normalizedTls,
           },
         }));
       }

@@ -366,6 +366,12 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 			if err != nil {
 				return nil, fmt.Errorf("invalid protoset asset path %q: %w", ps.Name, err)
 			}
+			// Check for symlink-based traversal inside the root directory
+			if hasSymlink, err := isSymlinkInPath(abs); err != nil {
+				return nil, fmt.Errorf("checking symlinks in %q: %w", ps.Name, err)
+			} else if hasSymlink {
+				return nil, fmt.Errorf("rejecting protoset asset %q: symlink in path", ps.Name)
+			}
 			if err := os.WriteFile(abs, ps.Data, 0o644); err != nil {
 				return nil, fmt.Errorf("extracting %s: %w", ps.Name, err)
 			}
@@ -399,6 +405,12 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 			abs, err := joinUnderRoot(protoDir, filepath.FromSlash(pf.Path))
 			if err != nil {
 				return nil, fmt.Errorf("invalid proto asset path %q: %w", pf.Path, err)
+			}
+			// Check for symlink-based traversal inside the root directory
+			if hasSymlink, err := isSymlinkInPath(abs); err != nil {
+				return nil, fmt.Errorf("checking symlinks in %q: %w", pf.Path, err)
+			} else if hasSymlink {
+				return nil, fmt.Errorf("rejecting proto asset %q: symlink in path", pf.Path)
 			}
 			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 				return nil, fmt.Errorf("creating proto source path: %w", err)
@@ -492,4 +504,33 @@ func joinUnderRoot(root, rel string) (string, error) {
 		return "", fmt.Errorf("path escapes root")
 	}
 	return candidate, nil
+}
+
+// isSymlinkInPath checks if any component in the path chain is a symlink,
+// preventing symlink-based directory traversal attacks.
+func isSymlinkInPath(p string) (bool, error) {
+	parts := strings.Split(filepath.Clean(p), string(filepath.Separator))
+	current := ""
+	if filepath.IsAbs(p) {
+		current = string(filepath.Separator)
+		parts = parts[1:] // skip empty string from split of absolute path
+	}
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Path doesn't exist yet, check parent
+				continue
+			}
+			return false, err
+		}
+		if (info.Mode() & os.ModeSymlink) != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }

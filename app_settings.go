@@ -43,8 +43,8 @@ type UserSettings struct {
 func (a *App) GetUserSettings() UserSettings {
 	defaults := UserSettings{
 		ConfirmDeletes:       true,
-		TimestampInputLocal:  true,
-		ConfirmClearHistory:  true,
+		TimestampInputLocal:  false,
+		ConfirmClearHistory:  false,
 		AutoConnectOnStartup: false,
 		Theme:                "nimbus",
 		FontSize:             16,
