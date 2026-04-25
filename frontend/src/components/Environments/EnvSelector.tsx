@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Environment } from '../../types';
-import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings, Lock, Unlock } from 'lucide-react';
+import { Plus, X, Check, ChevronDown, Settings, Lock, Unlock } from 'lucide-react';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
 
-const TLS_OPTIONS = [
+export const TLS_OPTIONS = [
   { value: 'none',   label: 'No TLS',      Icon: Unlock },
   { value: 'system', label: 'TLS (System)', Icon: Lock   },
 ] as const;
@@ -17,7 +17,7 @@ interface EnvEditorProps {
   onClose: () => void;
 }
 
-function EnvEditor({ initial, onClose }: EnvEditorProps) {
+export function EnvEditor({ initial, onClose }: EnvEditorProps) {
   const { saveEnvironment } = useAppStore();
   const [name, setName] = useState(initial?.name ?? '');
   const [target, setTarget] = useState(initial?.target ?? '');
@@ -144,139 +144,6 @@ function EnvEditor({ initial, onClose }: EnvEditorProps) {
   );
 }
 
-// ─── Environments Manager Modal ───────────────────────────────────────────────
-
-interface EnvManagerProps {
-  onClose: () => void;
-}
-
-function EnvManager({ onClose }: EnvManagerProps) {
-  const { environments, activeEnvironmentId, setActiveEnvironment, deleteEnvironment } = useAppStore();
-  const [editing, setEditing] = useState<Environment | undefined>(undefined);
-  const [showEditor, setShowEditor] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const handleDelete = async (id: string) => {
-    await deleteEnvironment(id);
-    setConfirmDeleteId(null);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-c-panel border border-c-border rounded-lg shadow-xl w-[480px] max-h-[70vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-c-border">
-          <h3 className="text-sm font-semibold text-c-text">Environments</h3>
-          <button onClick={onClose} className="text-c-text3 hover:text-c-text">
-            <X size={14} />
-          </button>
-        </div>
-
-        {/* List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-c-border">
-          {environments.length === 0 && (
-            <p className="px-4 py-6 text-xs text-c-text3 text-center">
-              No environments yet. Create one to add default headers like Authorization.
-            </p>
-          )}
-          {environments.map((env) => {
-            const headerCount = (env.headers ?? []).filter((h) => h.key.trim()).length;
-            const isActive = env.id === activeEnvironmentId;
-            return (
-              <div key={env.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-c-hover">
-                {/* Active indicator + select */}
-                <button
-                  onClick={() => setActiveEnvironment(isActive ? '' : env.id)}
-                  title={isActive ? 'Deactivate' : 'Set active'}
-                  className={`w-3 h-3 rounded-full border-2 shrink-0 transition-colors ${
-                    isActive ? 'bg-green-400 border-green-400' : 'border-c-text3 hover:border-green-400'
-                  }`}
-                />
-
-                {/* Name + header count */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium truncate ${isActive ? 'text-green-400' : 'text-c-text'}`} title={env.name}>
-                      {env.name}
-                    </span>
-                    {isActive && (
-                      <span className="text-[10px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">active</span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-c-text3 mt-0.5">
-                    {[
-                      env.target && <span key="target" className="font-mono">{env.target}</span>,
-                      headerCount > 0 && `${headerCount} header${headerCount !== 1 ? 's' : ''}`,
-                    ].filter(Boolean).reduce<React.ReactNode[]>((acc, item, i) => {
-                      if (i > 0) acc.push(' · ');
-                      acc.push(item);
-                      return acc;
-                    }, []) || 'No connection or headers'}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                {confirmDeleteId === env.id ? (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-c-text2">Delete?</span>
-                    <button
-                      onClick={() => handleDelete(env.id)}
-                      className="px-2 py-0.5 bg-c-accent text-white rounded text-[11px] hover:bg-c-accent2"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(null)}
-                      className="px-2 py-0.5 border border-c-border text-c-text2 rounded text-[11px] hover:bg-c-hover"
-                    >
-                      No
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => { setEditing(env); setShowEditor(true); }}
-                      title="Edit"
-                      className="p-1.5 text-c-text3 hover:text-c-text hover:bg-c-border rounded"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(env.id)}
-                      title="Delete"
-                      className="p-1.5 text-c-text3 hover:text-c-accent hover:bg-c-border rounded"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-c-border">
-          <p className="text-[10px] text-c-text3">Click ● to activate an environment</p>
-          <button
-            onClick={() => { setEditing(undefined); setShowEditor(true); }}
-            className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-white rounded hover:bg-c-accent2"
-          >
-            <Plus size={11} /> New Environment
-          </button>
-        </div>
-      </div>
-
-      {showEditor && (
-        <EnvEditor
-          initial={editing}
-          onClose={() => { setShowEditor(false); setEditing(undefined); }}
-        />
-      )}
-    </div>
-  );
-}
-
 // ─── Environment Selector Dropdown ───────────────────────────────────────────
 
 export default function EnvSelector() {
@@ -285,10 +152,10 @@ export default function EnvSelector() {
     activeEnvironmentId,
     loadEnvironments,
     setActiveEnvironment,
+    openSettings,
   } = useAppStore();
 
   const { open, toggle, close, triggerRef, menuRef, menuStyle } = usePortalMenu('right');
-  const [showManager, setShowManager] = useState(false);
 
   useEffect(() => { loadEnvironments(); }, [loadEnvironments]);
 
@@ -332,7 +199,7 @@ export default function EnvSelector() {
 
           <div className="border-t border-c-border mt-1">
             <button
-              onClick={() => { close(); setShowManager(true); }}
+              onClick={() => { close(); openSettings('environments'); }}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-c-text2 hover:text-c-text hover:bg-c-hover"
             >
               <Settings size={11} /> Manage Environments…
@@ -341,9 +208,6 @@ export default function EnvSelector() {
         </div>,
         document.body
       )}
-
-      {showManager && <EnvManager onClose={() => setShowManager(false)} />}
     </div>
   );
 }
-

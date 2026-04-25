@@ -25,6 +25,13 @@ type App struct {
 	settings   *storage.SettingsStore
 	activeEnv  *storage.Environment
 
+	// defaultMetadata holds the global default request headers from settings.
+	// Protected by mu; updated synchronously when SaveUserSettings is called.
+	defaultMetadata []rpc.MetadataEntry
+	// allowShellCommands gates $(...) header interpolation at send time.
+	// Protected by mu; updated synchronously when SaveUserSettings is called.
+	allowShellCommands bool
+
 	// Loaded descriptor state is tracked by source family so proto files,
 	// protosets, and reflection can coexist.
 	loadedProtosetPaths []string
@@ -100,6 +107,30 @@ func (a *App) startup(ctx context.Context) {
 	}
 	if merged := rpc.MergeDescriptors(parts...); merged != nil {
 		a.protoset = merged
+	}
+
+	// Apply persisted request/behaviour settings at startup.
+	if a.histStore != nil && saved.HistoryLimit != nil {
+		a.histStore.SetLimit(*saved.HistoryLimit)
+	}
+	a.mu.Lock()
+	if len(saved.DefaultMetadata) > 0 {
+		a.defaultMetadata = saved.DefaultMetadata
+	}
+	if saved.AllowShellCommands != nil {
+		a.allowShellCommands = *saved.AllowShellCommands
+	}
+	a.mu.Unlock()
+	if saved.AutoConnectOnStartup != nil && *saved.AutoConnectOnStartup && saved.LastTarget != "" {
+		tls := rpc.TLSModeNone
+		if saved.LastTLS != "" {
+			tls = rpc.TLSMode(saved.LastTLS)
+		}
+		go func() {
+			if err := a.Connect(rpc.ConnectionConfig{Target: saved.LastTarget, TLS: tls}); err != nil {
+				fmt.Printf("warning: auto-connect failed: %v\n", err)
+			}
+		}()
 	}
 }
 

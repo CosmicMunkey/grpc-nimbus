@@ -19,6 +19,8 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	conn := a.conn
 	pd := a.protoset
 	env := a.activeEnv
+	defaultMeta := a.defaultMetadata
+	allowShell := a.allowShellCommands
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.unaryCancelSeq++
 	cancelSeq := a.unaryCancelSeq
@@ -42,7 +44,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	}
 
 	// Apply environment variable interpolation.
-	req = interpolateRequest(req, env)
+	req = interpolateRequest(req, defaultMeta, env, allowShell)
 
 	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
 	if err != nil {
@@ -81,6 +83,8 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 	conn := a.conn
 	pd := a.protoset
 	env := a.activeEnv
+	defaultMeta := a.defaultMetadata
+	allowShell := a.allowShellCommands
 	// Cancel any running stream first.
 	if a.streamCancel != nil {
 		a.streamCancel()
@@ -100,7 +104,7 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 		return fmt.Errorf("no descriptor loaded")
 	}
 
-	req = interpolateRequest(req, env)
+	req = interpolateRequest(req, defaultMeta, env, allowShell)
 
 	go func() {
 		defer func() {
@@ -135,11 +139,20 @@ func (a *App) CancelStream() {
 	}
 }
 
-func interpolateRequest(req rpc.InvokeRequest, env *storage.Environment) rpc.InvokeRequest {
-	if env == nil || len(env.Headers) == 0 {
+func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, env *storage.Environment, allowShell bool) rpc.InvokeRequest {
+	// Resolve dynamic syntax in per-request metadata values.
+	for i, m := range req.Metadata {
+		if resolved := resolveHeaderValue(m.Value, allowShell); resolved != m.Value {
+			req.Metadata[i].Value = resolved
+		}
+	}
+
+	if len(defaultMeta) == 0 && (env == nil || len(env.Headers) == 0) {
 		return req
 	}
 
+	// Build key sets for higher-priority layers (env + per-request override default;
+	// per-request overrides env). Precedence: default → env → per-request.
 	requestKeys := make(map[string]bool, len(req.Metadata))
 	for _, entry := range req.Metadata {
 		key := strings.TrimSpace(entry.Key)
@@ -149,11 +162,28 @@ func interpolateRequest(req rpc.InvokeRequest, env *storage.Environment) rpc.Inv
 		requestKeys[strings.ToLower(key)] = true
 	}
 
-	// Prepend environment-level headers that are not overridden by request metadata.
-	envMeta := make([]rpc.MetadataEntry, 0, len(env.Headers))
-	envKeys := make(map[string]bool, len(env.Headers))
-	for _, h := range env.Headers {
-		key := strings.TrimSpace(h.Key)
+	// Environment metadata (overridden by per-request).
+	envMeta := make([]rpc.MetadataEntry, 0)
+	envKeys := make(map[string]bool)
+	if env != nil {
+		for _, h := range env.Headers {
+			key := strings.TrimSpace(h.Key)
+			if key == "" {
+				continue
+			}
+			lower := strings.ToLower(key)
+			if requestKeys[lower] || envKeys[lower] {
+				continue
+			}
+			envKeys[lower] = true
+			envMeta = append(envMeta, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(h.Value, allowShell)})
+		}
+	}
+
+	// Default metadata (lowest priority — skipped if key appears in env or request).
+	defaultOut := make([]rpc.MetadataEntry, 0, len(defaultMeta))
+	for _, m := range defaultMeta {
+		key := strings.TrimSpace(m.Key)
 		if key == "" {
 			continue
 		}
@@ -161,13 +191,9 @@ func interpolateRequest(req rpc.InvokeRequest, env *storage.Environment) rpc.Inv
 		if requestKeys[lower] || envKeys[lower] {
 			continue
 		}
-		envKeys[lower] = true
-		envMeta = append(envMeta, rpc.MetadataEntry{
-			Key:   key,
-			Value: h.Value,
-		})
+		defaultOut = append(defaultOut, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(m.Value, allowShell)})
 	}
-	req.Metadata = append(envMeta, req.Metadata...)
 
+	req.Metadata = append(defaultOut, append(envMeta, req.Metadata...)...)
 	return req
 }

@@ -55,7 +55,7 @@ func TestHistoryAddConcurrent(t *testing.T) {
 	if len(entries) == 0 {
 		t.Fatal("expected history entries")
 	}
-	if len(entries) > maxHistoryPerMethod {
-		t.Fatalf("expected max %d entries, got %d", maxHistoryPerMethod, len(entries))
+	if len(entries) > defaultHistoryLimit {
+		t.Fatalf("expected max %d entries, got %d", defaultHistoryLimit, len(entries))
 	}
 }

@@ -9,10 +9,11 @@ import FormBuilder from '../RequestBuilder/FormBuilder';
 
 function MetadataTable() {
   const { requestMetadata } = useActiveTab();
-  const { setRequestMetadata, environments, activeEnvironmentId } = useAppStore();
+  const { setRequestMetadata, environments, activeEnvironmentId, defaultMetadata } = useAppStore();
 
   const activeEnv = environments.find((e) => e.id === activeEnvironmentId);
   const envHeaders = (activeEnv?.headers ?? []).filter((h) => h.key.trim());
+  const defaultMeta = (defaultMetadata ?? []).filter((h) => h.key.trim());
 
   const addRow = () => setRequestMetadata([...requestMetadata, { key: '', value: '' }]);
 
@@ -25,6 +26,28 @@ function MetadataTable() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Default metadata from Settings (read-only) */}
+      {defaultMeta.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">
+            Default · Settings
+          </span>
+          <div className="space-y-1">
+            {defaultMeta.map((h, i) => (
+              <div key={i} className="flex gap-1 items-center opacity-60">
+                <div className="w-2/5 shrink-0 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-accent font-mono truncate">
+                  {h.key}
+                </div>
+                <span className="text-c-text3 text-sm shrink-0">:</span>
+                <div className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text2 font-mono truncate">
+                  {h.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Environment headers (read-only) */}
       {envHeaders.length > 0 && (
         <div className="flex flex-col gap-1">
@@ -33,14 +56,14 @@ function MetadataTable() {
           </span>
           <div className="space-y-1">
             {envHeaders.map((h, i) => (
-              <div key={i} className="flex gap-1 opacity-60">
-                <div className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-accent font-mono truncate">
+              <div key={i} className="flex gap-1 items-center opacity-60">
+                <div className="w-2/5 shrink-0 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-accent font-mono truncate">
                   {h.key}
                 </div>
+                <span className="text-c-text3 text-sm shrink-0">:</span>
                 <div className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text2 font-mono truncate">
                   {h.value}
                 </div>
-                <div className="w-5" /> {/* spacer to align with editable rows */}
               </div>
             ))}
           </div>
@@ -63,28 +86,37 @@ function MetadataTable() {
           <p className="text-xs text-c-text3">No request metadata — click Add to set entries</p>
         ) : (
           <div className="space-y-1">
-            {requestMetadata.map((row, i) => (
-              <div key={i} className="flex gap-1">
-                <input
-                  value={row.key}
-                  onChange={(e) => updateRow(i, 'key', e.target.value)}
-                  placeholder="key"
-                  className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
-                />
-                <input
-                  value={row.value}
-                  onChange={(e) => updateRow(i, 'value', e.target.value)}
-                  placeholder="value"
-                  className="flex-1 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
-                />
-                <button
-                  onClick={() => removeRow(i)}
-                  className="text-c-text3 hover:text-c-accent p-1"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
+            {requestMetadata.map((row, i) => {
+              const dynamic = row.value.includes('${') || row.value.includes('$(');
+              return (
+                <div key={i} className="flex gap-1 items-center">
+                  <input
+                    value={row.key}
+                    onChange={(e) => updateRow(i, 'key', e.target.value)}
+                    placeholder="key"
+                    className="w-2/5 shrink-0 bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
+                  />
+                  <span className="text-c-text3 text-sm shrink-0">:</span>
+                  <div className="relative flex-1">
+                    <input
+                      value={row.value}
+                      onChange={(e) => updateRow(i, 'value', e.target.value)}
+                      placeholder="value"
+                      className={`w-full bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono ${dynamic ? 'pr-6' : ''}`}
+                    />
+                    {dynamic && (
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="shrink-0 w-5 h-5 flex items-center justify-center text-c-text3 hover:text-c-accent rounded hover:bg-c-hover"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

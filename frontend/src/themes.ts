@@ -12,8 +12,16 @@ export interface ThemeTokens {
   accent2: string; // accent on hover / pressed
 }
 
-export type ThemeId = 'nimbus' | 'dark' | 'light' | 'custom';
+// CustomThemeEntry mirrors the Go struct exposed by Wails bindings.
+export interface CustomThemeEntry {
+  id: string;
+  name: string;
+  tokens: Partial<ThemeTokens>;
+}
 
+export type ThemeId = 'nimbus' | 'dark' | 'light' | 'deuteranopia' | 'tritanopia' | 'highcontrast' | 'custom';
+
+// Built-in preset themes. 'custom' is handled separately via CustomThemeEntry list.
 export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeTokens> = {
   nimbus: {
     bg:      '#1a1a2e',
@@ -23,7 +31,7 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeTokens> = {
     border:  '#2d3748',
     text:    '#e2e8f0',
     text2:   '#94a3b8',
-    text3:   '#4a5568',
+    text3:   '#64748b',
     accent:  '#e94560',
     accent2: '#c73652',
   },
@@ -45,20 +53,65 @@ export const THEMES: Record<Exclude<ThemeId, 'custom'>, ThemeTokens> = {
     input:   '#f8fafc',
     hover:   '#e2e8f0',
     border:  '#cbd5e1',
-    text:    '#1e293b',
-    text2:   '#475569',
-    text3:   '#94a3b8',
+    text:    '#0f172a',
+    text2:   '#334155',
+    text3:   '#64748b',
     accent:  '#e94560',
     accent2: '#c73652',
+  },
+  // Deuteranopia-safe: avoids red/green distinction; uses blue accent.
+  deuteranopia: {
+    bg:      '#0d1117',
+    panel:   '#161b22',
+    input:   '#0b1021',
+    hover:   '#1c2333',
+    border:  '#30363d',
+    text:    '#e6edf3',
+    text2:   '#8b949e',
+    text3:   '#636e7b',
+    accent:  '#58a6ff',
+    accent2: '#388bfd',
+  },
+  // Tritanopia-safe: avoids blue/yellow distinction; uses magenta accent.
+  tritanopia: {
+    bg:      '#1a1a1a',
+    panel:   '#242424',
+    input:   '#141414',
+    hover:   '#2e2e2e',
+    border:  '#404040',
+    text:    '#f0f0f0',
+    text2:   '#a0a0a0',
+    text3:   '#737373',
+    accent:  '#e040fb',
+    accent2: '#c438d8',
+  },
+  // High contrast: maximum contrast for visibility across colorblindness types.
+  highcontrast: {
+    bg:      '#000000',
+    panel:   '#111111',
+    input:   '#0a0a0a',
+    hover:   '#1e1e1e',
+    border:  '#555555',
+    text:    '#ffffff',
+    text2:   '#cccccc',
+    text3:   '#888888',
+    accent:  '#ffdd00',
+    accent2: '#e5c700',
   },
 };
 
 export const DEFAULT_CUSTOM_THEME: ThemeTokens = { ...THEMES.nimbus };
 
-// Returns the ThemeTokens for a given id + optional custom overrides.
-export function resolveTheme(id: ThemeId, custom?: Partial<ThemeTokens>): ThemeTokens {
-  if (id === 'custom') return { ...DEFAULT_CUSTOM_THEME, ...custom };
+// Returns the ThemeTokens for a given preset id.
+// For 'custom', pass the active custom theme's tokens merged over the default.
+export function resolveTheme(id: ThemeId, customTokens?: Partial<ThemeTokens>): ThemeTokens {
+  if (id === 'custom') return { ...DEFAULT_CUSTOM_THEME, ...customTokens };
   return THEMES[id];
+}
+
+// isBuiltinTheme returns true for non-custom theme IDs.
+export function isBuiltinTheme(id: string): id is Exclude<ThemeId, 'custom'> {
+  return id in THEMES;
 }
 
 // Sets the base font size by scaling the html root element.

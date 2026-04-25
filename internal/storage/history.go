@@ -10,7 +10,7 @@ import (
 	"grpc-nimbus/internal/rpc"
 )
 
-const maxHistoryPerMethod = 50
+const defaultHistoryLimit = 50
 
 // HistoryEntry is a single recorded invocation.
 type HistoryEntry struct {
@@ -24,8 +24,17 @@ type HistoryEntry struct {
 
 // HistoryStore manages per-method request/response history on disk.
 type HistoryStore struct {
-	dir string
-	mu  sync.Mutex
+	dir   string
+	mu    sync.Mutex
+	limit int // 0 = use defaultHistoryLimit; negative = unlimited
+}
+
+// SetLimit updates the per-method history cap. 0 restores the default (50).
+// Negative values disable the cap (unlimited). Safe to call concurrently.
+func (s *HistoryStore) SetLimit(n int) {
+	s.mu.Lock()
+	s.limit = n
+	s.mu.Unlock()
 }
 
 // NewHistoryStore creates a HistoryStore backed by the OS user config directory.
@@ -41,21 +50,22 @@ func NewHistoryStore() (*HistoryStore, error) {
 	return &HistoryStore{dir: dir}, nil
 }
 
-// Add appends an entry to the history for its method, capping at maxHistoryPerMethod.
+// Add appends an entry to the history for its method, capping at the configured limit.
 func (s *HistoryStore) Add(entry HistoryEntry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	existing, err := s.getHistoryLocked(entry.MethodPath)
 	if err != nil {
-		// Treat a corrupt or unreadable history file as empty so a single bad
-		// file doesn't permanently disable recording. The write below will
-		// overwrite it; permission errors will surface there instead.
 		existing = nil
 	}
 	entries := append([]HistoryEntry{entry}, existing...)
-	if len(entries) > maxHistoryPerMethod {
-		entries = entries[:maxHistoryPerMethod]
+	cap := s.limit
+	if cap == 0 {
+		cap = defaultHistoryLimit
+	}
+	if cap > 0 && len(entries) > cap {
+		entries = entries[:cap]
 	}
 	return s.writeLocked(entry.MethodPath, entries)
 }

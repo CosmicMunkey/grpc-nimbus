@@ -62,12 +62,13 @@ Many teams use build pipelines that emit **compiled `.protoset` files** — bina
 - **Saved collections** — save requests by name, organized into collections that persist across restarts
 - **Portable export** — exported collections embed all referenced protoset files as base64 so the `.json` bundle works on any machine with no extra files
 - **Request history** — expandable per-method history showing the full request, response body, status, headers, and trailers
-- **Environments** — define named environments with default gRPC metadata headers; switch from the connection bar
+- **Environments** — define named environments with default gRPC metadata headers and an optional host:port override; switch from the connection bar or manage them in the Settings panel; header values support `${ENV_VAR}` and `$(shell command)` dynamic syntax
 - **Streaming** — unary, server-streaming, client-streaming, and bidirectional; live event log with stop button
 - **Resizable layout** — drag to resize the sidebar and request/response panel split; sizes persist across restarts
 - **Stale connection detection** — editing the host or TLS mode while connected surfaces a Reconnect button
 - **grpcurl tab** — generates the equivalent grpcurl command for any request
-- **Themes and font size** — multiple built-in themes, adjustable font size, all persisted
+- **Themes** — built-in themes, colorblind-friendly presets, and fully custom named themes you can create and save
+- **Settings panel** — organized into Appearance, Themes, Behavior, Requests, and Environments tabs; all preferences persisted
 - **Cross-platform** — native desktop binary for macOS (arm64 + amd64), Windows, and Linux
 
 ---
@@ -104,14 +105,59 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - Per-session request history ring-buffer — click any entry to expand and see the full request, response body, status, headers, and trailers
 
 ### Environments
-- Define named environments with default **gRPC metadata headers** (e.g. `Authorization: Bearer <token>`, `x-api-key: …`)
-- Headers are prepended to every request when the environment is active; per-request metadata can still override them
+- Define named environments with default **gRPC metadata headers** and an optional host:port + TLS override
+- Headers are entered as separate key and value fields; values support dynamic syntax (see below)
+- Per-request metadata is appended after environment headers, so request-specific values can override them
 - Switch environments from the connection bar; the active environment is highlighted in green
+- Create and edit environments in the **Settings → Environments** tab with an inline editor — no popover required
+
+**Dynamic header values**
+
+Header values anywhere (environment headers, Settings default metadata, per-request metadata) support dynamic syntax resolved at send time:
+
+| Syntax | Resolves to |
+|--------|-------------|
+| `${MY_VAR}` | Value of the `MY_VAR` OS environment variable |
+| `$(command arg)` | `stdout` of the command, run via `sh -c` (or `cmd /c` on Windows), trimmed (**requires** enabling "Allow shell commands in metadata" in Settings → Requests) |
+
+Examples:
+```
+Authorization   →   ${API_TOKEN}
+Authorization   →   Bearer ${API_TOKEN}
+x-timestamp     →   $(date +%s)
+x-aws-identity  →   $(aws sts get-caller-identity --query UserId --output text)
+```
+
+Inputs that contain either syntax show a small `$` badge. Shell command interpolation is disabled by default.
 
 ### Settings
-- **Theme** — choose from a set of built-in color themes (accessible via the gear icon in the connection bar)
-- **Font size** — Small (14 px), Medium (16 px), or Large (18 px); scales all UI text proportionally
-- **Confirm before delete** — toggle whether a confirmation dialog appears when deleting requests, collections, or environments; defaults to on
+
+Open the Settings panel with the gear icon in the connection bar. Settings are organized into five tabs:
+
+**Appearance**
+- Font size — Small (14 px), Medium (16 px), or Large (18 px); scales all UI text proportionally
+- Response word wrap — toggle whether long response lines wrap or scroll horizontally
+- JSON indent — 2 or 4 spaces for formatted JSON output
+
+**Themes**
+- Built-in themes (Nimbus, Midnight, Storm, Slate, Terminal, and more)
+- Colorblind-friendly presets (Deuteranopia, Protanopia, Tritanopia)
+- Custom themes — create, name, and save multiple custom color themes; edit any CSS token with a color picker
+
+**Behavior**
+- Confirm before delete — toggle confirmation dialogs when removing requests, collections, or environments
+- Confirm before clear history — toggle confirmation when clearing request history
+- Auto-connect on startup — automatically connect to the last-used host when the app launches
+- History limit — retain the last 25 / 50 / 100 / 200 requests per method, or unlimited
+
+**Requests**
+- Default timeout — seconds before an unary request times out (0 = no timeout)
+- Max stream messages — cap on messages shown in the streaming log (100 / 200 / 500 / unlimited)
+- Allow shell commands in metadata — enables `$(command)` interpolation for metadata values (off by default)
+- Default metadata — key/value headers sent with every request before environment and per-request headers; values support `${VAR}` and `$(command)` dynamic syntax
+
+**Environments**
+- Full environment management inline — create, edit (name, host:port, TLS mode, default headers), delete, and activate environments without leaving Settings
 
 ### Resizable layout
 - Drag the divider between the sidebar and request panel to resize the sidebar
@@ -123,9 +169,10 @@ Switch between **Form**, **JSON**, and **Metadata** tabs at any time — the two
 - Editing the host or TLS mode while connected changes the button to **Reconnect**, applying new settings in one click without a manual disconnect first
 
 ### Connections
-- Plain-text or TLS connections (system CA or skip-verify)
+- Plain-text or TLS connections (system CA bundle)
 - Connection config (host:port, TLS mode) saved and restored automatically
 - Last-loaded protoset / proto files restored on next launch
+- Environments can override the host:port and TLS mode when activated
 
 ### Server reflection
 - Load the full service tree directly from a live server via gRPC reflection
@@ -152,7 +199,7 @@ Alternatively, use the **Proto Files** tab to load raw `.proto` sources (specify
 1. Click any method in the service tree.
 2. The **Form** tab populates with all available request fields.
 3. Fill in values (scalar, nested, repeated, map, oneof — all supported).
-4. Optionally add metadata/headers in the **Metadata** tab.
+4. Optionally add metadata/headers in the **Metadata** tab. The tab shows three read-only tiers first — **Default** (from Settings → Requests), **From environment** (active environment's headers), and an editable **Request metadata** section for per-request overrides. Values in the editable section support `${VAR}` and `$(command)` dynamic syntax (`$(command)` requires enabling shell commands in Settings → Requests).
 5. Press **Send** (or `Cmd/Ctrl+Enter`).
 6. The response appears in the right panel. Streaming responses update in real time.
 
@@ -311,6 +358,7 @@ grpc-nimbus/
 ├── main.go                   # Wails entry point, app menu
 ├── app.go                    # App struct, startup/shutdown
 ├── app_invoke.go             # Invoke / streaming backend methods
+├── app_resolve.go            # Dynamic header value resolution (${VAR}, $(cmd))
 ├── app_proto.go              # Protoset / proto / reflection loading
 ├── app_collections.go        # Collection CRUD backend methods
 ├── app_environments.go       # Environment CRUD backend methods

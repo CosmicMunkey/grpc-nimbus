@@ -15,7 +15,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
-import { ThemeId, ThemeTokens, applyTheme, applyFontSize, resolveTheme, isColorDark } from '../themes';
+import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -57,8 +57,44 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
-          SaveUserSettings(s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
+          GetUserSettings(): Promise<{
+            confirmDeletes: boolean;
+            timestampInputLocal: boolean;
+            confirmClearHistory?: boolean;
+            theme: string;
+            customThemes?: CustomThemeEntry[];
+            activeCustomThemeId?: string;
+            fontSize?: number;
+            responseWordWrap?: boolean;
+            responseIndent?: number;
+            sidebarWidth?: number;
+            panelSplit?: number;
+            defaultTimeoutSeconds?: number;
+            historyLimit?: number;
+            autoConnectOnStartup?: boolean;
+            allowShellCommands?: boolean;
+            maxStreamMessages?: number;
+            defaultMetadata?: MetadataEntry[];
+          }>;
+          SaveUserSettings(s: {
+            confirmDeletes: boolean;
+            timestampInputLocal: boolean;
+            confirmClearHistory: boolean;
+            theme: string;
+            customThemes: CustomThemeEntry[];
+            activeCustomThemeId: string;
+            fontSize: number;
+            responseWordWrap: boolean;
+            responseIndent: number;
+            sidebarWidth: number;
+            panelSplit: number;
+            defaultTimeoutSeconds: number;
+            historyLimit: number;
+            autoConnectOnStartup: boolean;
+            allowShellCommands: boolean;
+            maxStreamMessages: number;
+            defaultMetadata: MetadataEntry[];
+          }): Promise<void>;
           GetVersion(): Promise<string>;
         };
       };
@@ -103,19 +139,45 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
   getUserSettings: () => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  saveUserSettings: (s: {
+    confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
+    theme: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
+    fontSize: number; responseWordWrap: boolean; responseIndent: number;
+    sidebarWidth: number; panelSplit: number;
+    defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
+    allowShellCommands: boolean;
+    maxStreamMessages: number; defaultMetadata: MetadataEntry[];
+  }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // Persist all user settings from the current store state.
-function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'timestampInputLocal' | 'theme' | 'customTheme' | 'fontSize' | 'sidebarWidth' | 'panelSplit'>) {
+function saveAllSettings(s: Pick<AppState,
+  'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
+  'theme' | 'customThemes' | 'activeCustomThemeId' |
+  'fontSize' | 'responseWordWrap' | 'responseIndent' |
+  'sidebarWidth' | 'panelSplit' |
+  'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
+  'allowShellCommands' |
+  'maxStreamMessages' | 'defaultMetadata'
+>) {
   api.saveUserSettings({
     confirmDeletes: s.confirmDeletes,
     timestampInputLocal: s.timestampInputLocal,
+    confirmClearHistory: s.confirmClearHistory,
     theme: s.theme,
-    customTheme: s.customTheme as Record<string, string>,
+    customThemes: s.customThemes,
+    activeCustomThemeId: s.activeCustomThemeId,
     fontSize: s.fontSize,
+    responseWordWrap: s.responseWordWrap,
+    responseIndent: s.responseIndent,
     sidebarWidth: s.sidebarWidth,
     panelSplit: s.panelSplit,
+    defaultTimeoutSeconds: s.defaultTimeoutSeconds,
+    historyLimit: s.historyLimit,
+    autoConnectOnStartup: s.autoConnectOnStartup,
+    allowShellCommands: s.allowShellCommands,
+    maxStreamMessages: s.maxStreamMessages,
+    defaultMetadata: s.defaultMetadata,
   }).catch(() => {});
 }
 
@@ -404,14 +466,37 @@ interface AppState {
   // Settings
   confirmDeletes: boolean;
   setConfirmDeletes: (v: boolean) => void;
+  confirmClearHistory: boolean;
+  setConfirmClearHistory: (v: boolean) => void;
   timestampInputLocal: boolean;
   setTimestampInputLocal: (v: boolean) => void;
   theme: ThemeId;
   isDark: boolean;
-  customTheme: Partial<ThemeTokens>;
-  setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
+  customThemes: CustomThemeEntry[];
+  activeCustomThemeId: string;
+  setTheme: (id: ThemeId, customThemeId?: string) => void;
+  forkTheme: (sourceId: string) => void;
+  updateCustomTheme: (id: string, tokens: Partial<ThemeTokens>) => void;
+  renameCustomTheme: (id: string, name: string) => void;
+  deleteCustomTheme: (id: string) => void;
   fontSize: number;
   setFontSize: (size: number) => void;
+  responseWordWrap: boolean;
+  setResponseWordWrap: (v: boolean) => void;
+  responseIndent: number;
+  setResponseIndent: (v: number) => void;
+  defaultTimeoutSeconds: number;
+  setDefaultTimeoutSeconds: (v: number) => void;
+  historyLimit: number;
+  setHistoryLimit: (v: number) => void;
+  autoConnectOnStartup: boolean;
+  setAutoConnectOnStartup: (v: boolean) => void;
+  allowShellCommands: boolean;
+  setAllowShellCommands: (v: boolean) => void;
+  maxStreamMessages: number;
+  setMaxStreamMessages: (v: number) => void;
+  defaultMetadata: MetadataEntry[];
+  setDefaultMetadata: (v: MetadataEntry[]) => void;
   loadUserSettings: () => Promise<void>;
 
   // Layout
@@ -424,6 +509,12 @@ interface AppState {
   confirmDialog: { message: string; resolve: (yes: boolean) => void } | null;
   showConfirm: (message: string) => Promise<boolean>;
   resolveConfirm: (yes: boolean) => void;
+
+  // Settings panel
+  settingsOpen: boolean;
+  settingsTarget: string | null;
+  openSettings: (tab?: string) => void;
+  closeSettings: () => void;
 }
 
 // Convenience hook: returns the currently active tab's state.
@@ -542,7 +633,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '' };
       }
       let remaining = s.tabs.filter((t) => !orphanedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = orphanedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -590,7 +681,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (invalidTabs.length === 0) return base;
       const closedIds = new Set(invalidTabs.map((t) => t.id));
       let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = closedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -605,7 +696,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   streamingTabId: null,
 
   newTab: () => {
-    const tab = makeTab();
+    const tab = makeTab({ timeoutSeconds: get().defaultTimeoutSeconds });
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
   },
 
@@ -617,7 +708,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const remaining = s.tabs.filter((t) => t.id !== id);
       const clearStreaming = s.streamingTabId === id ? null : s.streamingTabId;
       if (remaining.length === 0) {
-        const fresh = makeTab();
+        const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
         return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: clearStreaming };
       }
       const newActive = s.activeTabId === id
@@ -670,6 +761,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       savedRequestId: savedRequestId ?? null,
       savedRequestName: savedRequestName ?? null,
       requestJson: normalizedRequestJson, requestMetadata: normalizedMetadata,
+      timeoutSeconds: get().defaultTimeoutSeconds,
       response: null, streamMessages: [], history: [],
       requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
     };
@@ -706,7 +798,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setRequestMetadata: (md) => {
     const { activeTabId } = get();
-    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: normalizeMetadataEntries(md) }) }));
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: md as MetadataEntry[] }) }));
   },
 
   setTimeoutSeconds: (t) => {
@@ -782,9 +874,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!streamTab.isStreaming && normalized.type !== 'error' && normalized.type !== 'trailer') {
         return {};
       }
-      const nextMessages = normalized.type === 'header' && (normalized.metadata?.length ?? 0) === 0
+      const rawMessages = normalized.type === 'header' && (normalized.metadata?.length ?? 0) === 0
         ? streamTab.streamMessages
         : [...streamTab.streamMessages, normalized];
+      const cap = s.maxStreamMessages;
+      const nextMessages = cap > 0 && rawMessages.length > cap ? rawMessages.slice(-cap) : rawMessages;
       const patch: Partial<Tab> = {
         streamMessages: nextMessages,
         isStreaming: !isDone,
@@ -842,6 +936,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearHistory: async (methodPath) => {
+    if (get().confirmClearHistory) {
+      const confirmed = await get().showConfirm('Clear history for this method? This cannot be undone.');
+      if (!confirmed) return;
+    }
     const { activeTabId } = get();
     await api.clearHistory(methodPath);
     set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
@@ -961,8 +1059,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteRequest: async (collectionId, requestId) => {
-    const confirmed = await get().showConfirm('Delete this saved request? This cannot be undone.');
-    if (!confirmed) return;
+    if (get().confirmDeletes) {
+      const confirmed = await get().showConfirm('Delete this saved request? This cannot be undone.');
+      if (!confirmed) return;
+    }
     const { collections } = get();
     const col = collections.find((c) => c.id === collectionId);
     if (!col) return;
@@ -1010,8 +1110,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteCollection: async (id) => {
     const col = get().collections.find((c) => c.id === id);
-    const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
-    if (!confirmed) return;
+    if (get().confirmDeletes) {
+      const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
+      if (!confirmed) return;
+    }
     const requestIds = new Set((col?.requests ?? []).map((r) => r.id));
     const streamOwner = get().tabs.find((t) => t.id === get().streamingTabId);
     if (streamOwner?.savedRequestId && requestIds.has(streamOwner.savedRequestId)) {
@@ -1026,7 +1128,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       if (closedIds.size === 0) return {};
       let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = closedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -1102,12 +1204,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Settings ─────────────────────────────────────────────────────────────
   confirmDeletes: true,
+  confirmClearHistory: false,
   timestampInputLocal: false,
   theme: 'nimbus' as ThemeId,
   isDark: true,
-  customTheme: {},
+  customThemes: [],
+  activeCustomThemeId: '',
   fontSize: 16,
+  responseWordWrap: true,
+  responseIndent: 2,
+  defaultTimeoutSeconds: 0,
+  historyLimit: 50,
+  autoConnectOnStartup: false,
+  allowShellCommands: false,
+  maxStreamMessages: 200,
+  defaultMetadata: [],
   confirmDialog: null,
+  settingsOpen: false,
+  settingsTarget: null,
+  openSettings: (tab) => set({ settingsOpen: true, settingsTarget: tab ?? null }),
+  closeSettings: () => set({ settingsOpen: false, settingsTarget: null }),
 
   // ── Layout ──────────────────────────────────────────────────────────────
   sidebarWidth: 256,
@@ -1117,12 +1233,34 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const s = await api.getUserSettings();
       const themeId = (s.theme as ThemeId) || 'nimbus';
-      const custom = (s.customTheme as Partial<ThemeTokens>) ?? {};
-      const fontSize = s.fontSize ?? 14;
+      const customThemes: CustomThemeEntry[] = s.customThemes ?? [];
+      const activeCustomThemeId = s.activeCustomThemeId ?? '';
+      const activeTokens = customThemes.find((t) => t.id === activeCustomThemeId)?.tokens ?? {};
+      const fontSize = s.fontSize ?? 16;
       const sidebarWidth = s.sidebarWidth ?? 256;
       const panelSplit = s.panelSplit ?? 0.5;
-      set({ confirmDeletes: s.confirmDeletes, timestampInputLocal: s.timestampInputLocal ?? false, theme: themeId, isDark: isColorDark(resolveTheme(themeId, custom).bg), customTheme: custom, fontSize, sidebarWidth, panelSplit });
-      applyTheme(resolveTheme(themeId, custom));
+      const resolved = resolveTheme(themeId, activeTokens);
+      set({
+        confirmDeletes: s.confirmDeletes,
+        confirmClearHistory: s.confirmClearHistory ?? false,
+        timestampInputLocal: s.timestampInputLocal ?? false,
+        theme: themeId,
+        isDark: isColorDark(resolved.bg),
+        customThemes,
+        activeCustomThemeId,
+        fontSize,
+        responseWordWrap: s.responseWordWrap ?? true,
+        responseIndent: s.responseIndent ?? 2,
+        sidebarWidth,
+        panelSplit,
+        defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
+        historyLimit: s.historyLimit ?? 50,
+        autoConnectOnStartup: s.autoConnectOnStartup ?? false,
+        allowShellCommands: s.allowShellCommands ?? false,
+        maxStreamMessages: s.maxStreamMessages ?? 200,
+        defaultMetadata: s.defaultMetadata ?? [],
+      });
+      applyTheme(resolved);
       applyFontSize(fontSize);
     } catch { /* use defaults */ }
   },
@@ -1132,22 +1270,130 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveAllSettings(get());
   },
 
+  setConfirmClearHistory: (v) => {
+    set({ confirmClearHistory: v });
+    saveAllSettings(get());
+  },
+
   setTimestampInputLocal: (v) => {
     set({ timestampInputLocal: v });
     saveAllSettings(get());
   },
 
-  setTheme: (id, custom) => {
-    const resolved = resolveTheme(id, custom);
-    const customTheme = id === 'custom' ? (custom ?? {}) : {};
-    set({ theme: id, isDark: isColorDark(resolved.bg), customTheme });
+  setTheme: (id, customThemeId?) => {
+    const { customThemes } = get();
+    const activeId = id === 'custom' ? (customThemeId ?? get().activeCustomThemeId) : '';
+    const activeTokens = activeId ? (customThemes.find((t) => t.id === activeId)?.tokens ?? {}) : {};
+    const resolved = resolveTheme(id, activeTokens);
+    set({ theme: id, isDark: isColorDark(resolved.bg), activeCustomThemeId: activeId });
     applyTheme(resolved);
+    saveAllSettings(get());
+  },
+
+  forkTheme: (sourceId) => {
+    const { customThemes } = get();
+    const sourceTokens: Partial<ThemeTokens> = (() => {
+      // Check if sourceId is a built-in preset
+      if (sourceId in THEMES) return { ...THEMES[sourceId as keyof typeof THEMES] };
+      // Otherwise find in custom themes list
+      return { ...(customThemes.find((t) => t.id === sourceId)?.tokens ?? DEFAULT_CUSTOM_THEME) };
+    })();
+    const sourceName = (() => {
+      if (sourceId in THEMES) {
+        const labels: Record<string, string> = {
+          nimbus: 'Nimbus', dark: 'Dark', light: 'Light',
+          deuteranopia: 'Deuteranopia', tritanopia: 'Tritanopia', highcontrast: 'High Contrast',
+        };
+        return labels[sourceId] ?? sourceId;
+      }
+      return customThemes.find((t) => t.id === sourceId)?.name ?? 'Theme';
+    })();
+    const newId = crypto.randomUUID();
+    const newEntry: CustomThemeEntry = { id: newId, name: `${sourceName} copy`, tokens: sourceTokens };
+    const updated = [...customThemes, newEntry];
+    const resolved = resolveTheme('custom', sourceTokens);
+    set({ customThemes: updated, theme: 'custom', activeCustomThemeId: newId, isDark: isColorDark(resolved.bg) });
+    applyTheme(resolved);
+    saveAllSettings(get());
+  },
+
+  updateCustomTheme: (id, tokens) => {
+    const { customThemes, activeCustomThemeId, theme } = get();
+    const updated = customThemes.map((t) => t.id === id ? { ...t, tokens } : t);
+    set({ customThemes: updated });
+    // Re-apply if this is the active theme
+    if (theme === 'custom' && activeCustomThemeId === id) {
+      const resolved = resolveTheme('custom', tokens);
+      set({ isDark: isColorDark(resolved.bg) });
+      applyTheme(resolved);
+    }
+    saveAllSettings(get());
+  },
+
+  renameCustomTheme: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set((s) => ({ customThemes: s.customThemes.map((t) => t.id === id ? { ...t, name: trimmed } : t) }));
+    saveAllSettings(get());
+  },
+
+  deleteCustomTheme: (id) => {
+    const { customThemes, activeCustomThemeId } = get();
+    const updated = customThemes.filter((t) => t.id !== id);
+    // If the deleted theme was active, fall back to nimbus
+    if (activeCustomThemeId === id) {
+      const resolved = resolveTheme('nimbus');
+      set({ customThemes: updated, theme: 'nimbus', activeCustomThemeId: '', isDark: isColorDark(resolved.bg) });
+      applyTheme(resolved);
+    } else {
+      set({ customThemes: updated });
+    }
     saveAllSettings(get());
   },
 
   setFontSize: (size) => {
     set({ fontSize: size });
     applyFontSize(size);
+    saveAllSettings(get());
+  },
+
+  setResponseWordWrap: (v) => {
+    set({ responseWordWrap: v });
+    saveAllSettings(get());
+  },
+
+  setResponseIndent: (v) => {
+    set({ responseIndent: v });
+    saveAllSettings(get());
+  },
+
+  setDefaultTimeoutSeconds: (v) => {
+    set({ defaultTimeoutSeconds: v });
+    saveAllSettings(get());
+  },
+
+  setHistoryLimit: (v) => {
+    set({ historyLimit: v });
+    saveAllSettings(get());
+  },
+
+  setAutoConnectOnStartup: (v) => {
+    set({ autoConnectOnStartup: v });
+    saveAllSettings(get());
+  },
+
+  setAllowShellCommands: (v) => {
+    set({ allowShellCommands: v });
+    saveAllSettings(get());
+  },
+
+  setMaxStreamMessages: (v) => {
+    set({ maxStreamMessages: v });
+    saveAllSettings(get());
+  },
+
+  setDefaultMetadata: (v) => {
+    set({ defaultMetadata: v });
     saveAllSettings(get());
   },
 
@@ -1162,7 +1408,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   showConfirm: (message) => {
-    if (!get().confirmDeletes) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       set({ confirmDialog: { message, resolve } });
     });
