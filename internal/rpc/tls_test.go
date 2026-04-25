@@ -103,22 +103,6 @@ func waitReady(t *testing.T, addr string, opts []grpc.DialOption) connectivity.S
 	return state
 }
 
-// TestTLSInsecureSkip verifies TLSModeInsecureSkip reaches Ready against a
-// self-signed cert (no CA trust needed).
-func TestTLSInsecureSkip(t *testing.T) {
-	serverCfg, _ := selfSignedTLS(t)
-	addr := startTLSServer(t, serverCfg)
-
-	opts, err := buildDialOptions(ConnectionConfig{Target: addr, TLS: TLSModeInsecureSkip})
-	if err != nil {
-		t.Fatalf("buildDialOptions: %v", err)
-	}
-
-	if state := waitReady(t, addr, opts); state != connectivity.Ready {
-		t.Errorf("TLSModeInsecureSkip: want Ready, got %v", state)
-	}
-}
-
 // TestTLSSystemRejectsUntrustedCert verifies TLSModeSystem rejects a self-signed
 // cert — i.e. certificate validation is actually happening.
 func TestTLSSystemRejectsUntrustedCert(t *testing.T) {

@@ -230,7 +230,7 @@ function normalizeStringArray(values: unknown): string[] {
 function normalizeConnectionConfig(config: unknown): ConnectionConfig {
   const raw = config && typeof config === 'object' ? (config as Partial<ConnectionConfig>) : {};
   const tls: ConnectionConfig['tls'] =
-    raw.tls === 'system' || raw.tls === 'insecure_skip' || raw.tls === 'none' ? raw.tls : 'none';
+    raw.tls === 'system' || raw.tls === 'none' ? raw.tls : 'none';
   return {
     target: typeof raw.target === 'string' ? raw.target : '',
     tls,

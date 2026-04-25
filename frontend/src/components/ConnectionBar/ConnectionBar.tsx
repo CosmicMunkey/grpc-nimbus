@@ -5,9 +5,8 @@ import EnvSelector from '../Environments/EnvSelector';
 import SettingsPanel from '../Settings/SettingsPanel';
 
 const TLS_OPTIONS = [
-  { value: 'none',          label: 'Plaintext (h2c)' },
-  { value: 'system',        label: 'TLS (system CA)' },
-  { value: 'insecure_skip', label: 'TLS (skip verify)' },
+  { value: 'none',   label: 'Plaintext (h2c)' },
+  { value: 'system', label: 'TLS (system CA)' },
 ] as const;
 
 type ConnStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';

@@ -115,41 +115,6 @@ func loadPingDescriptor(t *testing.T) *ProtosetDescriptor {
 	return pd
 }
 
-// TestInvokeUnaryOverTLSInsecureSkip sends a real unary RPC over a TLS
-// connection with cert verification disabled and checks the echoed response.
-func TestInvokeUnaryOverTLSInsecureSkip(t *testing.T) {
-	serverCfg, _ := selfSignedTLS(t)
-	addr := startPingServer(t, serverCfg)
-	pd := loadPingDescriptor(t)
-
-	conn, err := NewConnection(context.Background(), ConnectionConfig{
-		Target: addr,
-		TLS:    TLSModeInsecureSkip,
-	})
-	if err != nil {
-		t.Fatalf("NewConnection: %v", err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-
-	resp, err := InvokeUnary(context.Background(), conn, pd, InvokeRequest{
-		MethodPath:  "sample.v1.PingService/Ping",
-		RequestJSON: `{"message": "hello-tls"}`,
-	})
-	if err != nil {
-		t.Fatalf("InvokeUnary: %v", err)
-	}
-	if resp.Error != "" {
-		t.Fatalf("RPC error: %s", resp.Error)
-	}
-	if resp.StatusCode != 0 {
-		t.Errorf("expected OK status, got %s (%d): %s", resp.Status, resp.StatusCode, resp.StatusMessage)
-	}
-	if resp.ResponseJSON == "" {
-		t.Error("expected non-empty response JSON")
-	}
-	t.Logf("response: %s", resp.ResponseJSON)
-}
-
 // TestInvokeUnaryOverTLSSystemCA sends a unary RPC over TLS with a custom CA
 // pool that trusts the self-signed cert, simulating a real CA-issued cert.
 func TestInvokeUnaryOverTLSSystemCA(t *testing.T) {
@@ -235,20 +200,30 @@ func TestInvokeUnaryTLSRejectsUntrustedCert(t *testing.T) {
 // TestInvokeUnaryMetadataSentOverTLS verifies that request metadata (headers)
 // are accepted and the RPC completes successfully over a TLS connection.
 func TestInvokeUnaryMetadataSentOverTLS(t *testing.T) {
-	serverCfg, _ := selfSignedTLS(t)
+	serverCfg, caPEM := selfSignedTLS(t)
 	addr := startPingServer(t, serverCfg)
 	pd := loadPingDescriptor(t)
 
-	conn, err := NewConnection(context.Background(), ConnectionConfig{
-		Target: addr,
-		TLS:    TLSModeInsecureSkip,
-	})
-	if err != nil {
-		t.Fatalf("NewConnection: %v", err)
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPEM) {
+		t.Fatal("failed to parse CA PEM")
 	}
-	t.Cleanup(func() { _ = conn.Close() })
+	opts, err := buildDialOptions(ConnectionConfig{Target: addr, TLS: TLSModeSystem})
+	if err != nil {
+		t.Fatalf("buildDialOptions: %v", err)
+	}
+	opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+		RootCAs:    pool,
+		ServerName: "localhost",
+	})))
 
-	resp, err := InvokeUnary(context.Background(), conn, pd, InvokeRequest{
+	cc, err := grpc.NewClient(addr, opts...)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	t.Cleanup(func() { _ = cc.Close() })
+
+	resp, err := InvokeUnary(context.Background(), &Connection{conn: cc}, pd, InvokeRequest{
 		MethodPath:  "sample.v1.PingService/Ping",
 		RequestJSON: `{"message": "meta-test"}`,
 		Metadata: []MetadataEntry{

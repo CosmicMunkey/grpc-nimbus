@@ -6,9 +6,8 @@ import { Plus, Trash2, X, Check, ChevronDown, Pencil, Settings, Lock, Unlock } f
 import { usePortalMenu } from '../../hooks/usePortalMenu';
 
 const TLS_OPTIONS = [
-  { value: 'none',          label: 'No TLS',        Icon: Unlock },
-  { value: 'system',        label: 'TLS (System)',   Icon: Lock   },
-  { value: 'insecure_skip', label: 'TLS (No Verify)', Icon: Lock   },
+  { value: 'none',   label: 'No TLS',      Icon: Unlock },
+  { value: 'system', label: 'TLS (System)', Icon: Lock   },
 ] as const;
 
 // ─── Environment Editor Modal ────────────────────────────────────────────────

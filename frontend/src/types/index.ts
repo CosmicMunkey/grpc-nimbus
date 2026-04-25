@@ -7,7 +7,7 @@ export interface MetadataEntry {
 
 export interface ConnectionConfig {
   target: string;
-  tls: 'none' | 'system' | 'insecure_skip';
+  tls: 'none' | 'system';
   clientCert?: string;
   clientKey?: string;
 }

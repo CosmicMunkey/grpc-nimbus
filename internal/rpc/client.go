@@ -16,9 +16,8 @@ import (
 type TLSMode string
 
 const (
-	TLSModeNone         TLSMode = "none"          // plaintext (h2c)
-	TLSModeSystem       TLSMode = "system"         // TLS with system cert pool
-	TLSModeInsecureSkip TLSMode = "insecure_skip"  // TLS, skip cert verification
+	TLSModeNone   TLSMode = "none"   // plaintext (h2c)
+	TLSModeSystem TLSMode = "system" // TLS with system cert pool
 )
 
 // ConnectionConfig holds the parameters to connect to a gRPC server.
@@ -96,13 +95,6 @@ func buildDialOptions(cfg ConnectionConfig) ([]grpc.DialOption, error) {
 	switch cfg.TLS {
 	case TLSModeNone:
 		return []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}, nil
-
-	case TLSModeInsecureSkip:
-		tlsCfg := &tls.Config{InsecureSkipVerify: true} //nolint:gosec // user explicitly requested skip
-		if err := applyClientCert(cfg, tlsCfg); err != nil {
-			return nil, err
-		}
-		return []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg))}, nil
 
 	case TLSModeSystem:
 		tlsCfg := &tls.Config{}

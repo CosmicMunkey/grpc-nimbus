@@ -177,7 +177,6 @@ function buildGrpcurlCommand(opts: {
   const args: string[] = ['grpcurl'];
 
   if (tls === 'none') args.push('-plaintext');
-  else if (tls === 'insecure_skip') args.push('-insecure');
 
   if (loadMode === 'protoset' && protosetPath) {
     args.push(`-protoset ${shellQuote(protosetPath)}`);

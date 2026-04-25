@@ -155,7 +155,6 @@ export const helpTopics: HelpTopic[] = [
       { type: 'bullets', items: [
         'Plaintext — no encryption. For local development or internal networks.',
         'TLS (system CA) — encrypts and verifies the server certificate against your OS trust store.',
-        'TLS (skip verify) — encrypts but skips certificate validation. Useful for self-signed certs.',
         'mTLS — provide a client certificate and key for mutual TLS authentication.',
       ]},
       { type: 'heading', text: 'Connection Status' },
