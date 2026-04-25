@@ -215,7 +215,8 @@ function normalizeMetadataEntries(entries: unknown): MetadataEntry[] {
   if (!Array.isArray(entries)) return [];
   return entries.reduce<MetadataEntry[]>((acc, entry) => {
     if (!entry || typeof entry !== 'object') return acc;
-    const key = 'key' in entry && typeof entry.key === 'string' ? entry.key : '';
+    const key = 'key' in entry && typeof entry.key === 'string' ? entry.key.trim() : '';
+    if (!key) return acc;
     const value = 'value' in entry && typeof entry.value === 'string' ? entry.value : '';
     acc.push({ key, value });
     return acc;
@@ -473,7 +474,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           connectionConfig: {
             ...s.connectionConfig,
             target: state.lastTarget,
-            tls: (state.lastTLS as ConnectionConfig['tls']) || 'none',
+            tls: (state.lastTLS === 'system' ? 'system' : 'none'),
           },
         }));
       }

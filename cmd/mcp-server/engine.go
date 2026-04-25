@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -402,6 +403,9 @@ func dedupeStrings(values []string) []string {
 }
 
 func validateTimeoutSeconds(timeoutSeconds float64) error {
+	if math.IsNaN(timeoutSeconds) || math.IsInf(timeoutSeconds, 0) {
+		return fmt.Errorf("timeout_seconds must be a finite number")
+	}
 	if timeoutSeconds <= 0 {
 		return fmt.Errorf("timeout_seconds must be greater than 0")
 	}

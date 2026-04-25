@@ -121,6 +121,10 @@ func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) er
 		_ = os.Remove(tmpPath)
 		return err
 	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		_ = os.Remove(tmpPath)
 		return err
