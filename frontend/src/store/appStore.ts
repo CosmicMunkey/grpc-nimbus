@@ -302,20 +302,22 @@ function normalizeEnvironments(environments: Environment[]): Environment[] {
   return environments.map(normalizeEnvironment);
 }
 
-function normalizeStreamEvent(event: StreamEvent): StreamEvent | null {
-  const type = event?.type;
+function normalizeStreamEvent(event: unknown): StreamEvent | null {
+  if (!event || typeof event !== 'object') return null;
+  const e = event as Record<string, unknown>;
+  const type = e.type;
   if (type !== 'message' && type !== 'header' && type !== 'trailer' && type !== 'error') {
     return null;
   }
 
   const normalized: StreamEvent = { type };
-  if (typeof event.json === 'string') normalized.json = event.json;
-  if (typeof event.status === 'string') normalized.status = event.status;
+  if (typeof e.json === 'string') normalized.json = e.json;
+  if (typeof e.status === 'string') normalized.status = e.status;
   if (type === 'trailer' && typeof normalized.status !== 'string') normalized.status = 'OK';
-  if (typeof event.statusCode === 'number') normalized.statusCode = event.statusCode;
+  if (typeof e.statusCode === 'number') normalized.statusCode = e.statusCode;
   if (type === 'trailer' && typeof normalized.statusCode !== 'number') normalized.statusCode = 0;
-  if (typeof event.error === 'string') normalized.error = event.error;
-  if (type === 'header' || type === 'trailer') normalized.metadata = normalizeMetadataEntries(event.metadata);
+  if (typeof e.error === 'string') normalized.error = e.error;
+  if (type === 'header' || type === 'trailer') normalized.metadata = normalizeMetadataEntries(e.metadata);
   return normalized;
 }
 
@@ -369,7 +371,7 @@ interface AppState {
   loadRequestSchema: (methodPath: string) => Promise<void>;
   invoke: () => Promise<void>;
   cancelInvoke: () => Promise<void>;
-  appendStreamEvent: (evt: StreamEvent) => void;
+  appendStreamEvent: (evt: unknown) => void;
   clearStream: () => void;
   cancelStream: () => Promise<void>;
   loadHistory: (methodPath: string) => Promise<void>;

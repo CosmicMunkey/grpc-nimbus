@@ -48,7 +48,10 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 
 	existing, err := s.getHistoryLocked(entry.MethodPath)
 	if err != nil {
-		return fmt.Errorf("reading history: %w", err)
+		// Treat a corrupt or unreadable history file as empty so a single bad
+		// file doesn't permanently disable recording. The write below will
+		// overwrite it; permission errors will surface there instead.
+		existing = nil
 	}
 	entries := append([]HistoryEntry{entry}, existing...)
 	if len(entries) > maxHistoryPerMethod {
@@ -58,10 +61,16 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 }
 
 // GetHistory returns the history entries for a given method path (newest first).
+// A corrupt or unreadable file is treated as empty history; it will be overwritten
+// on the next Add, so callers never need to handle the error as fatal.
 func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.getHistoryLocked(methodPath)
+	entries, err := s.getHistoryLocked(methodPath)
+	if err != nil {
+		return nil, nil
+	}
+	return entries, nil
 }
 
 func (s *HistoryStore) getHistoryLocked(methodPath string) ([]HistoryEntry, error) {

@@ -321,7 +321,7 @@ export default function ResponsePanel() {
     const runtime = window.runtime;
     if (!runtime) return;
     const offEvent = runtime.EventsOn('stream:event', (raw) => {
-      appendStreamEvent(raw as StreamEvent);
+      appendStreamEvent(raw);
     });
     const offDone = runtime.EventsOn('stream:done', () => {});
     return () => {
