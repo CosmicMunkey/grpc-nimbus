@@ -9,34 +9,34 @@ env:
   WAILS_CLI_VERSION: v2.12.0
 
 jobs:
-   test-go:
-     name: Go tests
-     runs-on: ubuntu-22.04
-     permissions:
-       contents: read
-     steps:
-       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+  test-go:
+    name: Go tests
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
-       - name: Set up Go
-         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
-         with:
-           go-version-file: go.mod
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
 
-       - name: Set up Node
-         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-         with:
-           node-version: '24'
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
 
-       - name: Install frontend deps
-         working-directory: frontend
-         run: npm ci
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
 
-       - name: Build frontend
-         working-directory: frontend
-         run: npm run build
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
 
-       - name: Run Go tests
-         run: go test ./...
+      - name: Run Go tests
+        run: go test ./...
 
   build-macos:
     name: macOS (${{ matrix.arch }})
