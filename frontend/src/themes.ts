@@ -122,11 +122,11 @@ export function applyFontSize(size: number): void {
 }
 
 export const FONT_SIZE_PRESETS = [
-  { label: 'XS',     value: 12 },
-  { label: 'Small',  value: 14 },
-  { label: 'Medium', value: 16 },
-  { label: 'Large',  value: 18 },
-  { label: 'XL',     value: 20 },
+  { label: 'XS',     value: 14 },
+  { label: 'Small',  value: 16 },
+  { label: 'Medium', value: 18 },
+  { label: 'Large',  value: 20 },
+  { label: 'XL',     value: 22 },
 ] as const;
 
 // Writes CSS custom properties to :root and updates derived globals.
