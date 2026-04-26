@@ -15,7 +15,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
-import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
+import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -1234,7 +1234,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadUserSettings: async () => {
     try {
       const s = await api.getUserSettings();
-      const themeId = (s.theme as ThemeId) || 'nimbus';
+      const rawTheme = s.theme as string;
+      const themeId: ThemeId = (isBuiltinTheme(rawTheme) || rawTheme === 'custom') ? rawTheme as ThemeId : 'nimbus';
       const customThemes: CustomThemeEntry[] = s.customThemes ?? [];
       const activeCustomThemeId = s.activeCustomThemeId ?? '';
       const activeTokens = customThemes.find((t) => t.id === activeCustomThemeId)?.tokens ?? {};

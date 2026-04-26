@@ -124,7 +124,10 @@ func (a *App) startup(ctx context.Context) {
 	if saved.AutoConnectOnStartup != nil && *saved.AutoConnectOnStartup && saved.LastTarget != "" {
 		tls := rpc.TLSModeNone
 		if saved.LastTLS != "" {
-			tls = rpc.TLSMode(saved.LastTLS)
+			mode := rpc.TLSMode(saved.LastTLS)
+			if mode == rpc.TLSModeNone || mode == rpc.TLSModeSystem {
+				tls = mode
+			}
 		}
 		go func() {
 			if err := a.Connect(rpc.ConnectionConfig{Target: saved.LastTarget, TLS: tls}); err != nil {

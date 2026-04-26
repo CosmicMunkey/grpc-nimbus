@@ -367,7 +367,7 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 				return nil, fmt.Errorf("invalid protoset asset path %q: %w", ps.Name, err)
 			}
 			// Check for symlink-based traversal inside the root directory
-			if hasSymlink, err := isSymlinkInPath(abs); err != nil {
+			if hasSymlink, err := isSymlinkInPath(protosetDir, filepath.FromSlash(ps.Name)); err != nil {
 				return nil, fmt.Errorf("checking symlinks in %q: %w", ps.Name, err)
 			} else if hasSymlink {
 				return nil, fmt.Errorf("rejecting protoset asset %q: symlink in path", ps.Name)
@@ -407,7 +407,7 @@ func (s *Store) importPortable(raw []byte) (*Collection, error) {
 				return nil, fmt.Errorf("invalid proto asset path %q: %w", pf.Path, err)
 			}
 			// Check for symlink-based traversal inside the root directory
-			if hasSymlink, err := isSymlinkInPath(abs); err != nil {
+			if hasSymlink, err := isSymlinkInPath(protoDir, filepath.FromSlash(pf.Path)); err != nil {
 				return nil, fmt.Errorf("checking symlinks in %q: %w", pf.Path, err)
 			} else if hasSymlink {
 				return nil, fmt.Errorf("rejecting proto asset %q: symlink in path", pf.Path)
@@ -477,6 +477,11 @@ func validatePortableAssetPath(name string) error {
 	if filepath.IsAbs(name) {
 		return fmt.Errorf("absolute paths are not allowed")
 	}
+	// Reject Windows volume-relative paths (e.g. "C:foo") that pass IsAbs but
+	// can change how filepath.Join behaves and bypass the "under root" guarantee.
+	if filepath.VolumeName(name) != "" {
+		return fmt.Errorf("paths with a volume name are not allowed")
+	}
 
 	clean := path.Clean(filepath.ToSlash(name))
 	if clean == "." {
@@ -506,24 +511,23 @@ func joinUnderRoot(root, rel string) (string, error) {
 	return candidate, nil
 }
 
-// isSymlinkInPath checks if any component in the path chain is a symlink,
-// preventing symlink-based directory traversal attacks.
-func isSymlinkInPath(p string) (bool, error) {
-	parts := strings.Split(filepath.Clean(p), string(filepath.Separator))
-	current := ""
-	if filepath.IsAbs(p) {
-		current = string(filepath.Separator)
-		parts = parts[1:] // skip empty string from split of absolute path
-	}
+// isSymlinkInPath checks if any component of rel (relative to root) is a
+// symlink, preventing symlink-based directory traversal attacks inside root.
+// Only path components contributed by untrusted data (i.e., below root) are
+// checked; system-level symlinks above root (e.g. macOS /var → /private/var)
+// are not the attacker's doing and are intentionally ignored.
+func isSymlinkInPath(root, rel string) (bool, error) {
+	current := filepath.Clean(root)
+	parts := strings.Split(filepath.Clean(rel), string(filepath.Separator))
 	for _, part := range parts {
-		if part == "" {
+		if part == "" || part == "." {
 			continue
 		}
 		current = filepath.Join(current, part)
 		info, err := os.Lstat(current)
 		if err != nil {
 			if os.IsNotExist(err) {
-				// Path doesn't exist yet, check parent
+				// Path doesn't exist yet; no symlink to follow here.
 				continue
 			}
 			return false, err
