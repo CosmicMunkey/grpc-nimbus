@@ -15,7 +15,7 @@ import {
   StreamEvent,
   Tab,
 } from '../types';
-import { ThemeId, ThemeTokens, applyTheme, applyFontSize, resolveTheme, isColorDark } from '../themes';
+import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -57,8 +57,44 @@ declare global {
           RemoveProtoPath(path: string): Promise<ServiceInfo[]>;
           GetLoadedState(): Promise<LoadedState>;
           GetConnectionState(): Promise<string>;
-          GetUserSettings(): Promise<{ confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize?: number; sidebarWidth?: number; panelSplit?: number }>;
-          SaveUserSettings(s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void>;
+          GetUserSettings(): Promise<{
+            confirmDeletes: boolean;
+            timestampInputLocal: boolean;
+            confirmClearHistory?: boolean;
+            theme: string;
+            customThemes?: CustomThemeEntry[];
+            activeCustomThemeId?: string;
+            fontSize?: number;
+            responseWordWrap?: boolean;
+            responseIndent?: number;
+            sidebarWidth?: number;
+            panelSplit?: number;
+            defaultTimeoutSeconds?: number;
+            historyLimit?: number;
+            autoConnectOnStartup?: boolean;
+            allowShellCommands?: boolean;
+            maxStreamMessages?: number;
+            defaultMetadata?: MetadataEntry[];
+          }>;
+          SaveUserSettings(s: {
+            confirmDeletes: boolean;
+            timestampInputLocal: boolean;
+            confirmClearHistory: boolean;
+            theme: string;
+            customThemes: CustomThemeEntry[];
+            activeCustomThemeId: string;
+            fontSize: number;
+            responseWordWrap: boolean;
+            responseIndent: number;
+            sidebarWidth: number;
+            panelSplit: number;
+            defaultTimeoutSeconds: number;
+            historyLimit: number;
+            autoConnectOnStartup: boolean;
+            allowShellCommands: boolean;
+            maxStreamMessages: number;
+            defaultMetadata: MetadataEntry[];
+          }): Promise<void>;
           GetVersion(): Promise<string>;
         };
       };
@@ -103,25 +139,66 @@ export const api = {
   getLoadedState: () => window.go.main.App.GetLoadedState(),
   getConnectionState: (): Promise<string> => window.go.main.App.GetConnectionState(),
   getUserSettings: () => window.go.main.App.GetUserSettings(),
-  saveUserSettings: (s: { confirmDeletes: boolean; timestampInputLocal: boolean; theme: string; customTheme?: Record<string, string>; fontSize: number; sidebarWidth: number; panelSplit: number }): Promise<void> => window.go.main.App.SaveUserSettings(s),
+  saveUserSettings: (s: {
+    confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
+    theme: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
+    fontSize: number; responseWordWrap: boolean; responseIndent: number;
+    sidebarWidth: number; panelSplit: number;
+    defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
+    allowShellCommands: boolean;
+    maxStreamMessages: number; defaultMetadata: MetadataEntry[];
+  }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
 // Persist all user settings from the current store state.
-function saveAllSettings(s: Pick<AppState, 'confirmDeletes' | 'timestampInputLocal' | 'theme' | 'customTheme' | 'fontSize' | 'sidebarWidth' | 'panelSplit'>) {
+function saveAllSettings(s: Pick<AppState,
+  'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
+  'theme' | 'customThemes' | 'activeCustomThemeId' |
+  'fontSize' | 'responseWordWrap' | 'responseIndent' |
+  'sidebarWidth' | 'panelSplit' |
+  'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
+  'allowShellCommands' |
+  'maxStreamMessages' | 'defaultMetadata'
+>) {
   api.saveUserSettings({
     confirmDeletes: s.confirmDeletes,
     timestampInputLocal: s.timestampInputLocal,
+    confirmClearHistory: s.confirmClearHistory,
     theme: s.theme,
-    customTheme: s.customTheme as Record<string, string>,
+    customThemes: s.customThemes,
+    activeCustomThemeId: s.activeCustomThemeId,
     fontSize: s.fontSize,
+    responseWordWrap: s.responseWordWrap,
+    responseIndent: s.responseIndent,
     sidebarWidth: s.sidebarWidth,
     panelSplit: s.panelSplit,
+    defaultTimeoutSeconds: s.defaultTimeoutSeconds,
+    historyLimit: s.historyLimit,
+    autoConnectOnStartup: s.autoConnectOnStartup,
+    allowShellCommands: s.allowShellCommands,
+    maxStreamMessages: s.maxStreamMessages,
+    defaultMetadata: s.defaultMetadata,
   }).catch(() => {});
 }
 
 // ─── Tab helpers ──────────────────────────────────────────────────────────────
 
 let _tabSeq = 0;
+type ConnectionStatus = 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
+
+const CONNECTION_STATUS_SET: ReadonlySet<ConnectionStatus> = new Set([
+  'disconnected',
+  'idle',
+  'connecting',
+  'ready',
+  'transient_failure',
+]);
+
+function normalizeConnectionStatus(status: unknown): ConnectionStatus {
+  return typeof status === 'string' && CONNECTION_STATUS_SET.has(status as ConnectionStatus)
+    ? (status as ConnectionStatus)
+    : 'disconnected';
+}
 
 // Module-level handle so polling survives re-renders
 let _connPollInterval: ReturnType<typeof setInterval> | null = null;
@@ -131,8 +208,8 @@ function startConnPoll() {
   _connPollInterval = setInterval(async () => {
     try {
       const raw = await api.getConnectionState();
-      const status = raw as AppState['connectionStatus'];
-      useAppStore.setState({ connectionStatus: status });
+      const status = normalizeConnectionStatus(raw);
+      useAppStore.setState({ connectionStatus: status, isConnected: status !== 'disconnected' });
     } catch {
       // backend unavailable — leave status unchanged
     }
@@ -196,6 +273,117 @@ function includesAll(current: string[], expected: string[] = []): boolean {
   return expected.every((value) => loaded.has(value));
 }
 
+function normalizeMetadataEntries(entries: unknown): MetadataEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.reduce<MetadataEntry[]>((acc, entry) => {
+    if (!entry || typeof entry !== 'object') return acc;
+    const key = 'key' in entry && typeof entry.key === 'string' ? entry.key.trim() : '';
+    if (!key) return acc;
+    const value = 'value' in entry && typeof entry.value === 'string' ? entry.value : '';
+    acc.push({ key, value });
+    return acc;
+  }, []);
+}
+
+function normalizeStringArray(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
+function normalizeConnectionConfig(config: unknown): ConnectionConfig {
+  const raw = config && typeof config === 'object' ? (config as Partial<ConnectionConfig>) : {};
+  const tls: ConnectionConfig['tls'] =
+    raw.tls === 'system' || raw.tls === 'none' ? raw.tls : 'none';
+  return {
+    target: typeof raw.target === 'string' ? raw.target : '',
+    tls,
+    ...(typeof raw.clientCert === 'string' ? { clientCert: raw.clientCert } : {}),
+    ...(typeof raw.clientKey === 'string' ? { clientKey: raw.clientKey } : {}),
+  };
+}
+
+function normalizeInvokeResponse(response: InvokeResponse): InvokeResponse {
+  return {
+    ...response,
+    responseJson: typeof response.responseJson === 'string' ? response.responseJson : '',
+    status: typeof response.status === 'string' ? response.status : '',
+    statusCode: typeof response.statusCode === 'number' ? response.statusCode : 0,
+    statusMessage: typeof response.statusMessage === 'string' ? response.statusMessage : '',
+    headers: normalizeMetadataEntries(response.headers),
+    trailers: normalizeMetadataEntries(response.trailers),
+    durationMs: typeof response.durationMs === 'number' ? response.durationMs : 0,
+    ...(typeof response.error === 'string' ? { error: response.error } : {}),
+    ...(typeof response.streaming === 'boolean' ? { streaming: response.streaming } : {}),
+  };
+}
+
+function normalizeHistoryEntries(entries: HistoryEntry[]): HistoryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry) => ({
+    ...entry,
+    requestJson: typeof entry.requestJson === 'string' ? entry.requestJson : '{}',
+    metadata: normalizeMetadataEntries(entry.metadata),
+    response: entry.response ? normalizeInvokeResponse(entry.response) : undefined,
+    invokedAt: typeof entry.invokedAt === 'string' ? entry.invokedAt : new Date(0).toISOString(),
+  }));
+}
+
+function normalizeSavedRequest(request: SavedRequest): SavedRequest {
+  return {
+    ...request,
+    methodPath: typeof request.methodPath === 'string' ? request.methodPath : '',
+    requestJson: typeof request.requestJson === 'string' ? request.requestJson : '{}',
+    metadata: normalizeMetadataEntries(request.metadata),
+    connection: normalizeConnectionConfig(request.connection),
+  };
+}
+
+function normalizeCollection(collection: Collection): Collection {
+  return {
+    ...collection,
+    protosetPaths: normalizeStringArray(collection.protosetPaths),
+    protoFilePaths: normalizeStringArray(collection.protoFilePaths),
+    protoImportPaths: normalizeStringArray(collection.protoImportPaths),
+    requests: Array.isArray(collection.requests) ? collection.requests.map(normalizeSavedRequest) : [],
+  };
+}
+
+function normalizeCollections(collections: Collection[]): Collection[] {
+  if (!Array.isArray(collections)) return [];
+  return collections.map(normalizeCollection);
+}
+
+function normalizeEnvironment(environment: Environment): Environment {
+  return {
+    ...environment,
+    headers: normalizeMetadataEntries(environment.headers),
+  };
+}
+
+function normalizeEnvironments(environments: Environment[]): Environment[] {
+  if (!Array.isArray(environments)) return [];
+  return environments.map(normalizeEnvironment);
+}
+
+function normalizeStreamEvent(event: unknown): StreamEvent | null {
+  if (!event || typeof event !== 'object') return null;
+  const e = event as Record<string, unknown>;
+  const type = e.type;
+  if (type !== 'message' && type !== 'header' && type !== 'trailer' && type !== 'error') {
+    return null;
+  }
+
+  const normalized: StreamEvent = { type };
+  if (typeof e.json === 'string') normalized.json = e.json;
+  if (typeof e.status === 'string') normalized.status = e.status;
+  if (type === 'trailer' && typeof normalized.status !== 'string') normalized.status = 'OK';
+  if (typeof e.statusCode === 'number') normalized.statusCode = e.statusCode;
+  if (type === 'trailer' && typeof normalized.statusCode !== 'number') normalized.statusCode = 0;
+  if (typeof e.error === 'string') normalized.error = e.error;
+  if (type === 'header' || type === 'trailer') normalized.metadata = normalizeMetadataEntries(e.metadata);
+  return normalized;
+}
+
 const INITIAL_TAB = makeTab();
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -204,11 +392,11 @@ interface AppState {
   // Connection
   connectionConfig: ConnectionConfig;
   isConnected: boolean;
-  connectionStatus: 'disconnected' | 'idle' | 'connecting' | 'ready' | 'transient_failure';
+  connectionStatus: ConnectionStatus;
   connectionError: string | null;
   setConnectionConfig: (cfg: Partial<ConnectionConfig>) => void;
   connect: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 
   // Startup state restoration
   restoreLoadedState: () => Promise<void>;
@@ -233,10 +421,10 @@ interface AppState {
   activeTabId: string;
   streamingTabId: string | null;
   newTab: () => void;
-  closeTab: (id: string) => void;
+  closeTab: (id: string) => Promise<void>;
   setActiveTab: (id: string) => void;
   duplicateTab: (id: string) => void;
-  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[], savedRequestId?: string, savedRequestName?: string) => void;
+  openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[] | null, savedRequestId?: string, savedRequestName?: string) => void;
 
   // Per-tab actions (operate on the active tab)
   selectMethod: (method: MethodInfo | null) => void;
@@ -245,10 +433,10 @@ interface AppState {
   setTimeoutSeconds: (t: number) => void;
   loadRequestSchema: (methodPath: string) => Promise<void>;
   invoke: () => Promise<void>;
-  cancelInvoke: () => void;
-  appendStreamEvent: (evt: StreamEvent) => void;
+  cancelInvoke: () => Promise<void>;
+  appendStreamEvent: (evt: unknown) => void;
   clearStream: () => void;
-  cancelStream: () => void;
+  cancelStream: () => Promise<void>;
   loadHistory: (methodPath: string) => Promise<void>;
   clearHistory: (methodPath: string) => Promise<void>;
 
@@ -278,14 +466,37 @@ interface AppState {
   // Settings
   confirmDeletes: boolean;
   setConfirmDeletes: (v: boolean) => void;
+  confirmClearHistory: boolean;
+  setConfirmClearHistory: (v: boolean) => void;
   timestampInputLocal: boolean;
   setTimestampInputLocal: (v: boolean) => void;
   theme: ThemeId;
   isDark: boolean;
-  customTheme: Partial<ThemeTokens>;
-  setTheme: (id: ThemeId, custom?: Partial<ThemeTokens>) => void;
+  customThemes: CustomThemeEntry[];
+  activeCustomThemeId: string;
+  setTheme: (id: ThemeId, customThemeId?: string) => void;
+  forkTheme: (sourceId: string) => void;
+  updateCustomTheme: (id: string, tokens: Partial<ThemeTokens>) => void;
+  renameCustomTheme: (id: string, name: string) => void;
+  deleteCustomTheme: (id: string) => void;
   fontSize: number;
   setFontSize: (size: number) => void;
+  responseWordWrap: boolean;
+  setResponseWordWrap: (v: boolean) => void;
+  responseIndent: number;
+  setResponseIndent: (v: number) => void;
+  defaultTimeoutSeconds: number;
+  setDefaultTimeoutSeconds: (v: number) => void;
+  historyLimit: number;
+  setHistoryLimit: (v: number) => void;
+  autoConnectOnStartup: boolean;
+  setAutoConnectOnStartup: (v: boolean) => void;
+  allowShellCommands: boolean;
+  setAllowShellCommands: (v: boolean) => void;
+  maxStreamMessages: number;
+  setMaxStreamMessages: (v: number) => void;
+  defaultMetadata: MetadataEntry[];
+  setDefaultMetadata: (v: MetadataEntry[]) => void;
   loadUserSettings: () => Promise<void>;
 
   // Layout
@@ -298,6 +509,12 @@ interface AppState {
   confirmDialog: { message: string; resolve: (yes: boolean) => void } | null;
   showConfirm: (message: string) => Promise<boolean>;
   resolveConfirm: (yes: boolean) => void;
+
+  // Settings panel
+  settingsOpen: boolean;
+  settingsTarget: string | null;
+  openSettings: (tab?: string) => void;
+  closeSettings: () => void;
 }
 
 // Convenience hook: returns the currently active tab's state.
@@ -317,18 +534,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   connect: async () => {
     const { connectionConfig } = get();
+    set({ connectionStatus: 'connecting', connectionError: null });
     try {
       await api.connect(connectionConfig);
-      set({ isConnected: true, connectionStatus: 'connecting', connectionError: null });
+      const status = normalizeConnectionStatus(await api.getConnectionState().catch(() => 'connecting'));
+      set({ isConnected: status !== 'disconnected', connectionStatus: status, connectionError: null });
       startConnPoll();
     } catch (e: unknown) {
       set({ isConnected: false, connectionStatus: 'disconnected', connectionError: e instanceof Error ? e.message : String(e) });
     }
   },
 
-  disconnect: () => {
+  disconnect: async () => {
     stopConnPoll();
-    api.disconnect().catch(() => {});
+    try {
+      await api.disconnect();
+    } catch {
+      // best-effort disconnect
+    }
     set({ isConnected: false, connectionStatus: 'disconnected' });
   },
 
@@ -338,11 +561,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const state = await api.getLoadedState();
       if (!state) return;
       if (state.lastTarget) {
+        // Normalize lastTLS to allowed values; fallback to 'none' for invalid/removed modes
+        const normalizedTls: ConnectionConfig['tls'] = (state.lastTLS === 'system' ? 'system' : 'none');
         set((s) => ({
           connectionConfig: {
             ...s.connectionConfig,
             target: state.lastTarget,
-            tls: (state.lastTLS as ConnectionConfig['tls']) || 'none',
+            tls: normalizedTls,
           },
         }));
       }
@@ -357,9 +582,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* non-fatal */ }
     // If the backend is already connected, start polling
     try {
-      const connState = await api.getConnectionState();
+      const connState = normalizeConnectionStatus(await api.getConnectionState());
+      set({ isConnected: connState !== 'disconnected', connectionStatus: connState });
       if (connState !== 'disconnected') {
-        set({ isConnected: true, connectionStatus: connState as AppState['connectionStatus'] });
         startConnPoll();
       }
     } catch { /* non-fatal */ }
@@ -398,6 +623,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearLoadedProtos: async () => {
+    const { streamingTabId, tabs } = get();
+    if (streamingTabId && tabs.some((t) => t.id === streamingTabId && t.selectedMethod)) {
+      await get().cancelStream();
+    }
     await api.clearLoadedProtos();
     // Close all tabs that had a method selected (they're all orphaned now)
     set((s) => {
@@ -406,7 +635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { services: [], protosetPaths: [], loadedProtosetPaths: [], loadedProtoFilePaths: [], protoImportPaths: [], loadMode: '' };
       }
       let remaining = s.tabs.filter((t) => !orphanedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = orphanedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -437,6 +666,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
+    const current = get();
+    const closingIds = new Set(
+      current.tabs
+        .filter((t) => t.selectedMethod && !validMethods.has(t.selectedMethod.fullName))
+        .map((t) => t.id)
+    );
+    if (current.streamingTabId && closingIds.has(current.streamingTabId)) {
+      await get().cancelStream();
+    }
+
     // Apply loaded state and close orphaned tabs in one atomic update
     set((s) => {
       const base = { ...applyLoadedState(state), services: newServices };
@@ -444,7 +683,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (invalidTabs.length === 0) return base;
       const closedIds = new Set(invalidTabs.map((t) => t.id));
       let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = closedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -459,16 +698,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   streamingTabId: null,
 
   newTab: () => {
-    const tab = makeTab();
+    const tab = makeTab({ timeoutSeconds: get().defaultTimeoutSeconds });
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
   },
 
-  closeTab: (id) => {
+  closeTab: async (id) => {
+    if (get().streamingTabId === id) {
+      await get().cancelStream();
+    }
     set((s) => {
       const remaining = s.tabs.filter((t) => t.id !== id);
       const clearStreaming = s.streamingTabId === id ? null : s.streamingTabId;
       if (remaining.length === 0) {
-        const fresh = makeTab();
+        const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
         return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: clearStreaming };
       }
       const newActive = s.activeTabId === id
@@ -514,11 +756,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Reuse a pristine blank tab rather than opening a redundant one.
     const active = tabs.find((t) => t.id === activeTabId);
     const label = savedRequestName ?? method.methodName;
+    const normalizedRequestJson = typeof requestJson === 'string' ? requestJson : '{}';
+    const normalizedMetadata = normalizeMetadataEntries(metadata);
     const patch: Partial<Tab> = {
       selectedMethod: method, label,
       savedRequestId: savedRequestId ?? null,
       savedRequestName: savedRequestName ?? null,
-      requestJson, requestMetadata: metadata,
+      requestJson: normalizedRequestJson, requestMetadata: normalizedMetadata,
+      timeoutSeconds: get().defaultTimeoutSeconds,
       response: null, streamMessages: [], history: [],
       requestSchema: [], isInvoking: false, isStreaming: false, invokeError: null,
     };
@@ -555,7 +800,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setRequestMetadata: (md) => {
     const { activeTabId } = get();
-    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: md }) }));
+    set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { requestMetadata: md as MetadataEntry[] }) }));
   },
 
   setTimeoutSeconds: (t) => {
@@ -574,10 +819,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   invoke: async () => {
-    const { tabs, activeTabId } = get();
+    const { tabs, activeTabId, streamingTabId } = get();
     const tab = tabs.find((t) => t.id === activeTabId);
     if (!tab?.selectedMethod) return;
+
+    if (streamingTabId) {
+      const owner = tabs.find((t) => t.id === streamingTabId);
+      const msg = owner
+        ? `A stream is active in "${owner.label}". Cancel it before sending another request.`
+        : 'A stream is already active. Cancel it before sending another request.';
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { invokeError: msg }) }));
+      return;
+    }
+
     const { selectedMethod, requestJson, requestMetadata, timeoutSeconds } = tab;
+    const metadata = normalizeMetadataEntries(requestMetadata);
 
     set((s) => ({
       tabs: patchTab(s.tabs, activeTabId, {
@@ -591,10 +847,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           tabs: patchTab(s.tabs, activeTabId, { isStreaming: true, isInvoking: false }),
           streamingTabId: activeTabId,
         }));
-        await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
+        await api.invokeStream({ methodPath: selectedMethod.fullName, requestJson, metadata, timeoutSeconds });
       } else {
-        const resp = await api.invokeUnary({ methodPath: selectedMethod.fullName, requestJson, metadata: requestMetadata, timeoutSeconds });
-        set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { response: resp, isInvoking: false }) }));
+        const resp = await api.invokeUnary({ methodPath: selectedMethod.fullName, requestJson, metadata, timeoutSeconds });
+        set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { response: normalizeInvokeResponse(resp), isInvoking: false }) }));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -606,17 +862,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   appendStreamEvent: (evt) => {
+    const normalized = normalizeStreamEvent(evt);
+    if (!normalized) return;
     const { streamingTabId } = get();
     if (!streamingTabId) return;
-    const isDone = evt.type === 'trailer' || evt.type === 'error';
+    const isDone = normalized.type === 'trailer' || normalized.type === 'error';
     set((s) => {
       const streamTab = s.tabs.find((t) => t.id === streamingTabId);
-      if (!streamTab) return {};
+      if (!streamTab) return { streamingTabId: null };
+      if (!streamTab.selectedMethod || (!streamTab.selectedMethod.serverStreaming && !streamTab.selectedMethod.clientStreaming)) {
+        return { streamingTabId: null, tabs: patchTab(s.tabs, streamingTabId, { isStreaming: false }) };
+      }
+      if (!streamTab.isStreaming && normalized.type !== 'error' && normalized.type !== 'trailer') {
+        return {};
+      }
+      const rawMessages = normalized.type === 'header' && (normalized.metadata?.length ?? 0) === 0
+        ? streamTab.streamMessages
+        : [...streamTab.streamMessages, normalized];
+      const cap = s.maxStreamMessages;
+      const nextMessages = cap > 0 && rawMessages.length > cap ? rawMessages.slice(-cap) : rawMessages;
       const patch: Partial<Tab> = {
-        streamMessages: [...streamTab.streamMessages, evt],
+        streamMessages: nextMessages,
         isStreaming: !isDone,
       };
-      if (evt.type === 'error') patch.invokeError = evt.error ?? null;
+      if (normalized.type === 'error') patch.invokeError = normalized.error ?? 'Stream ended with an error';
       return {
         tabs: patchTab(s.tabs, streamingTabId, patch),
         streamingTabId: isDone ? null : streamingTabId,
@@ -629,28 +898,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { streamMessages: [], isStreaming: false }) }));
   },
 
-  cancelStream: () => {
-    api.cancelStream().catch(() => {});
-    const id = get().streamingTabId ?? get().activeTabId;
+  cancelStream: async () => {
+    const id = get().streamingTabId;
+    if (!id) return;
+    try {
+      await api.cancelStream();
+    } catch {
+      // best-effort cancellation
+    }
     set((s) => ({
       tabs: patchTab(s.tabs, id, { isStreaming: false }),
       streamingTabId: null,
     }));
   },
 
-  cancelInvoke: () => {
+  cancelInvoke: async () => {
     const { tabs, activeTabId, streamingTabId } = get();
     const tab = tabs.find((t) => t.id === activeTabId);
     if (tab?.isInvoking) {
-      api.cancelUnary().catch(() => {});
+      try {
+        await api.cancelUnary();
+      } catch {
+        // best-effort cancellation
+      }
       set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { isInvoking: false }) }));
     } else if (streamingTabId) {
-      api.cancelStream().catch(() => {});
-      const id = streamingTabId;
-      set((s) => ({
-        tabs: patchTab(s.tabs, id, { isStreaming: false }),
-        streamingTabId: null,
-      }));
+      await get().cancelStream();
     }
   },
 
@@ -658,13 +931,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeTabId } = get();
     try {
       const entries = await api.getHistory(methodPath);
-      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: entries ?? [] }) }));
+      set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: normalizeHistoryEntries(entries ?? []) }) }));
     } catch {
       set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
     }
   },
 
   clearHistory: async (methodPath) => {
+    if (get().confirmClearHistory) {
+      const confirmed = await get().showConfirm('Clear history for this method? This cannot be undone.');
+      if (!confirmed) return;
+    }
     const { activeTabId } = get();
     await api.clearHistory(methodPath);
     set((s) => ({ tabs: patchTab(s.tabs, activeTabId, { history: [] }) }));
@@ -676,23 +953,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadCollections: async () => {
     try {
       const cols = await api.listCollections();
-      set({ collections: cols ?? [] });
+      set({ collections: normalizeCollections(cols ?? []) });
     } catch { set({ collections: [] }); }
   },
 
   loadCollectionDescriptors: async (collection) => {
+    const normalized = normalizeCollection(collection);
     const { loadedProtosetPaths, loadedProtoFilePaths, protoImportPaths } = get();
-    const needsProtosets = (collection.protosetPaths?.length ?? 0) > 0
-      && !includesAll(loadedProtosetPaths, collection.protosetPaths);
-    const needsProtoFiles = (collection.protoFilePaths?.length ?? 0) > 0
-      && (!includesAll(loadedProtoFilePaths, collection.protoFilePaths)
-        || !includesAll(protoImportPaths, collection.protoImportPaths ?? []));
+    const needsProtosets = normalized.protosetPaths.length > 0
+      && !includesAll(loadedProtosetPaths, normalized.protosetPaths);
+    const needsProtoFiles = normalized.protoFilePaths.length > 0
+      && (!includesAll(loadedProtoFilePaths, normalized.protoFilePaths)
+        || !includesAll(protoImportPaths, normalized.protoImportPaths));
 
     if (needsProtosets) {
-      await get().loadProtosets(collection.protosetPaths);
+      await get().loadProtosets(normalized.protosetPaths);
     }
     if (needsProtoFiles) {
-      await get().loadProtoFiles(collection.protoImportPaths ?? [], collection.protoFilePaths);
+      await get().loadProtoFiles(normalized.protoImportPaths, normalized.protoFilePaths);
     }
   },
 
@@ -706,7 +984,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const req = {
       id: newReqId, name, collectionId,
       methodPath: selectedMethod.fullName, requestJson,
-      metadata: requestMetadata, connection: connectionConfig,
+      metadata: normalizeMetadataEntries(requestMetadata), connection: normalizeConnectionConfig(connectionConfig),
       createdAt: now, updatedAt: now,
     };
     let col = collections.find((c) => c.id === collectionId);
@@ -739,13 +1017,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openSavedRequest: async (collection, request) => {
-    let method = findMethodByPath(get().services, request.methodPath);
+    const normalizedRequest = normalizeSavedRequest(request);
+    let method = findMethodByPath(get().services, normalizedRequest.methodPath);
     if (!method) {
       await get().loadCollectionDescriptors(collection);
-      method = findMethodByPath(get().services, request.methodPath);
+      method = findMethodByPath(get().services, normalizedRequest.methodPath);
     }
     if (!method) return;
-    get().openMethodInNewTab(method, request.requestJson, request.metadata, request.id, request.name);
+    get().openMethodInNewTab(method, normalizedRequest.requestJson, normalizedRequest.metadata, normalizedRequest.id, normalizedRequest.name);
   },
 
   renameCollection: async (collectionId, newName) => {
@@ -768,7 +1047,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const updatedRequests = col.requests.map((r) =>
       r.id === savedRequestId
-        ? { ...r, requestJson, metadata: requestMetadata, connection: connectionConfig, updatedAt: now }
+        ? {
+            ...r,
+            requestJson,
+            metadata: normalizeMetadataEntries(requestMetadata),
+            connection: normalizeConnectionConfig(connectionConfig),
+            updatedAt: now,
+          }
         : r
     );
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
@@ -776,8 +1061,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteRequest: async (collectionId, requestId) => {
-    const confirmed = await get().showConfirm('Delete this saved request? This cannot be undone.');
-    if (!confirmed) return;
+    if (get().confirmDeletes) {
+      const confirmed = await get().showConfirm('Delete this saved request? This cannot be undone.');
+      if (!confirmed) return;
+    }
     const { collections } = get();
     const col = collections.find((c) => c.id === collectionId);
     if (!col) return;
@@ -786,7 +1073,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await api.saveCollection({ ...col, requests: updatedRequests, updatedAt: now });
     await get().loadCollections();
     const linkedTab = get().tabs.find((t) => t.savedRequestId === requestId);
-    if (linkedTab) get().closeTab(linkedTab.id);
+    if (linkedTab) await get().closeTab(linkedTab.id);
   },
 
   renameRequest: async (tabId, newName) => {
@@ -825,9 +1112,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteCollection: async (id) => {
     const col = get().collections.find((c) => c.id === id);
-    const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
-    if (!confirmed) return;
+    if (get().confirmDeletes) {
+      const confirmed = await get().showConfirm(`Delete collection "${col?.name ?? id}"? This cannot be undone.`);
+      if (!confirmed) return;
+    }
     const requestIds = new Set((col?.requests ?? []).map((r) => r.id));
+    const streamOwner = get().tabs.find((t) => t.id === get().streamingTabId);
+    if (streamOwner?.savedRequestId && requestIds.has(streamOwner.savedRequestId)) {
+      await get().cancelStream();
+    }
     await api.deleteCollection(id);
     await get().loadCollections();
     // Batch-close all linked tabs in a single state update
@@ -837,7 +1130,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       if (closedIds.size === 0) return {};
       let remaining = s.tabs.filter((t) => !closedIds.has(t.id));
-      if (remaining.length === 0) remaining = [makeTab()];
+      if (remaining.length === 0) remaining = [makeTab({ timeoutSeconds: s.defaultTimeoutSeconds })];
       const newActive = closedIds.has(s.activeTabId)
         ? remaining[remaining.length - 1].id
         : s.activeTabId;
@@ -856,11 +1149,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   importCollection: async () => {
     const srcPath = await api.pickImportFile();
     if (srcPath) {
-      const imported = await api.importCollection(srcPath);
+      const imported = normalizeCollection(await api.importCollection(srcPath));
       await get().loadCollections();
-      if (imported) {
-        await get().loadCollectionDescriptors(imported);
-      }
+      await get().loadCollectionDescriptors(imported);
     }
   },
 
@@ -871,12 +1162,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadEnvironments: async () => {
     try {
       const envs = await api.listEnvironments();
-      set({ environments: envs ?? [] });
+      set({ environments: normalizeEnvironments(envs ?? []) });
     } catch { set({ environments: [] }); }
   },
 
   saveEnvironment: async (env) => {
-    await api.saveEnvironment(env);
+    await api.saveEnvironment(normalizeEnvironment(env));
     await get().loadEnvironments();
     // If the saved environment is currently active and has a target, keep the
     // connection bar in sync so the URL/TLS fields reflect the saved values.
@@ -915,12 +1206,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ── Settings ─────────────────────────────────────────────────────────────
   confirmDeletes: true,
+  confirmClearHistory: false,
   timestampInputLocal: false,
   theme: 'nimbus' as ThemeId,
   isDark: true,
-  customTheme: {},
+  customThemes: [],
+  activeCustomThemeId: '',
   fontSize: 16,
+  responseWordWrap: true,
+  responseIndent: 2,
+  defaultTimeoutSeconds: 0,
+  historyLimit: 50,
+  autoConnectOnStartup: false,
+  allowShellCommands: false,
+  maxStreamMessages: 200,
+  defaultMetadata: [],
   confirmDialog: null,
+  settingsOpen: false,
+  settingsTarget: null,
+  openSettings: (tab) => set({ settingsOpen: true, settingsTarget: tab ?? null }),
+  closeSettings: () => set({ settingsOpen: false, settingsTarget: null }),
 
   // ── Layout ──────────────────────────────────────────────────────────────
   sidebarWidth: 256,
@@ -929,13 +1234,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadUserSettings: async () => {
     try {
       const s = await api.getUserSettings();
-      const themeId = (s.theme as ThemeId) || 'nimbus';
-      const custom = (s.customTheme as Partial<ThemeTokens>) ?? {};
-      const fontSize = s.fontSize ?? 14;
+      const rawTheme = s.theme as string;
+      const themeId: ThemeId = (isBuiltinTheme(rawTheme) || rawTheme === 'custom') ? rawTheme as ThemeId : 'nimbus';
+      const customThemes: CustomThemeEntry[] = s.customThemes ?? [];
+      const activeCustomThemeId = s.activeCustomThemeId ?? '';
+      const activeTokens = customThemes.find((t) => t.id === activeCustomThemeId)?.tokens ?? {};
+      const fontSize = s.fontSize ?? 16;
       const sidebarWidth = s.sidebarWidth ?? 256;
       const panelSplit = s.panelSplit ?? 0.5;
-      set({ confirmDeletes: s.confirmDeletes, timestampInputLocal: s.timestampInputLocal ?? false, theme: themeId, isDark: isColorDark(resolveTheme(themeId, custom).bg), customTheme: custom, fontSize, sidebarWidth, panelSplit });
-      applyTheme(resolveTheme(themeId, custom));
+      const resolved = resolveTheme(themeId, activeTokens);
+      set({
+        confirmDeletes: s.confirmDeletes,
+        confirmClearHistory: s.confirmClearHistory ?? false,
+        timestampInputLocal: s.timestampInputLocal ?? false,
+        theme: themeId,
+        isDark: isColorDark(resolved.bg),
+        customThemes,
+        activeCustomThemeId,
+        fontSize,
+        responseWordWrap: s.responseWordWrap ?? true,
+        responseIndent: s.responseIndent ?? 2,
+        sidebarWidth,
+        panelSplit,
+        defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
+        historyLimit: s.historyLimit ?? 50,
+        autoConnectOnStartup: s.autoConnectOnStartup ?? false,
+        allowShellCommands: s.allowShellCommands ?? false,
+        maxStreamMessages: s.maxStreamMessages ?? 200,
+        defaultMetadata: s.defaultMetadata ?? [],
+      });
+      applyTheme(resolved);
       applyFontSize(fontSize);
     } catch { /* use defaults */ }
   },
@@ -945,22 +1273,130 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveAllSettings(get());
   },
 
+  setConfirmClearHistory: (v) => {
+    set({ confirmClearHistory: v });
+    saveAllSettings(get());
+  },
+
   setTimestampInputLocal: (v) => {
     set({ timestampInputLocal: v });
     saveAllSettings(get());
   },
 
-  setTheme: (id, custom) => {
-    const resolved = resolveTheme(id, custom);
-    const customTheme = id === 'custom' ? (custom ?? {}) : {};
-    set({ theme: id, isDark: isColorDark(resolved.bg), customTheme });
+  setTheme: (id, customThemeId?) => {
+    const { customThemes } = get();
+    const activeId = id === 'custom' ? (customThemeId ?? get().activeCustomThemeId) : '';
+    const activeTokens = activeId ? (customThemes.find((t) => t.id === activeId)?.tokens ?? {}) : {};
+    const resolved = resolveTheme(id, activeTokens);
+    set({ theme: id, isDark: isColorDark(resolved.bg), activeCustomThemeId: activeId });
     applyTheme(resolved);
+    saveAllSettings(get());
+  },
+
+  forkTheme: (sourceId) => {
+    const { customThemes } = get();
+    const sourceTokens: Partial<ThemeTokens> = (() => {
+      // Check if sourceId is a built-in preset
+      if (sourceId in THEMES) return { ...THEMES[sourceId as keyof typeof THEMES] };
+      // Otherwise find in custom themes list
+      return { ...(customThemes.find((t) => t.id === sourceId)?.tokens ?? DEFAULT_CUSTOM_THEME) };
+    })();
+    const sourceName = (() => {
+      if (sourceId in THEMES) {
+        const labels: Record<string, string> = {
+          nimbus: 'Nimbus', dark: 'Dark', light: 'Light',
+          deuteranopia: 'Deuteranopia', tritanopia: 'Tritanopia', highcontrast: 'High Contrast',
+        };
+        return labels[sourceId] ?? sourceId;
+      }
+      return customThemes.find((t) => t.id === sourceId)?.name ?? 'Theme';
+    })();
+    const newId = crypto.randomUUID();
+    const newEntry: CustomThemeEntry = { id: newId, name: `${sourceName} copy`, tokens: sourceTokens };
+    const updated = [...customThemes, newEntry];
+    const resolved = resolveTheme('custom', sourceTokens);
+    set({ customThemes: updated, theme: 'custom', activeCustomThemeId: newId, isDark: isColorDark(resolved.bg) });
+    applyTheme(resolved);
+    saveAllSettings(get());
+  },
+
+  updateCustomTheme: (id, tokens) => {
+    const { customThemes, activeCustomThemeId, theme } = get();
+    const updated = customThemes.map((t) => t.id === id ? { ...t, tokens } : t);
+    set({ customThemes: updated });
+    // Re-apply if this is the active theme
+    if (theme === 'custom' && activeCustomThemeId === id) {
+      const resolved = resolveTheme('custom', tokens);
+      set({ isDark: isColorDark(resolved.bg) });
+      applyTheme(resolved);
+    }
+    saveAllSettings(get());
+  },
+
+  renameCustomTheme: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set((s) => ({ customThemes: s.customThemes.map((t) => t.id === id ? { ...t, name: trimmed } : t) }));
+    saveAllSettings(get());
+  },
+
+  deleteCustomTheme: (id) => {
+    const { customThemes, activeCustomThemeId } = get();
+    const updated = customThemes.filter((t) => t.id !== id);
+    // If the deleted theme was active, fall back to nimbus
+    if (activeCustomThemeId === id) {
+      const resolved = resolveTheme('nimbus');
+      set({ customThemes: updated, theme: 'nimbus', activeCustomThemeId: '', isDark: isColorDark(resolved.bg) });
+      applyTheme(resolved);
+    } else {
+      set({ customThemes: updated });
+    }
     saveAllSettings(get());
   },
 
   setFontSize: (size) => {
     set({ fontSize: size });
     applyFontSize(size);
+    saveAllSettings(get());
+  },
+
+  setResponseWordWrap: (v) => {
+    set({ responseWordWrap: v });
+    saveAllSettings(get());
+  },
+
+  setResponseIndent: (v) => {
+    set({ responseIndent: v });
+    saveAllSettings(get());
+  },
+
+  setDefaultTimeoutSeconds: (v) => {
+    set({ defaultTimeoutSeconds: v });
+    saveAllSettings(get());
+  },
+
+  setHistoryLimit: (v) => {
+    set({ historyLimit: v });
+    saveAllSettings(get());
+  },
+
+  setAutoConnectOnStartup: (v) => {
+    set({ autoConnectOnStartup: v });
+    saveAllSettings(get());
+  },
+
+  setAllowShellCommands: (v) => {
+    set({ allowShellCommands: v });
+    saveAllSettings(get());
+  },
+
+  setMaxStreamMessages: (v) => {
+    set({ maxStreamMessages: v });
+    saveAllSettings(get());
+  },
+
+  setDefaultMetadata: (v) => {
+    set({ defaultMetadata: v });
     saveAllSettings(get());
   },
 
@@ -975,7 +1411,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   showConfirm: (message) => {
-    if (!get().confirmDeletes) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       set({ confirmDialog: { message, resolve } });
     });

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,11 +18,12 @@ import (
 // Wails or UI dependencies, and reads from the same OS config directory so
 // environments and collections saved in the desktop app are immediately visible.
 type MCPEngine struct {
-	mu        sync.Mutex
-	ctx       context.Context
-	conn      *rpc.Connection
-	protoset  *rpc.ProtosetDescriptor
-	activeEnv *storage.Environment
+	mu         sync.Mutex
+	settingsMu sync.Mutex
+	ctx        context.Context
+	conn       *rpc.Connection
+	protoset   *rpc.ProtosetDescriptor
+	activeEnv  *storage.Environment
 
 	store     *storage.Store
 	envStore  *storage.EnvStore
@@ -32,6 +36,11 @@ type MCPEngine struct {
 	loadReflection      bool
 }
 
+const (
+	defaultInvokeTimeoutSeconds = 30.0
+	maxInvokeTimeoutSeconds     = 600.0
+)
+
 // NewMCPEngine creates and initialises an MCPEngine. It auto-restores the last
 // saved descriptor sources and active environment from the shared config dir.
 func NewMCPEngine(ctx context.Context) *MCPEngine {
@@ -40,19 +49,19 @@ func NewMCPEngine(ctx context.Context) *MCPEngine {
 	var err error
 	e.store, err = storage.NewStore()
 	if err != nil {
-		fmt.Printf("warning: collection store unavailable: %v\n", err)
+		log.Printf("warning: collection store unavailable: %v", err)
 	}
 	e.envStore, err = storage.NewEnvStore()
 	if err != nil {
-		fmt.Printf("warning: environment store unavailable: %v\n", err)
+		log.Printf("warning: environment store unavailable: %v", err)
 	}
 	e.histStore, err = storage.NewHistoryStore()
 	if err != nil {
-		fmt.Printf("warning: history store unavailable: %v\n", err)
+		log.Printf("warning: history store unavailable: %v", err)
 	}
 	e.settings, err = storage.NewSettingsStore()
 	if err != nil {
-		fmt.Printf("warning: settings store unavailable: %v\n", err)
+		log.Printf("warning: settings store unavailable: %v", err)
 		return e
 	}
 
@@ -92,14 +101,14 @@ func NewMCPEngine(ctx context.Context) *MCPEngine {
 }
 
 // Connect dials the specified gRPC server.
-func (e *MCPEngine) Connect(cfg rpc.ConnectionConfig) error {
+func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	if e.conn != nil {
 		_ = e.conn.Close()
 	}
-	conn, err := rpc.NewConnection(e.ctx, cfg)
+	conn, err := rpc.NewConnection(e.mergeContext(ctx), cfg)
 	if err != nil {
 		return err
 	}
@@ -173,7 +182,7 @@ func (e *MCPEngine) SetActiveEnvironmentByName(name string) error {
 }
 
 // LoadProtosets loads one or more .protoset files, merging with any existing descriptors.
-func (e *MCPEngine) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
+func (e *MCPEngine) LoadProtosets(ctx context.Context, paths []string) ([]rpc.ServiceInfo, error) {
 	e.mu.Lock()
 	currentProtosets := append([]string(nil), e.loadedProtosetPaths...)
 	importPaths := append([]string(nil), e.loadImportPaths...)
@@ -183,7 +192,7 @@ func (e *MCPEngine) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 	e.mu.Unlock()
 
 	allProtosets := dedupeStrings(append(currentProtosets, paths...))
-	pd, err := e.rebuildDescriptor(allProtosets, importPaths, protoFiles, withReflection, conn)
+	pd, err := e.rebuildDescriptor(ctx, allProtosets, importPaths, protoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +201,7 @@ func (e *MCPEngine) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 }
 
 // LoadViaReflection queries the connected server's reflection API.
-func (e *MCPEngine) LoadViaReflection() ([]rpc.ServiceInfo, error) {
+func (e *MCPEngine) LoadViaReflection(ctx context.Context) ([]rpc.ServiceInfo, error) {
 	e.mu.Lock()
 	conn := e.conn
 	protosets := append([]string(nil), e.loadedProtosetPaths...)
@@ -203,7 +212,7 @@ func (e *MCPEngine) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	if conn == nil {
 		return nil, fmt.Errorf("not connected — call connect first")
 	}
-	pd, err := e.rebuildDescriptor(protosets, importPaths, protoFiles, true, conn)
+	pd, err := e.rebuildDescriptor(ctx, protosets, importPaths, protoFiles, true, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +243,11 @@ func (e *MCPEngine) GetRequestSchema(methodPath string) ([]rpc.FieldSchema, erro
 }
 
 // InvokeUnary executes a unary RPC and records it to history.
-func (e *MCPEngine) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
+func (e *MCPEngine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
+	if err := validateTimeoutSeconds(req.TimeoutSeconds); err != nil {
+		return nil, err
+	}
+
 	e.mu.Lock()
 	conn := e.conn
 	pd := e.protoset
@@ -250,14 +263,10 @@ func (e *MCPEngine) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, err
 
 	req = interpolateRequest(req, env)
 
-	ctx := e.ctx
-	if req.TimeoutSeconds > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(req.TimeoutSeconds*float64(time.Second)))
-		defer cancel()
-	}
+	callCtx, cancel := context.WithTimeout(e.mergeContext(ctx), time.Duration(req.TimeoutSeconds*float64(time.Second)))
+	defer cancel()
 
-	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
+	resp, err := rpc.InvokeUnary(callCtx, conn, pd, req)
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +287,7 @@ func (e *MCPEngine) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, err
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 func (e *MCPEngine) rebuildDescriptor(
+	ctx context.Context,
 	protosets, importPaths, protoFiles []string,
 	withReflection bool,
 	conn *rpc.Connection,
@@ -301,13 +311,46 @@ func (e *MCPEngine) rebuildDescriptor(
 		if conn == nil {
 			return nil, fmt.Errorf("not connected")
 		}
-		pd, err := rpc.LoadViaReflection(e.ctx, conn.ClientConn())
+		pd, err := rpc.LoadViaReflection(e.mergeContext(ctx), conn.ClientConn())
 		if err != nil {
 			return nil, err
 		}
 		parts = append(parts, pd)
 	}
 	return rpc.MergeDescriptors(parts...), nil
+}
+
+// EnsureCollectionDescriptors loads descriptor sources referenced by col.
+func (e *MCPEngine) EnsureCollectionDescriptors(ctx context.Context, col *storage.Collection) error {
+	if col == nil {
+		return fmt.Errorf("collection is required")
+	}
+	if len(col.ProtosetPaths) == 0 && len(col.ProtoFilePaths) == 0 {
+		return nil
+	}
+
+	e.mu.Lock()
+	currentProtosets := append([]string(nil), e.loadedProtosetPaths...)
+	currentProtoFiles := append([]string(nil), e.loadedProtoFiles...)
+	currentImportPaths := append([]string(nil), e.loadImportPaths...)
+	withReflection := e.loadReflection
+	conn := e.conn
+	e.mu.Unlock()
+
+	allProtosets := dedupeStrings(append(currentProtosets, col.ProtosetPaths...))
+	allProtoFiles := dedupeStrings(append(currentProtoFiles, col.ProtoFilePaths...))
+	allImportPaths := dedupeStrings(append(currentImportPaths, col.ProtoImportPaths...))
+
+	pd, err := e.rebuildDescriptor(ctx, allProtosets, allImportPaths, allProtoFiles, withReflection, conn)
+	if err != nil {
+		return fmt.Errorf("loading descriptors for collection %q: %w", col.Name, err)
+	}
+	if pd == nil {
+		return fmt.Errorf("no descriptors available for collection %q", col.Name)
+	}
+
+	e.storeDescriptorState(pd, allProtosets, allImportPaths, allProtoFiles, withReflection)
+	return nil
 }
 
 func (e *MCPEngine) storeDescriptorState(
@@ -336,6 +379,9 @@ func (e *MCPEngine) saveSettings(fn func(*storage.AppSettings)) {
 	if e.settings == nil {
 		return
 	}
+	e.settingsMu.Lock()
+	defer e.settingsMu.Unlock()
+
 	saved, err := e.settings.Load()
 	if err != nil || saved == nil {
 		saved = &storage.AppSettings{}
@@ -356,13 +402,48 @@ func dedupeStrings(values []string) []string {
 	return out
 }
 
+func validateTimeoutSeconds(timeoutSeconds float64) error {
+	if math.IsNaN(timeoutSeconds) || math.IsInf(timeoutSeconds, 0) {
+		return fmt.Errorf("timeout_seconds must be a finite number")
+	}
+	if timeoutSeconds <= 0 {
+		return fmt.Errorf("timeout_seconds must be greater than 0")
+	}
+	if timeoutSeconds > maxInvokeTimeoutSeconds {
+		return fmt.Errorf("timeout_seconds must be <= %.0f", maxInvokeTimeoutSeconds)
+	}
+	return nil
+}
+
+func (e *MCPEngine) mergeContext(ctx context.Context) context.Context {
+	if ctx != nil {
+		return ctx
+	}
+	if e.ctx != nil {
+		return e.ctx
+	}
+	return context.Background()
+}
+
 func interpolateRequest(req rpc.InvokeRequest, env *storage.Environment) rpc.InvokeRequest {
 	if env == nil || len(env.Headers) == 0 {
 		return req
 	}
+
+	// Per-request metadata should override environment defaults by key.
+	requestKeys := make(map[string]bool, len(req.Metadata))
+	for _, md := range req.Metadata {
+		key := strings.ToLower(strings.TrimSpace(md.Key))
+		if key == "" {
+			continue
+		}
+		requestKeys[key] = true
+	}
+
 	envMeta := make([]rpc.MetadataEntry, 0, len(env.Headers))
 	for _, h := range env.Headers {
-		if h.Key == "" {
+		key := strings.ToLower(strings.TrimSpace(h.Key))
+		if key == "" || requestKeys[key] {
 			continue
 		}
 		envMeta = append(envMeta, rpc.MetadataEntry{Key: h.Key, Value: h.Value})

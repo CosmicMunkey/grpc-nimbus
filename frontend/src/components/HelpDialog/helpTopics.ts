@@ -32,7 +32,7 @@ export const helpTopics: HelpTopic[] = [
         'Tabs — each open method gets its own independent tab with its own request and response state.',
         'Environments — store a target URL, TLS mode, and auth headers per environment (dev, staging, prod).',
         'Collections — saved requests grouped by name; portable across machines when exported.',
-        'History — every request is automatically logged and can be replayed.',
+        'History — every request is automatically logged for review.',
       ]},
       { type: 'note', text: 'Press Cmd/Ctrl+Shift+/ to open this dialog from anywhere in the app.' },
     ],
@@ -123,13 +123,11 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'history',
     title: 'Request History',
-    keywords: ['history', 'recent', 'past', 'log', 'replay', 'expand'],
+    keywords: ['history', 'recent', 'past', 'log', 'expand'],
     content: [
       { type: 'paragraph', text: 'Every request you send is automatically logged. History is stored locally and persists across restarts.' },
       { type: 'heading', text: 'Viewing History' },
       { type: 'paragraph', text: 'Open the History tab in the sidebar. Entries are sorted newest-first. Click any entry to expand it and see the full request payload, response body, status code, latency, and metadata.' },
-      { type: 'heading', text: 'Replaying a Request' },
-      { type: 'paragraph', text: 'Click the restore icon on a history entry to load it back into the current tab — method, payload, and metadata all restored.' },
     ],
   },
   {
@@ -155,8 +153,6 @@ export const helpTopics: HelpTopic[] = [
       { type: 'bullets', items: [
         'Plaintext — no encryption. For local development or internal networks.',
         'TLS (system CA) — encrypts and verifies the server certificate against your OS trust store.',
-        'TLS (skip verify) — encrypts but skips certificate validation. Useful for self-signed certs.',
-        'mTLS — provide a client certificate and key for mutual TLS authentication.',
       ]},
       { type: 'heading', text: 'Connection Status' },
       { type: 'paragraph', text: 'The status dot next to the host reflects real gRPC connectivity: green = connected, yellow = idle, red = error with details in a tooltip.' },

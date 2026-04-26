@@ -100,29 +100,64 @@ function StreamPanel() {
 
 function StreamMessage({ evt }: { evt: StreamEvent }) {
   const isDark = useAppStore(s => s.isDark);
+  const responseIndent = useAppStore(s => s.responseIndent);
+  const responseWordWrap = useAppStore(s => s.responseWordWrap);
+  const wrapClass = responseWordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre';
   const pretty = (() => {
     if (!evt.json) return '';
-    try { return JSON.stringify(JSON.parse(evt.json), null, 2); } catch { return evt.json; }
+    try { return JSON.stringify(JSON.parse(evt.json), null, responseIndent); } catch { return evt.json; }
   })();
 
   if (evt.type === 'message') {
     return (
       <div className="border border-c-border rounded overflow-hidden">
         <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">message</div>
-        <pre className="p-2 text-c-text overflow-x-auto whitespace-pre-wrap">{pretty}</pre>
+        <pre className={`p-2 text-c-text overflow-x-auto ${wrapClass}`}>{pretty}</pre>
+      </div>
+    );
+  }
+  if (evt.type === 'header') {
+    const entries = evt.metadata ?? [];
+    if (entries.length === 0) return null;
+    return (
+      <div className="border border-c-border rounded overflow-hidden">
+        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">header</div>
+        <div className="p-2 space-y-0.5">
+          {entries.map((entry, i) => (
+            <div key={i} className="flex gap-2 text-[10px]">
+              <span className="text-c-text2">{entry.key}:</span>
+              <span className="text-c-text break-all">{entry.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
   if (evt.type === 'trailer') {
-    const statusCls = evt.statusCode === 0
+    const statusCode = typeof evt.statusCode === 'number' ? evt.statusCode : 0;
+    const statusText = evt.status ?? (statusCode === 0 ? 'OK' : 'UNKNOWN');
+    const trailerMetadata = evt.metadata ?? [];
+    const statusCls = statusCode === 0
       ? (isDark ? 'text-green-400' : 'text-green-600')
       : 'text-c-accent';
     return (
-      <div className="border border-c-border rounded px-2 py-1 text-[10px]">
-        <span className="text-c-text2">trailer </span>
-        <span className={`font-medium ${statusCls}`}>
-          {evt.statusCode} {evt.status}
-        </span>
+      <div className="border border-c-border rounded overflow-hidden">
+        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">trailer</div>
+        <div className="px-2 py-1 text-[10px]">
+          <span className={`font-medium ${statusCls}`}>
+            {statusCode} {statusText}
+          </span>
+          {trailerMetadata.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {trailerMetadata.map((entry, i) => (
+                <div key={i} className="flex gap-2">
+                  <span className="text-c-text2">{entry.key}:</span>
+                  <span className="text-c-text break-all">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -133,13 +168,14 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
   return null;
 }
 
-function formatJson(s: string | null | undefined): string {
+function formatJson(s: string | null | undefined, indent = 2): string {
   if (!s) return '';
-  try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+  try { return JSON.stringify(JSON.parse(s), null, indent); } catch { return s; }
 }
 
 function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
   const isDark = useAppStore(s => s.isDark);
+  const responseIndent = useAppStore(s => s.responseIndent);
   const [expanded, setExpanded] = useState(false);
   const successCls = isDark ? 'text-green-400' : 'text-green-600';
 
@@ -169,7 +205,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           <div>
             <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Request</span>
             <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
-              {formatJson(entry.requestJson)}
+              {formatJson(entry.requestJson, responseIndent)}
             </pre>
           </div>
 
@@ -194,7 +230,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
               <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Response</span>
               {entry.response.responseJson?.trim() ? (
                 <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                  {formatJson(entry.response.responseJson)}
+                  {formatJson(entry.response.responseJson, responseIndent)}
                 </pre>
               ) : entry.response.statusCode !== 0 && entry.response.statusMessage ? (
                 <p className="mt-0.5 text-[10px] text-c-accent font-mono">{entry.response.statusMessage}</p>
@@ -282,14 +318,19 @@ export default function ResponsePanel() {
   const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
   const { appendStreamEvent } = useAppStore();
   const isDark = useAppStore(s => s.isDark);
+  const responseIndent = useAppStore(s => s.responseIndent);
   const [tab, setTab] = useState<'response' | 'headers' | 'history'>('response');
+
+  // Snap back to Response tab when a request fires or method changes
+  useEffect(() => { if (isInvoking || isStreaming) setTab('response'); }, [isInvoking, isStreaming]);
+  useEffect(() => { setTab('response'); }, [selectedMethod?.fullName]);
 
   // Subscribe to Wails stream events
   useEffect(() => {
     const runtime = window.runtime;
     if (!runtime) return;
     const offEvent = runtime.EventsOn('stream:event', (raw) => {
-      appendStreamEvent(raw as StreamEvent);
+      appendStreamEvent(raw);
     });
     const offDone = runtime.EventsOn('stream:done', () => {});
     return () => {
@@ -299,21 +340,26 @@ export default function ResponsePanel() {
   }, [appendStreamEvent]);
 
   if (!selectedMethod) return null;
+  const isStreamingMethod = selectedMethod.serverStreaming || selectedMethod.clientStreaming;
 
   // Show streaming panel if streaming is active or we have stream messages
-  if (isStreaming || (selectedMethod.serverStreaming && streamMessages.length > 0)) {
+  if (isStreaming || (isStreamingMethod && streamMessages.length > 0)) {
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex border-b border-c-border">
-          {(['response', 'history'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t as typeof tab)}
+          {(['response', 'headers', 'history'] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === t ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'}`}>
               {t === 'response' ? 'Stream' : t}
             </button>
           ))}
         </div>
         <div className="flex-1 min-h-0">
-          {tab === 'response' ? <StreamPanel /> : <HistoryPanel />}
+          {tab === 'response' ? <StreamPanel /> : tab === 'history' ? <HistoryPanel /> : (
+            <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
+              No headers yet
+            </div>
+          )}
         </div>
       </div>
     );
@@ -333,15 +379,19 @@ export default function ResponsePanel() {
       return (
         <div className="flex flex-col h-full min-h-0">
           <div className="flex border-b border-c-border">
-            {(['response', 'history'] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t as typeof tab)}
+            {(['response', 'headers', 'history'] as const).map((t) => (
+              <button key={t} onClick={() => setTab(t)}
                 className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === t ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'}`}>
                 {t}
               </button>
             ))}
           </div>
           <div className="flex-1 min-h-0 overflow-auto">
-            {tab === 'history' ? <HistoryPanel /> : (
+            {tab === 'history' ? <HistoryPanel /> : tab === 'headers' ? (
+              <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
+                No headers yet
+              </div>
+            ) : (
               <div className="p-3 text-xs text-c-accent font-mono break-all">{invokeError}</div>
             )}
           </div>
@@ -352,14 +402,20 @@ export default function ResponsePanel() {
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex border-b border-c-border">
-          <button onClick={() => setTab('history')}
-            className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === 'history' ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'}`}>
-            History
-          </button>
+          {(['response', 'headers', 'history'] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-4 py-1.5 text-xs capitalize border-b-2 ${tab === t ? 'border-c-accent text-c-text' : 'border-transparent text-c-text2 hover:text-c-text'}`}>
+              {t}
+            </button>
+          ))}
         </div>
-        <div className="flex-1 min-h-0">
-          {tab === 'history' ? <HistoryPanel /> : (
-            <div className="flex-1 flex items-center justify-center text-c-text3 text-sm select-none h-full">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {tab === 'history' ? <HistoryPanel /> : tab === 'headers' ? (
+            <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
+              No headers yet
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
               Response will appear here
             </div>
           )}
@@ -369,7 +425,7 @@ export default function ResponsePanel() {
   }
 
   const prettyJson = (() => {
-    try { return JSON.stringify(JSON.parse(response.responseJson), null, 2); }
+    try { return JSON.stringify(JSON.parse(response.responseJson), null, responseIndent); }
     catch { return response.responseJson; }
   })();
 

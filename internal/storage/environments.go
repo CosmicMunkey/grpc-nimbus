@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -76,6 +77,10 @@ func (s *EnvStore) GetEnvironment(id string) (*Environment, error) {
 
 // SaveEnvironment persists an environment to disk.
 func (s *EnvStore) SaveEnvironment(env Environment) error {
+	if strings.TrimSpace(env.ID) == "" {
+		return fmt.Errorf("environment id is required")
+	}
+
 	now := time.Now().Format(time.RFC3339Nano)
 	if env.CreatedAt == "" {
 		env.CreatedAt = now

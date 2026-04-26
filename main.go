@@ -27,6 +27,7 @@ func main() {
 
 	// Load saved window dimensions
 	var windowWidth, windowHeight, windowX, windowY int
+	var hasWindowPosition bool
 	settingsStore, err := storage.NewSettingsStore()
 	if err == nil {
 		if saved, err := settingsStore.Load(); err == nil && saved != nil {
@@ -46,6 +47,7 @@ func main() {
 			if saved.WindowY != nil {
 				windowY = *saved.WindowY
 			}
+			hasWindowPosition = saved.WindowX != nil && saved.WindowY != nil
 		} else {
 			windowWidth = 1280
 			windowHeight = 800
@@ -58,8 +60,7 @@ func main() {
 	// Create a startup wrapper that restores window position after init
 	startupWithRestore := func(ctx context.Context) {
 		app.startup(ctx)
-		// Only restore position if non-zero (indicating a saved state)
-		if windowX != 0 || windowY != 0 {
+		if hasWindowPosition {
 			runtime.WindowSetPosition(ctx, windowX, windowY)
 		}
 	}

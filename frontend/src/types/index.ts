@@ -7,7 +7,7 @@ export interface MetadataEntry {
 
 export interface ConnectionConfig {
   target: string;
-  tls: 'none' | 'system' | 'insecure_skip';
+  tls: 'none' | 'system';
   clientCert?: string;
   clientKey?: string;
 }
@@ -52,9 +52,9 @@ export interface InvokeResponse {
 export interface StreamEvent {
   type: 'message' | 'header' | 'trailer' | 'error';
   json?: string;
-  metadata?: MetadataEntry[];
+  metadata?: MetadataEntry[] | null;
   status?: string;
-  statusCode?: number;
+  statusCode?: number | null;
   error?: string;
 }
 

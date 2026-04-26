@@ -13,42 +13,71 @@ jobs:
       contents: read
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: Checkout source repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+
       - name: Get release version
         id: version
         run: |
-          # Strip the leading 'v' for the cask version field
-          TAG="$HEAD_BRANCH"
-          # workflow_run head_branch may be the tag; fall back to head_commit
-          # Use the GitHub API to find the release tag
-          RELEASE_TAG=$(gh release view --repo ${{ github.repository }} --json tagName --jq '.tagName' 2>/dev/null || echo "")
-          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+          git fetch --force --tags origin
+          TAG=""
+
+          if [[ -n "$HEAD_BRANCH" && "$HEAD_BRANCH" =~ ^v ]]; then
+            if git rev-parse -q --verify "refs/tags/$HEAD_BRANCH" >/dev/null 2>&1; then
+              TAG_COMMIT=$(git rev-list -n 1 "refs/tags/$HEAD_BRANCH")
+              if [[ "$TAG_COMMIT" == "$HEAD_SHA" ]]; then
+                TAG="$HEAD_BRANCH"
+              fi
+            fi
+          fi
+
+          if [[ -z "$TAG" ]]; then
+            mapfile -t MATCHING_TAGS < <(git tag --points-at "$HEAD_SHA" | grep '^v' || true)
+            if [[ "${#MATCHING_TAGS[@]}" -eq 1 ]]; then
+              TAG="${MATCHING_TAGS[0]}"
+            elif [[ "${#MATCHING_TAGS[@]}" -gt 1 ]]; then
+              echo "Ambiguous release tag for $HEAD_SHA: ${MATCHING_TAGS[*]}" >&2
+              exit 1
+            else
+              echo "No v* tag found for release workflow SHA $HEAD_SHA" >&2
+              exit 1
+            fi
+          fi
+
+          gh release view "$TAG" --repo ${{ github.repository }} --json tagName --jq '.tagName' >/dev/null
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
         env:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download release assets
         run: |
+          rm -rf release-assets
+          mkdir -p release-assets
           VERSION="${{ steps.version.outputs.version }}"
           TAG="${{ steps.version.outputs.tag }}"
           gh release download "${TAG}" \
             --repo ${{ github.repository }} \
             --pattern "*-darwin-arm64.zip" \
             --pattern "*-darwin-x86_64.zip" \
-            --dir /tmp/assets
+            --dir release-assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute SHA256
         id: sha
         run: |
-          ARM64=$(shasum -a 256 /tmp/assets/*-darwin-arm64.zip | awk '{print $1}')
-          X86_64=$(shasum -a 256 /tmp/assets/*-darwin-x86_64.zip | awk '{print $1}')
+          ARM64=$(shasum -a 256 release-assets/*-darwin-arm64.zip | awk '{print $1}')
+          X86_64=$(shasum -a 256 release-assets/*-darwin-x86_64.zip | awk '{print $1}')
           echo "arm64=${ARM64}" >> "$GITHUB_OUTPUT"
           echo "amd64=${X86_64}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew tap
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: CosmicMunkey/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

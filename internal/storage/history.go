@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"grpc-nimbus/internal/rpc"
 )
 
-const maxHistoryPerMethod = 50
+const defaultHistoryLimit = 50
 
 // HistoryEntry is a single recorded invocation.
 type HistoryEntry struct {
@@ -23,7 +24,17 @@ type HistoryEntry struct {
 
 // HistoryStore manages per-method request/response history on disk.
 type HistoryStore struct {
-	dir string
+	dir   string
+	mu    sync.Mutex
+	limit int // 0 = use defaultHistoryLimit; negative = unlimited
+}
+
+// SetLimit updates the per-method history cap. 0 restores the default (50).
+// Negative values disable the cap (unlimited). Safe to call concurrently.
+func (s *HistoryStore) SetLimit(n int) {
+	s.mu.Lock()
+	s.limit = n
+	s.mu.Unlock()
 }
 
 // NewHistoryStore creates a HistoryStore backed by the OS user config directory.
@@ -39,18 +50,40 @@ func NewHistoryStore() (*HistoryStore, error) {
 	return &HistoryStore{dir: dir}, nil
 }
 
-// Add appends an entry to the history for its method, capping at maxHistoryPerMethod.
+// Add appends an entry to the history for its method, capping at the configured limit.
 func (s *HistoryStore) Add(entry HistoryEntry) error {
-	existing, _ := s.GetHistory(entry.MethodPath)
-	entries := append([]HistoryEntry{entry}, existing...)
-	if len(entries) > maxHistoryPerMethod {
-		entries = entries[:maxHistoryPerMethod]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, err := s.getHistoryLocked(entry.MethodPath)
+	if err != nil {
+		existing = nil
 	}
-	return s.write(entry.MethodPath, entries)
+	entries := append([]HistoryEntry{entry}, existing...)
+	cap := s.limit
+	if cap == 0 {
+		cap = defaultHistoryLimit
+	}
+	if cap > 0 && len(entries) > cap {
+		entries = entries[:cap]
+	}
+	return s.writeLocked(entry.MethodPath, entries)
 }
 
 // GetHistory returns the history entries for a given method path (newest first).
+// A corrupt or unreadable file is treated as empty history; it will be overwritten
+// on the next Add, so callers never need to handle the error as fatal.
 func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entries, err := s.getHistoryLocked(methodPath)
+	if err != nil {
+		return nil, nil
+	}
+	return entries, nil
+}
+
+func (s *HistoryStore) getHistoryLocked(methodPath string) ([]HistoryEntry, error) {
 	path := s.filePath(methodPath)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -68,6 +101,9 @@ func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
 
 // ClearHistory deletes all history for a method path.
 func (s *HistoryStore) ClearHistory(methodPath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	path := s.filePath(methodPath)
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
@@ -75,17 +111,35 @@ func (s *HistoryStore) ClearHistory(methodPath string) error {
 	return nil
 }
 
-func (s *HistoryStore) write(methodPath string, entries []HistoryEntry) error {
+func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) error {
 	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		return err
 	}
 	path := s.filePath(methodPath)
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {

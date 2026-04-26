@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -283,7 +284,7 @@ func newDescriptor(src grpcurl.DescriptorSource, reflClient *grpcreflect.Client)
 	}
 
 	for _, svcName := range pending {
-		fmt.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)\n", svcName)
+		log.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)", svcName)
 	}
 
 	pd := &ProtosetDescriptor{source: src, methods: methods, unresolvable: pending}

@@ -15,15 +15,15 @@ import (
 
 // LoadedState bundles the currently loaded descriptor info for frontend restoration.
 type LoadedState struct {
-	Services         []rpc.ServiceInfo `json:"services"`
-	LoadedPaths      []string          `json:"loadedPaths"`
-	LoadedProtosets  []string          `json:"loadedProtosets"`
-	LoadedProtoFiles []string          `json:"loadedProtoFiles"`
-	LoadMode         string            `json:"loadMode"`         // "protoset", "proto", "reflection", "mixed", or ""
-	ProtoImportPaths []string          `json:"protoImportPaths"` // effective import paths for loaded .proto files
-	LastTarget       string            `json:"lastTarget"`       // last-used connection target
-	LastTLS          string            `json:"lastTLS"`
-	ActiveEnvironmentID string         `json:"activeEnvironmentId"` // active environment ID (empty = none)
+	Services            []rpc.ServiceInfo `json:"services"`
+	LoadedPaths         []string          `json:"loadedPaths"`
+	LoadedProtosets     []string          `json:"loadedProtosets"`
+	LoadedProtoFiles    []string          `json:"loadedProtoFiles"`
+	LoadMode            string            `json:"loadMode"`         // "protoset", "proto", "reflection", "mixed", or ""
+	ProtoImportPaths    []string          `json:"protoImportPaths"` // effective import paths for loaded .proto files
+	LastTarget          string            `json:"lastTarget"`       // last-used connection target
+	LastTLS             string            `json:"lastTLS"`
+	ActiveEnvironmentID string            `json:"activeEnvironmentId"` // active environment ID (empty = none)
 }
 
 func dedupeStrings(values []string) []string {
@@ -374,13 +374,17 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	protoFiles := append([]string(nil), a.loadedProtoFiles...)
 	ctx, cancel := context.WithCancel(a.ctx)
+	a.reflectionCancelSeq++
+	cancelSeq := a.reflectionCancelSeq
 	a.reflectionCancel = cancel
 	a.mu.Unlock()
 
 	defer func() {
 		cancel()
 		a.mu.Lock()
-		a.reflectionCancel = nil
+		if a.reflectionCancelSeq == cancelSeq {
+			a.reflectionCancel = nil
+		}
 		a.mu.Unlock()
 	}()
 

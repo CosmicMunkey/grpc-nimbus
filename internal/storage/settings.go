@@ -4,7 +4,16 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"grpc-nimbus/internal/rpc"
 )
+
+// CustomThemeEntry is a user-saved named color theme.
+type CustomThemeEntry struct {
+	ID     string            `json:"id"`
+	Name   string            `json:"name"`
+	Tokens map[string]string `json:"tokens"`
+}
 
 // AppSettings holds persistent application configuration that survives restarts.
 type AppSettings struct {
@@ -16,7 +25,7 @@ type AppSettings struct {
 
 	// Last-used connection
 	LastTarget string `json:"lastTarget,omitempty"` // e.g. "localhost:50051"
-	LastTLS    string `json:"lastTLS,omitempty"`    // e.g. "none", "system", "insecure_skip"
+	LastTLS    string `json:"lastTLS,omitempty"`    // e.g. "none", "system"
 
 	// Active environment
 	ActiveEnvironmentID string `json:"activeEnvironmentId,omitempty"`
@@ -24,15 +33,28 @@ type AppSettings struct {
 	// User preferences
 	ConfirmDeletes      *bool `json:"confirmDeletes,omitempty"`      // nil → default true
 	TimestampInputLocal *bool `json:"timestampInputLocal,omitempty"` // nil → default false (UTC input)
+	ConfirmClearHistory *bool `json:"confirmClearHistory,omitempty"` // nil → default false
 
 	// Appearance
-	Theme       string            `json:"theme,omitempty"`       // "nimbus" | "dracula" | "light" | "custom"; nil → "nimbus"
-	CustomTheme map[string]string `json:"customTheme,omitempty"` // token→hex map when theme=="custom"
-	FontSize    *int              `json:"fontSize,omitempty"`    // body font size in px; nil → 14
+	Theme               string             `json:"theme,omitempty"`               // "nimbus" | "dark" | "light" | "custom" | colorblind presets
+	CustomTheme         map[string]string  `json:"customTheme,omitempty"`         // legacy single custom theme (migrated on load)
+	CustomThemes        []CustomThemeEntry `json:"customThemes,omitempty"`        // named custom themes
+	ActiveCustomThemeID string             `json:"activeCustomThemeId,omitempty"` // ID of the active custom theme
+	FontSize            *int               `json:"fontSize,omitempty"`            // body font size in px; nil → 16
+	ResponseWordWrap    *bool              `json:"responseWordWrap,omitempty"`    // nil → default true
+	ResponseIndent      *int               `json:"responseIndent,omitempty"`      // nil → default 2
 
 	// Layout
 	SidebarWidth *float64 `json:"sidebarWidth,omitempty"` // sidebar width in px; nil → 256
 	PanelSplit   *float64 `json:"panelSplit,omitempty"`   // request/response split fraction; nil → 0.5
+
+	// Request defaults
+	DefaultTimeoutSeconds *float64            `json:"defaultTimeoutSeconds,omitempty"` // nil → 0 (no timeout)
+	HistoryLimit          *int                `json:"historyLimit,omitempty"`          // nil → 50; 0 = use default; negative = unlimited
+	AutoConnectOnStartup  *bool               `json:"autoConnectOnStartup,omitempty"`  // nil → false
+	AllowShellCommands    *bool               `json:"allowShellCommands,omitempty"`    // nil → false
+	MaxStreamMessages     *int                `json:"maxStreamMessages,omitempty"`     // nil → 200; 0 = unlimited
+	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata,omitempty"`       // global headers for all requests
 
 	// Window state
 	WindowWidth  *int `json:"windowWidth,omitempty"`  // window width in px

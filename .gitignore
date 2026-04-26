@@ -18,7 +18,7 @@ coverage.*
 profile.cov
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+ vendor/
 
 # Go workspace file
 go.work
@@ -28,8 +28,8 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+ .idea/
+ .vscode/
 
 # Wails build artifacts
 build/bin/
@@ -48,10 +48,8 @@ frontend/node_modules/
 
 # Wails dev bindings (auto-generated)
 frontend/wailsjs/
-.gitnexus
 .github/copilot-instructions.md
 .github/project-context.md
 
 .DS_Store
-.copilot-instructions
 /mcp-server

@@ -27,7 +27,7 @@ func main() {
 			mcp.Required(),
 		),
 		mcp.WithString("tls_mode",
-			mcp.Description("TLS mode: \"none\" (default), \"system\", or \"insecure_skip\""),
+			mcp.Description("TLS mode: \"none\" (default) or \"system\""),
 		),
 		mcp.WithString("client_cert",
 			mcp.Description("Path to client certificate file for mTLS (optional)"),
