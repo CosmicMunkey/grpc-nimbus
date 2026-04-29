@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Clock, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Square, History } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { MetadataEntry, StreamEvent, HistoryEntry } from '../../types';
+import { buildCodeMirrorTheme } from '../../codeMirrorTheme';
 
 // Subscribe to Wails stream events (injected at runtime)
 declare global {
@@ -318,6 +318,8 @@ export default function ResponsePanel() {
   const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
   const { appendStreamEvent } = useAppStore();
   const isDark = useAppStore(s => s.isDark);
+  const activeThemeTokens = useAppStore(s => s.activeThemeTokens);
+  const cmTheme = useMemo(() => buildCodeMirrorTheme(activeThemeTokens), [activeThemeTokens]);
   const responseIndent = useAppStore(s => s.responseIndent);
   const [tab, setTab] = useState<'response' | 'headers' | 'history'>('response');
 
@@ -461,7 +463,7 @@ export default function ResponsePanel() {
                 )}
               </div>
             ) : (
-              <CodeMirror value={prettyJson} theme={isDark ? oneDark : undefined} extensions={[json()]} readOnly className="h-full"
+              <CodeMirror value={prettyJson} theme={cmTheme} extensions={[json()]} readOnly className="h-full"
                 basicSetup={{ lineNumbers: true, foldGutter: true }} />
             )}
           </div>

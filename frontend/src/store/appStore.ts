@@ -472,6 +472,7 @@ interface AppState {
   setTimestampInputLocal: (v: boolean) => void;
   theme: ThemeId;
   isDark: boolean;
+  activeThemeTokens: ThemeTokens;
   customThemes: CustomThemeEntry[];
   activeCustomThemeId: string;
   setTheme: (id: ThemeId, customThemeId?: string) => void;
@@ -1210,6 +1211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   timestampInputLocal: false,
   theme: 'nimbus' as ThemeId,
   isDark: true,
+  activeThemeTokens: THEMES.nimbus,
   customThemes: [],
   activeCustomThemeId: '',
   fontSize: 16,
@@ -1249,6 +1251,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         timestampInputLocal: s.timestampInputLocal ?? false,
         theme: themeId,
         isDark: isColorDark(resolved.bg),
+        activeThemeTokens: resolved,
         customThemes,
         activeCustomThemeId,
         fontSize,
@@ -1288,7 +1291,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const activeId = id === 'custom' ? (customThemeId ?? get().activeCustomThemeId) : '';
     const activeTokens = activeId ? (customThemes.find((t) => t.id === activeId)?.tokens ?? {}) : {};
     const resolved = resolveTheme(id, activeTokens);
-    set({ theme: id, isDark: isColorDark(resolved.bg), activeCustomThemeId: activeId });
+    set({ theme: id, isDark: isColorDark(resolved.bg), activeThemeTokens: resolved, activeCustomThemeId: activeId });
     applyTheme(resolved);
     saveAllSettings(get());
   },
@@ -1315,7 +1318,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newEntry: CustomThemeEntry = { id: newId, name: `${sourceName} copy`, tokens: sourceTokens };
     const updated = [...customThemes, newEntry];
     const resolved = resolveTheme('custom', sourceTokens);
-    set({ customThemes: updated, theme: 'custom', activeCustomThemeId: newId, isDark: isColorDark(resolved.bg) });
+    set({ customThemes: updated, theme: 'custom', activeCustomThemeId: newId, isDark: isColorDark(resolved.bg), activeThemeTokens: resolved });
     applyTheme(resolved);
     saveAllSettings(get());
   },
@@ -1327,7 +1330,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Re-apply if this is the active theme
     if (theme === 'custom' && activeCustomThemeId === id) {
       const resolved = resolveTheme('custom', tokens);
-      set({ isDark: isColorDark(resolved.bg) });
+      set({ isDark: isColorDark(resolved.bg), activeThemeTokens: resolved });
       applyTheme(resolved);
     }
     saveAllSettings(get());
@@ -1346,7 +1349,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // If the deleted theme was active, fall back to nimbus
     if (activeCustomThemeId === id) {
       const resolved = resolveTheme('nimbus');
-      set({ customThemes: updated, theme: 'nimbus', activeCustomThemeId: '', isDark: isColorDark(resolved.bg) });
+      set({ customThemes: updated, theme: 'nimbus', activeCustomThemeId: '', isDark: isColorDark(resolved.bg), activeThemeTokens: resolved });
       applyTheme(resolved);
     } else {
       set({ customThemes: updated });
