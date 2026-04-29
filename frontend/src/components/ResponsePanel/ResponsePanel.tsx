@@ -317,7 +317,6 @@ function HistoryPanel() {
 export default function ResponsePanel() {
   const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
   const { appendStreamEvent } = useAppStore();
-  const isDark = useAppStore(s => s.isDark);
   const activeThemeTokens = useAppStore(s => s.activeThemeTokens);
   const cmTheme = useMemo(() => buildCodeMirrorTheme(activeThemeTokens), [activeThemeTokens]);
   const responseIndent = useAppStore(s => s.responseIndent);
