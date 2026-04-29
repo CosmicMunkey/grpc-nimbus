@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { MetadataEntry } from '../../types';
 import FormBuilder from '../RequestBuilder/FormBuilder';
+import { buildCodeMirrorTheme } from '../../codeMirrorTheme';
 
 function MetadataTable() {
   const { requestMetadata } = useActiveTab();
@@ -295,6 +295,8 @@ export default function RequestPanel() {
     savedRequestName,
   } = useActiveTab();
   const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest, streamingTabId } = useAppStore();
+  const activeThemeTokens = useAppStore(s => s.activeThemeTokens);
+  const cmTheme = useMemo(() => buildCodeMirrorTheme(activeThemeTokens), [activeThemeTokens]);
   const hasOtherActiveStream = streamingTabId !== null && streamingTabId !== tabId;
   const showCancel = isInvoking || isStreaming;
 
@@ -422,7 +424,7 @@ export default function RequestPanel() {
             <CodeMirror
               value={requestJson}
               onChange={setRequestJson}
-              theme={oneDark}
+              theme={cmTheme}
               extensions={[json()]}
               className="h-full"
               basicSetup={{
