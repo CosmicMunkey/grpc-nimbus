@@ -210,12 +210,13 @@ export default function App() {
 
     const offAbout = rt.EventsOn('menu:about', () => setShowAboutDialog(true));
     const offHelp  = rt.EventsOn('menu:help',  () => setShowHelpDialog(true));
+    const offCloseAllTabs = rt.EventsOn('menu:closeAllTabs', () => getState().closeAllTabs());
 
     return () => {
       offImport(); offExport();
       offZoomIn(); offZoomOut(); offZoomReset();
       offNewTab(); offCloseTab(); offNextTab(); offPrevTab();
-      offAbout(); offHelp();
+      offAbout(); offHelp(); offCloseAllTabs();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

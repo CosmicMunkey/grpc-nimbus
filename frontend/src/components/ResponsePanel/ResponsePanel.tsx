@@ -173,6 +173,36 @@ function formatJson(s: string | null | undefined, indent = 2): string {
   try { return JSON.stringify(JSON.parse(s), null, indent); } catch { return s; }
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const totalSeconds = Math.floor(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}m ${s}s`;
+}
+
+function dayLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  if (sameDay(date, today)) return 'Today';
+  if (sameDay(date, yesterday)) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function dateBucket(dateStr: string): string {
+  const d = new Date(dateStr);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
   const isDark = useAppStore(s => s.isDark);
   const responseIndent = useAppStore(s => s.responseIndent);
@@ -191,7 +221,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
         </span>
         {entry.response && (
           <span className={`text-[10px] font-medium shrink-0 ${entry.response.statusCode === 0 ? successCls : 'text-c-accent'}`}>
-            {entry.response.statusCode} {entry.response.status} · {entry.response.durationMs}ms
+            {entry.response.statusCode} {entry.response.status} · {formatDuration(entry.response.durationMs)}
           </span>
         )}
         <pre className="text-[10px] text-c-text3 truncate flex-1 font-mono" title={entry.requestJson ?? undefined}>
@@ -286,6 +316,18 @@ function HistoryPanel() {
 
   if (!selectedMethod) return null;
 
+  // Group consecutive entries by calendar day
+  const groups: { bucket: string; label: string; entries: typeof history }[] = [];
+  for (const entry of history) {
+    const bucket = dateBucket(entry.invokedAt);
+    const last = groups[groups.length - 1];
+    if (last && last.bucket === bucket) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ bucket, label: dayLabel(entry.invokedAt), entries: [entry] });
+    }
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-3 py-2 border-b border-c-border">
@@ -303,8 +345,15 @@ function HistoryPanel() {
         {history.length === 0 ? (
           <p className="p-4 text-xs text-c-text3 text-center">No history yet</p>
         ) : (
-          history.map((entry) => (
-            <HistoryEntryRow key={entry.id} entry={entry} />
+          groups.map((group) => (
+            <React.Fragment key={group.bucket}>
+              <div className="sticky top-0 z-10 px-3 py-0.5 bg-c-bg border-b border-c-border">
+                <span className="text-[10px] font-medium text-c-text3 uppercase tracking-wider">{group.label}</span>
+              </div>
+              {group.entries.map((entry) => (
+                <HistoryEntryRow key={entry.id} entry={entry} />
+              ))}
+            </React.Fragment>
           ))
         )}
       </div>
@@ -437,7 +486,7 @@ export default function ResponsePanel() {
         <StatusBadge code={response.statusCode} text={response.status} />
         <div className="ml-auto flex items-center gap-1 text-xs text-c-text3">
           <Clock size={11} />
-          {response.durationMs}ms
+          {response.durationMs !== undefined ? formatDuration(response.durationMs) : null}
         </div>
       </div>
 

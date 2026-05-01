@@ -137,6 +137,9 @@ func buildAppMenu(app *App) *menu.Menu {
 	viewMenu.AddText("Close Tab", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
 		app.TriggerMenuCloseTab()
 	})
+	viewMenu.AddText("Close All Tabs", nil, func(_ *menu.CallbackData) {
+		app.TriggerMenuCloseAllTabs()
+	})
 	viewMenu.AddText("Next Tab", keys.Combo("Tab", keys.ControlKey, keys.OptionOrAltKey), func(_ *menu.CallbackData) {
 		app.TriggerMenuNextTab()
 	})
