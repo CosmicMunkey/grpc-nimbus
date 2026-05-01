@@ -116,3 +116,6 @@ func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu:about") }
 
 // TriggerMenuHelp opens the searchable Help dialog in the frontend.
 func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu:help") }
+
+// TriggerMenuCloseAllTabs tells the frontend to close all tabs and open a fresh one.
+func (a *App) TriggerMenuCloseAllTabs() { runtime.EventsEmit(a.ctx, "menu:closeAllTabs") }

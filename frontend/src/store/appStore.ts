@@ -422,6 +422,7 @@ interface AppState {
   streamingTabId: string | null;
   newTab: () => void;
   closeTab: (id: string) => Promise<void>;
+  closeAllTabs: () => Promise<void>;
   setActiveTab: (id: string) => void;
   duplicateTab: (id: string) => void;
   openMethodInNewTab: (method: MethodInfo, requestJson?: string, metadata?: MetadataEntry[] | null, savedRequestId?: string, savedRequestName?: string) => void;
@@ -722,6 +723,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setActiveTab: (id) => set({ activeTabId: id }),
+
+  closeAllTabs: async () => {
+    if (get().streamingTabId) {
+      await get().cancelStream();
+    }
+    set((s) => {
+      const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
+      return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: null };
+    });
+  },
 
   duplicateTab: (id) => {
     const src = get().tabs.find((t) => t.id === id);
