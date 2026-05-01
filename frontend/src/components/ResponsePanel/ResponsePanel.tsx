@@ -198,7 +198,9 @@ function dayLabel(dateStr: string): string {
 
 function dateBucket(dateStr: string): string {
   const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
