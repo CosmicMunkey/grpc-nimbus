@@ -728,10 +728,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().streamingTabId) {
       await get().cancelStream();
     }
-    set((s) => {
-      const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
-      return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: null };
-    });
+    const tabIds = get().tabs.map((t) => t.id);
+    for (const id of tabIds) {
+      await get().closeTab(id);
+    }
   },
 
   duplicateTab: (id) => {
