@@ -153,7 +153,7 @@ export default function ConnectionBar() {
           onClick={() => { void (effectiveConnected ? disconnect() : connect()); }}
           disabled={connectionStatus === 'connecting'}
           className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-            effectiveConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-white hover:bg-c-accent2'
+            effectiveConnected ? 'bg-c-border text-c-text hover:bg-c-border' : 'bg-c-accent text-c-accent-text hover:bg-c-accent2'
           }`}
         >
           {effectiveConnected ? <WifiOff size={13} /> : <Wifi size={13} />}

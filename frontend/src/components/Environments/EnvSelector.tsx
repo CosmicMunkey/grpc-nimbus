@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/appStore';
 import { Environment } from '../../types';
 import { Plus, X, Check, ChevronDown, Settings, Lock, Unlock } from 'lucide-react';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
+import { AutoResizeTextarea } from '../AutoResizeTextarea';
 
 export const TLS_OPTIONS = [
   { value: 'none',   label: 'No TLS',      Icon: Unlock },
@@ -107,8 +108,8 @@ export function EnvEditor({ initial, onClose }: EnvEditorProps) {
           </div>
           <div className="overflow-y-auto space-y-2 max-h-72">
             {rows.map((row, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
+              <div key={i} className="flex items-start gap-2">
+                <AutoResizeTextarea
                   value={row}
                   onChange={(e) => updateRow(i, e.target.value)}
                   placeholder="Authorization: Bearer eyJhbGci..."
@@ -116,7 +117,7 @@ export function EnvEditor({ initial, onClose }: EnvEditorProps) {
                 />
                 <button
                   onClick={() => removeRow(i)}
-                  className="shrink-0 text-c-text3 hover:text-c-accent p-1 rounded hover:bg-c-hover"
+                  className="shrink-0 text-c-text3 hover:text-c-accent p-1 rounded hover:bg-c-hover mt-1"
                 >
                   <X size={13} />
                 </button>
@@ -135,7 +136,7 @@ export function EnvEditor({ initial, onClose }: EnvEditorProps) {
           <button onClick={onClose} className="flex-1 py-2 text-xs text-c-text2 border border-c-border rounded hover:bg-c-hover">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-2 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40">
+          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-2 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40">
             Save
           </button>
         </div>

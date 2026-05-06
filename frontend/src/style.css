@@ -13,8 +13,9 @@
   --color-c-text:    var(--c-text);
   --color-c-text2:   var(--c-text2);
   --color-c-text3:   var(--c-text3);
-  --color-c-accent:  var(--c-accent);
-  --color-c-accent2: var(--c-accent2);
+  --color-c-accent:       var(--c-accent);
+  --color-c-accent2:      var(--c-accent2);
+  --color-c-accent-text:  var(--c-accent-text);
 }
 
 /* ── Theme tokens (Nimbus default) ────────────────────────────────────────── */
@@ -29,8 +30,9 @@
   --c-text:    #e2e8f0;
   --c-text2:   #94a3b8;
   --c-text3:   #4a5568;
-  --c-accent:  #e94560;
-  --c-accent2: #c73652;
+  --c-accent:       #e94560;
+  --c-accent2:      #c73652;
+  --c-accent-text:  #ffffff;
 }
 
 @layer base {

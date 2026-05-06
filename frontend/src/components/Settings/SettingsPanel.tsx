@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/appStore';
 import { ThemeId, ThemeTokens, CustomThemeEntry, THEMES, DEFAULT_CUSTOM_THEME, FONT_SIZE_PRESETS } from '../../themes';
 import { MetadataEntry, Environment } from '../../types';
 import { TLS_OPTIONS } from '../Environments/EnvSelector';
+import { AutoResizeTextarea } from '../AutoResizeTextarea';
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -171,8 +172,9 @@ const TOKEN_LABELS: { key: keyof ThemeTokens; label: string }[] = [
   { key: 'text',    label: 'Text'           },
   { key: 'text2',   label: 'Text secondary' },
   { key: 'text3',   label: 'Text dim'       },
-  { key: 'accent',  label: 'Accent'         },
-  { key: 'accent2', label: 'Accent hover'   },
+  { key: 'accent',      label: 'Accent'         },
+  { key: 'accent2',     label: 'Accent hover'   },
+  { key: 'accentText',  label: 'Accent text'    },
 ];
 
 function TokenEditor({
@@ -297,7 +299,7 @@ function ThemesSection() {
         <p className="text-[10px] text-c-text3">Tip: use the copy icon on any preset or custom theme to fork it</p>
         <button
           onClick={() => forkTheme('nimbus')}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-white rounded hover:bg-c-accent2"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
         >
           <Plus size={11} /> New Theme
         </button>
@@ -309,7 +311,7 @@ function ThemesSection() {
 // ── Appearance section ────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent } = useAppStore();
+  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated } = useAppStore();
 
   return (
     <div className="space-y-5">
@@ -326,7 +328,7 @@ function AppearanceSection() {
               onClick={() => setFontSize(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 fontSize === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -334,15 +336,6 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Response word wrap */}
-      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
-        <div className="pr-4">
-          <p className="text-xs font-medium text-c-text">Response word wrap</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
-        </div>
-        <Toggle checked={responseWordWrap} onChange={setResponseWordWrap} />
       </div>
 
       {/* JSON indent */}
@@ -358,7 +351,7 @@ function AppearanceSection() {
               onClick={() => setResponseIndent(n)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 responseIndent === n
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -366,6 +359,24 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Response word wrap */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Response word wrap</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
+        </div>
+        <Toggle checked={responseWordWrap} onChange={setResponseWordWrap} />
+      </div>
+
+      {/* Environment sort order */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Sort environments by creation time</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
+        </div>
+        <Toggle checked={envSortByCreated} onChange={setEnvSortByCreated} />
       </div>
     </div>
   );
@@ -431,7 +442,7 @@ function BehaviorSection() {
               onClick={() => setHistoryLimit(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 historyLimit === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -458,6 +469,7 @@ function RequestsSection() {
     defaultTimeoutSeconds, setDefaultTimeoutSeconds,
     maxStreamMessages, setMaxStreamMessages,
     allowShellCommands, setAllowShellCommands,
+    emitDefaults, setEmitDefaults,
     defaultMetadata, setDefaultMetadata,
   } = useAppStore();
 
@@ -508,7 +520,7 @@ function RequestsSection() {
               onClick={() => setMaxStreamMessages(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 maxStreamMessages === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -525,6 +537,15 @@ function RequestsSection() {
           <p className="text-[11px] text-c-text3 mt-0.5">Enables $(command) interpolation in metadata values. Keep off unless you trust the source.</p>
         </div>
         <Toggle checked={allowShellCommands} onChange={setAllowShellCommands} />
+      </div>
+
+      {/* Show default field values */}
+      <div className="flex items-center justify-between py-3">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Show default field values</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">Include fields set to their default value (0, false, empty string, default enum) in the response JSON.</p>
+        </div>
+        <Toggle checked={emitDefaults} onChange={setEmitDefaults} />
       </div>
 
       {/* Default metadata */}
@@ -652,7 +673,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Production"
-            className="bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
+            className="bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent"
           />
         </div>
 
@@ -665,13 +686,13 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               placeholder="host:port"
-              className="flex-1 bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
+              className="flex-1 bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
             />
             <select
               value={tls}
               onChange={(e) => setTls(e.target.value)}
               disabled={!target.trim()}
-              className="bg-c-bg border border-c-border rounded px-2 py-2 text-xs text-c-text outline-none focus:border-c-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-c-bg border border-c-border rounded px-2 py-1.5 text-xs text-c-text outline-none focus:border-c-accent disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {TLS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -681,46 +702,51 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs text-c-text2 font-medium">Default Headers</label>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-c-text2">Metadata</p>
+              <p className="text-[10px] text-c-text3 mt-0.5">Applied to every request using this environment. Overridden by per-request metadata.</p>
+            </div>
+            <button
+              onClick={addRow}
+              className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-hover border border-c-border shrink-0"
+            >
+              <Plus size={11} /> Add
+            </button>
+          </div>
+          <div className="space-y-1.5">
             {rows.map((row, i) => {
               const dynamic = row.value.includes('${') || row.value.includes('$(');
               return (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex items-start gap-1.5">
                   <input
                     value={row.key}
                     onChange={(e) => updateRow(i, 'key', e.target.value)}
                     placeholder="Header-Name"
-                    className="w-2/5 bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
+                    className="w-2/5 bg-c-bg border border-c-border rounded px-2 py-1 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
                   />
-                  <span className="text-c-text3 text-sm shrink-0">:</span>
+                  <span className="text-c-text3 text-xs shrink-0 mt-1">:</span>
                   <div className="relative flex-1">
-                    <input
+                    <AutoResizeTextarea
                       value={row.value}
                       onChange={(e) => updateRow(i, 'value', e.target.value)}
                       placeholder="value or ${VAR}"
-                      className={`w-full bg-c-bg border border-c-border rounded px-3 py-2 text-sm text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono ${dynamic ? 'pr-7' : ''}`}
+                      className={`w-full bg-c-bg border border-c-border rounded px-2 py-1 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono ${dynamic ? 'pr-6' : ''}`}
                     />
                     {dynamic && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
+                      <span className="absolute right-1.5 top-1.5 text-[9px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
                     )}
                   </div>
                   <button
                     onClick={() => removeRow(i)}
-                    className="shrink-0 text-c-text3 hover:text-c-accent p-1 rounded hover:bg-c-hover"
+                    className="p-1 text-c-text3 hover:text-c-accent rounded transition-colors"
                   >
-                    <X size={13} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               );
             })}
           </div>
-          <button
-            onClick={addRow}
-            className="flex items-center gap-1.5 self-start text-xs text-c-text2 hover:text-c-text px-2 py-1 rounded hover:bg-c-hover"
-          >
-            <Plus size={11} /> Add header
-          </button>
           <p className="text-[10px] text-c-text3 leading-relaxed">
             Values support dynamic syntax — <span className="font-mono text-c-accent/80">${'{MY_VAR}'}</span> reads an OS environment variable, <span className="font-mono text-c-accent/80">$(command)</span> runs a shell command and uses its output.
           </p>
@@ -728,14 +754,14 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex gap-2 px-5 py-3 border-t border-c-border shrink-0">
-        <button onClick={onBack} className="flex-1 py-2 text-xs text-c-text2 border border-c-border rounded hover:bg-c-hover">
+      <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-c-border shrink-0">
+        <button onClick={onBack} className="text-xs px-3 py-1 border border-c-border text-c-text2 rounded hover:bg-c-hover">
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={!name.trim()}
-          className="flex-1 py-2 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+          className="text-xs px-3 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40"
         >
           Save
         </button>
@@ -810,7 +836,7 @@ function EnvironmentsSection() {
               {confirmDeleteId === env.id ? (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-c-text2">Delete?</span>
-                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-white rounded text-[11px] hover:bg-c-accent2">Yes</button>
+                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-c-accent-text rounded text-[11px] hover:bg-c-accent2">Yes</button>
                   <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-0.5 border border-c-border text-c-text2 rounded text-[11px] hover:bg-c-hover">No</button>
                 </div>
               ) : (
@@ -841,7 +867,7 @@ function EnvironmentsSection() {
         <p className="text-[10px] text-c-text3">Click ● to activate an environment</p>
         <button
           onClick={() => { setEditingEnv(undefined); setShowEditor(true); }}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-white rounded hover:bg-c-accent2"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
         >
           <Plus size={11} /> New Environment
         </button>
@@ -889,7 +915,7 @@ export default function SettingsPanel() {
       {settingsOpen && createPortal(
         <div className="fixed inset-0 z-[9000] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={closeSettings} />
-          <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl w-[780px] max-w-[95vw] h-[640px] max-h-[85vh] flex overflow-hidden">
+          <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl w-[960px] max-w-[95vw] h-[720px] max-h-[90vh] flex overflow-hidden">
             {/* Left category nav */}
             <div className="w-44 shrink-0 border-r border-c-border bg-c-bg flex flex-col py-3">
               <p className="px-4 pb-2 text-[10px] font-semibold text-c-text3 uppercase tracking-wider">Settings</p>

@@ -31,6 +31,9 @@ type App struct {
 	// allowShellCommands gates $(...) header interpolation at send time.
 	// Protected by mu; updated synchronously when SaveUserSettings is called.
 	allowShellCommands bool
+	// emitDefaults controls whether zero/default-value fields appear in response JSON.
+	// Protected by mu; updated synchronously when SaveUserSettings is called.
+	emitDefaults bool
 
 	// Loaded descriptor state is tracked by source family so proto files,
 	// protosets, and reflection can coexist.
@@ -86,19 +89,31 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	var parts []*rpc.ProtosetDescriptor
-	if len(saved.ProtosetPaths) > 0 {
-		pd, err := rpc.LoadProtosets(saved.ProtosetPaths)
+	for _, path := range saved.ProtosetPaths {
+		pd, err := rpc.LoadProtosets([]string{path})
 		if err != nil {
-			fmt.Printf("warning: auto-restore protoset failed: %v\n", err)
-		} else {
-			parts = append(parts, pd)
-			a.loadedProtosetPaths = append([]string(nil), saved.ProtosetPaths...)
+			fmt.Printf("warning: auto-restore protoset %q skipped: %v\n", path, err)
+			continue
 		}
+		parts = append(parts, pd)
+		a.loadedProtosetPaths = append(a.loadedProtosetPaths, path)
 	}
 	if len(saved.ProtoFilePaths) > 0 {
 		pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
 		if err != nil {
-			fmt.Printf("warning: auto-restore proto files failed: %v\n", err)
+			// Try each file individually so unrelated files still load.
+			for _, file := range saved.ProtoFilePaths {
+				pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, []string{file})
+				if err != nil {
+					fmt.Printf("warning: auto-restore proto file %q skipped: %v\n", file, err)
+					continue
+				}
+				parts = append(parts, pd)
+				a.loadedProtoFiles = append(a.loadedProtoFiles, file)
+			}
+			if len(a.loadedProtoFiles) > 0 {
+				a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
+			}
 		} else {
 			parts = append(parts, pd)
 			a.loadedProtoFiles = append([]string(nil), saved.ProtoFilePaths...)
@@ -119,6 +134,9 @@ func (a *App) startup(ctx context.Context) {
 	}
 	if saved.AllowShellCommands != nil {
 		a.allowShellCommands = *saved.AllowShellCommands
+	}
+	if saved.EmitDefaults != nil {
+		a.emitDefaults = *saved.EmitDefaults
 	}
 	a.mu.Unlock()
 	if saved.AutoConnectOnStartup != nil && *saved.AutoConnectOnStartup && saved.LastTarget != "" {

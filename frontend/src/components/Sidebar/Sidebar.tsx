@@ -4,7 +4,7 @@ import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Collection, MethodInfo, SavedRequest, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
-  FolderOpen, Folder, Trash2, Book, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle, Pencil,
+  Trash2, Book, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle, Pencil,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
@@ -151,7 +151,7 @@ function RenameRequestModal({
           <button
             onClick={onSave}
             disabled={!name.trim()}
-            className="flex-1 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+            className="flex-1 py-1.5 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40"
           >
             Save
           </button>
@@ -162,9 +162,8 @@ function RenameRequestModal({
   );
 }
 
-function CollectionsPanel() {
+function CollectionsList() {
   const { collections, loadCollections, importCollection, openSavedRequest, deleteRequest, renameCollection, renameCollectionRequest } = useAppStore();
-  const [expanded, setExpanded] = useState(true);
   const [collapsedCollections, setCollapsedCollections] = useState<Set<string>>(new Set());
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -215,22 +214,17 @@ function CollectionsPanel() {
   };
 
   return (
-    <div className="border-t border-c-border">
+    <div className="space-y-1 py-2">
+      {/* Import button at top */}
       <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 w-full px-2 py-2 text-xs text-c-text2 hover:text-c-text"
+        onClick={() => importCollection()}
+        className="flex items-center gap-1.5 mx-2 mb-1 px-2 py-1 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-text2 hover:text-c-text w-[calc(100%-16px)]"
       >
-        {expanded ? <FolderOpen size={13} /> : <Folder size={13} />}
-        <span className="font-semibold">Collections</span>
-        <span className="ml-auto text-c-text3 text-[10px]">{collections.length}</span>
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <Upload size={11} /> Import collection…
       </button>
-
-      {expanded && (
-        <div className="space-y-1 pb-2">
-          {collections.length === 0 && (
-            <p className="px-3 text-xs text-c-text3">No saved collections</p>
-          )}
+      {collections.length === 0 && (
+        <p className="px-3 text-xs text-c-text3">No saved collections</p>
+      )}
           {collections.map((col) => (
             <div key={col.id} className="px-2">
               <div className="flex items-center gap-1 text-xs text-c-text2 py-0.5 group">
@@ -301,15 +295,6 @@ function CollectionsPanel() {
             </div>
           ))}
 
-          {/* Import button at bottom */}
-          <button
-            onClick={() => importCollection()}
-            className="flex items-center gap-1.5 mx-2 mt-1 px-2 py-1 rounded border border-dashed border-c-border text-xs text-c-text2 hover:border-c-text2 hover:text-c-text w-[calc(100%-16px)]"
-          >
-            <Upload size={11} /> Import collection…
-          </button>
-        </div>
-      )}
       {renamingRequest && (
         <RenameRequestModal
           name={requestName}
@@ -324,20 +309,50 @@ function CollectionsPanel() {
 
 export default function Sidebar() {
   const { services } = useAppStore();
+  const [activeTab, setActiveTab] = useState<'services' | 'saved'>('services');
 
   return (
     <aside className="flex flex-col h-full bg-c-panel overflow-hidden">
       <ProtosetLoader />
-      <div className="flex-1 overflow-y-auto py-1 space-y-0.5">
-        {services.length === 0 ? (
-          <p className="px-3 py-4 text-xs text-c-text3 text-center">
-            Load a .protoset or .proto file to browse services
-          </p>
+      {/* Tab bar */}
+      <div className="flex shrink-0 border-b border-c-border">
+        <button
+          onClick={() => setActiveTab('services')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+            activeTab === 'services'
+              ? 'text-c-text border-b-2 border-c-accent -mb-px'
+              : 'text-c-text3 hover:text-c-text2'
+          }`}
+        >
+          Services
+        </button>
+        <button
+          onClick={() => setActiveTab('saved')}
+          className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+            activeTab === 'saved'
+              ? 'text-c-text border-b-2 border-c-accent -mb-px'
+              : 'text-c-text3 hover:text-c-text2'
+          }`}
+        >
+          Saved
+        </button>
+      </div>
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'services' ? (
+          <div className="py-1 space-y-0.5">
+            {services.length === 0 ? (
+              <p className="px-3 py-4 text-xs text-c-text3 text-center">
+                Load a .protoset or .proto file to browse services
+              </p>
+            ) : (
+              services.map((svc) => <ServiceNode key={svc.name} svc={svc} />)
+            )}
+          </div>
         ) : (
-          services.map((svc) => <ServiceNode key={svc.name} svc={svc} />)
+          <CollectionsList />
         )}
       </div>
-      <CollectionsPanel />
     </aside>
   );
 }

@@ -35,7 +35,11 @@ type AppSettings struct {
 	TimestampInputLocal *bool `json:"timestampInputLocal,omitempty"` // nil → default false (UTC input)
 	ConfirmClearHistory *bool `json:"confirmClearHistory,omitempty"` // nil → default false
 
+	// Response
+	EmitDefaults *bool `json:"emitDefaults,omitempty"` // nil → default false (omit zero-value fields)
+
 	// Appearance
+	EnvSortByCreated    *bool              `json:"envSortByCreated,omitempty"`    // nil → false (alphabetical); true → by creation time
 	Theme               string             `json:"theme,omitempty"`               // "nimbus" | "dark" | "light" | "custom" | colorblind presets
 	CustomTheme         map[string]string  `json:"customTheme,omitempty"`         // legacy single custom theme (migrated on load)
 	CustomThemes        []CustomThemeEntry `json:"customThemes,omitempty"`        // named custom themes

@@ -30,9 +30,9 @@ export const helpTopics: HelpTopic[] = [
       { type: 'heading', text: 'Key Concepts' },
       { type: 'bullets', items: [
         'Tabs — each open method gets its own independent tab with its own request and response state.',
-        'Environments — store a target URL, TLS mode, and auth headers per environment (dev, staging, prod).',
-        'Collections — saved requests grouped by name; portable across machines when exported.',
-        'History — every request is automatically logged for review.',
+        'Environments — store a target URL, TLS mode, and auth metadata per environment (dev, staging, prod).',
+        'Services / Saved — the sidebar has two tabs: Services shows the method browser; Saved holds your collections and saved requests.',
+        'History — every request is automatically logged; view it in the History tab of the response panel.',
       ]},
       { type: 'note', text: 'Press Cmd/Ctrl+Shift+/ to open this dialog from anywhere in the app.' },
     ],
@@ -114,7 +114,7 @@ export const helpTopics: HelpTopic[] = [
       { type: 'heading', text: 'Saving a Request' },
       { type: 'paragraph', text: "Click the bookmark icon or press Cmd/Ctrl+S to save the current tab's request. Give it a name and choose or create a collection." },
       { type: 'heading', text: 'Opening a Saved Request' },
-      { type: 'paragraph', text: 'Click any saved request in the Collections sidebar tab. The app reloads the associated descriptor sources automatically before restoring the method and payload.' },
+      { type: 'paragraph', text: 'Click any saved request in the Saved sidebar tab. The app reloads the associated descriptor sources automatically before restoring the method and payload.' },
       { type: 'heading', text: 'Portable Export / Import' },
       { type: 'paragraph', text: "Exporting a collection (Cmd/Ctrl+E) embeds the protoset directly into the .json bundle so it's fully self-contained — no separate proto files needed." },
       { type: 'note', text: 'Share the exported .json with a teammate and they can import it (Cmd/Ctrl+I) and run requests immediately, even without access to your servers.' },
@@ -127,7 +127,7 @@ export const helpTopics: HelpTopic[] = [
     content: [
       { type: 'paragraph', text: 'Every request you send is automatically logged. History is stored locally and persists across restarts.' },
       { type: 'heading', text: 'Viewing History' },
-      { type: 'paragraph', text: 'Open the History tab in the sidebar. Entries are sorted newest-first. Click any entry to expand it and see the full request payload, response body, status code, latency, and metadata.' },
+      { type: 'paragraph', text: 'Open the History tab in the response panel (top-right of the main area). Entries are sorted newest-first. Click any entry to expand it and see the full request payload, response body, status code, latency, and metadata.' },
     ],
   },
   {
@@ -138,8 +138,8 @@ export const helpTopics: HelpTopic[] = [
       { type: 'paragraph', text: 'Environments let you switch between server configurations (dev, staging, prod) with a single click. Each stores a target URL, TLS mode, and default gRPC metadata headers.' },
       { type: 'heading', text: 'Creating an Environment' },
       { type: 'paragraph', text: 'Click the environment selector in the connection bar and choose New Environment. Set the name, host:port, TLS mode, and any headers to apply to every request.' },
-      { type: 'heading', text: 'Headers & Auth' },
-      { type: 'paragraph', text: 'Add an Authorization header with a Bearer token or API key. Environment headers are prepended to every request automatically. Per-request metadata is appended afterward and can override them.' },
+      { type: 'heading', text: 'Metadata & Auth' },
+      { type: 'paragraph', text: 'Add an Authorization header with a Bearer token or API key in the Metadata section. Environment metadata is prepended to every request automatically; per-request metadata is appended afterward and can override it. Environments are listed alphabetically by default (configurable in Settings → Appearance).' },
       { type: 'note', text: 'Switching environments instantly reconnects using the new settings — no need to manually update the connection bar.' },
     ],
   },
@@ -167,8 +167,13 @@ export const helpTopics: HelpTopic[] = [
       { type: 'paragraph', text: 'Open Settings with the gear icon in the bottom-left corner. All changes take effect immediately and persist across restarts.' },
       { type: 'heading', text: 'Appearance' },
       { type: 'bullets', items: [
-        'Theme — Dark, Light, or Nimbus (a softer blue-gray light theme).',
+        'Theme — choose from built-in themes (Nimbus, Dark, Light, high-contrast, colorblind presets) or create a fully custom theme.',
         'Font size — adjust editor and UI font size. Also controllable with Cmd/Ctrl+Plus / Minus / 0.',
+        'Sort environments by creation time — when off (default), environments are listed alphabetically.',
+      ]},
+      { type: 'heading', text: 'Requests' },
+      { type: 'bullets', items: [
+        'Show default field values — when enabled, fields at their zero/default value are included in the response JSON.',
       ]},
       { type: 'heading', text: 'Behavior' },
       { type: 'bullets', items: [

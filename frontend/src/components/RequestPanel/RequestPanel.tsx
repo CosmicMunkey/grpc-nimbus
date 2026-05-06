@@ -180,7 +180,7 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={handleSave}
             disabled={!name}
-            className="flex-1 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+            className="flex-1 py-1.5 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40"
           >
             Save
           </button>
@@ -366,8 +366,8 @@ export default function RequestPanel() {
             title={!showCancel && hasOtherActiveStream ? 'Another tab is currently streaming' : undefined}
             className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${
               showCancel
-                ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-white'
-                : 'bg-c-accent text-white hover:bg-c-accent2 disabled:opacity-40 disabled:cursor-not-allowed'
+                ? 'border border-c-accent text-c-accent hover:bg-c-accent hover:text-c-accent-text'
+                : 'bg-c-accent text-c-accent-text hover:bg-c-accent2 disabled:opacity-40 disabled:cursor-not-allowed'
             }`}
           >
             {showCancel ? <Square size={11} /> : <Play size={12} />}
