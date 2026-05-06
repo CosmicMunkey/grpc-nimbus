@@ -139,7 +139,7 @@ export const helpTopics: HelpTopic[] = [
       { type: 'heading', text: 'Creating an Environment' },
       { type: 'paragraph', text: 'Click the environment selector in the connection bar and choose New Environment. Set the name, host:port, TLS mode, and any headers to apply to every request.' },
       { type: 'heading', text: 'Metadata & Auth' },
-      { type: 'paragraph', text: 'Add an Authorization header with a Bearer token or API key in the Metadata section. Environment metadata is prepended to every request automatically; per-request metadata is appended afterward and can override it. Environments are listed alphabetically in the selector.' },
+      { type: 'paragraph', text: 'Add an Authorization header with a Bearer token or API key in the Metadata section. Environment metadata is prepended to every request automatically; per-request metadata is appended afterward and can override it. Environments are listed alphabetically by default (configurable in Settings → Appearance).' },
       { type: 'note', text: 'Switching environments instantly reconnects using the new settings — no need to manually update the connection bar.' },
     ],
   },
@@ -173,7 +173,7 @@ export const helpTopics: HelpTopic[] = [
       ]},
       { type: 'heading', text: 'Requests' },
       { type: 'bullets', items: [
-        'Omit default field values — when enabled, zero/default-value fields are excluded from JSON responses, matching grpcurl behavior.',
+        'Show default field values — when enabled, fields at their zero/default value are included in the response JSON.',
       ]},
       { type: 'heading', text: 'Behavior' },
       { type: 'bullets', items: [

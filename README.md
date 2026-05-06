@@ -98,11 +98,11 @@ The MCP binary has no UI dependency — pure Go, no Wails or WebView2 required.
 
 | Tool | Description |
 |------|-------------|
-| `connect` | Connect to a gRPC server (target, TLS mode) |
-| `connect_with_environment` | Connect using a saved environment's target and TLS |
+| `connect` | Connect to a gRPC server (target, TLS mode, optional mTLS cert/key) |
+| `connect_with_environment` | Connect using a saved environment's target and TLS, and activate it so its headers apply |
 | `disconnect` | Close the current connection |
 | `get_connection_state` | Return connectivity state |
-| `list_environments` | List all saved environments |
+| `list_environments` | List all saved environments (name, target, TLS, active status, header count) |
 | `set_active_environment` | Activate a saved environment by name or ID |
 | `load_protoset` | Load a `.protoset` file by path |
 | `load_via_reflection` | Discover services via server reflection |

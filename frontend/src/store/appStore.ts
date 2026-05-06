@@ -373,7 +373,7 @@ function normalizeEnvironments(environments: Environment[]): Environment[] {
 
 function sortEnvironments(envs: Environment[], byCreated: boolean): Environment[] {
   return [...envs].sort(byCreated
-    ? (a, b) => a.createdAt.localeCompare(b.createdAt)
+    ? (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     : (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
