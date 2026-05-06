@@ -89,19 +89,31 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	var parts []*rpc.ProtosetDescriptor
-	if len(saved.ProtosetPaths) > 0 {
-		pd, err := rpc.LoadProtosets(saved.ProtosetPaths)
+	for _, path := range saved.ProtosetPaths {
+		pd, err := rpc.LoadProtosets([]string{path})
 		if err != nil {
-			fmt.Printf("warning: auto-restore protoset failed: %v\n", err)
-		} else {
-			parts = append(parts, pd)
-			a.loadedProtosetPaths = append([]string(nil), saved.ProtosetPaths...)
+			fmt.Printf("warning: auto-restore protoset %q skipped: %v\n", path, err)
+			continue
 		}
+		parts = append(parts, pd)
+		a.loadedProtosetPaths = append(a.loadedProtosetPaths, path)
 	}
 	if len(saved.ProtoFilePaths) > 0 {
 		pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
 		if err != nil {
-			fmt.Printf("warning: auto-restore proto files failed: %v\n", err)
+			// Try each file individually so unrelated files still load.
+			for _, file := range saved.ProtoFilePaths {
+				pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, []string{file})
+				if err != nil {
+					fmt.Printf("warning: auto-restore proto file %q skipped: %v\n", file, err)
+					continue
+				}
+				parts = append(parts, pd)
+				a.loadedProtoFiles = append(a.loadedProtoFiles, file)
+			}
+			if len(a.loadedProtoFiles) > 0 {
+				a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
+			}
 		} else {
 			parts = append(parts, pd)
 			a.loadedProtoFiles = append([]string(nil), saved.ProtoFilePaths...)
