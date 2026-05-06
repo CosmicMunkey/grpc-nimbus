@@ -136,7 +136,7 @@ export function EnvEditor({ initial, onClose }: EnvEditorProps) {
           <button onClick={onClose} className="flex-1 py-2 text-xs text-c-text2 border border-c-border rounded hover:bg-c-hover">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-2 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40">
+          <button onClick={handleSave} disabled={!name.trim()} className="flex-1 py-2 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40">
             Save
           </button>
         </div>

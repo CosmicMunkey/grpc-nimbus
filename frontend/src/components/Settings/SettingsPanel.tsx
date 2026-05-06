@@ -172,8 +172,9 @@ const TOKEN_LABELS: { key: keyof ThemeTokens; label: string }[] = [
   { key: 'text',    label: 'Text'           },
   { key: 'text2',   label: 'Text secondary' },
   { key: 'text3',   label: 'Text dim'       },
-  { key: 'accent',  label: 'Accent'         },
-  { key: 'accent2', label: 'Accent hover'   },
+  { key: 'accent',      label: 'Accent'         },
+  { key: 'accent2',     label: 'Accent hover'   },
+  { key: 'accentText',  label: 'Accent text'    },
 ];
 
 function TokenEditor({
@@ -298,7 +299,7 @@ function ThemesSection() {
         <p className="text-[10px] text-c-text3">Tip: use the copy icon on any preset or custom theme to fork it</p>
         <button
           onClick={() => forkTheme('nimbus')}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-white rounded hover:bg-c-accent2"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
         >
           <Plus size={11} /> New Theme
         </button>
@@ -327,7 +328,7 @@ function AppearanceSection() {
               onClick={() => setFontSize(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 fontSize === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -350,7 +351,7 @@ function AppearanceSection() {
               onClick={() => setResponseIndent(n)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 responseIndent === n
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -441,7 +442,7 @@ function BehaviorSection() {
               onClick={() => setHistoryLimit(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 historyLimit === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -519,7 +520,7 @@ function RequestsSection() {
               onClick={() => setMaxStreamMessages(value)}
               className={`px-2.5 py-1 rounded text-xs transition-colors ${
                 maxStreamMessages === value
-                  ? 'bg-c-accent text-white'
+                  ? 'bg-c-accent text-c-accent-text'
                   : 'bg-c-input text-c-text2 hover:bg-c-hover hover:text-c-text border border-c-border'
               }`}
             >
@@ -760,7 +761,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
         <button
           onClick={handleSave}
           disabled={!name.trim()}
-          className="text-xs px-3 py-1 bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+          className="text-xs px-3 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40"
         >
           Save
         </button>
@@ -835,7 +836,7 @@ function EnvironmentsSection() {
               {confirmDeleteId === env.id ? (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-c-text2">Delete?</span>
-                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-white rounded text-[11px] hover:bg-c-accent2">Yes</button>
+                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-c-accent-text rounded text-[11px] hover:bg-c-accent2">Yes</button>
                   <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-0.5 border border-c-border text-c-text2 rounded text-[11px] hover:bg-c-hover">No</button>
                 </div>
               ) : (
@@ -866,7 +867,7 @@ function EnvironmentsSection() {
         <p className="text-[10px] text-c-text3">Click ● to activate an environment</p>
         <button
           onClick={() => { setEditingEnv(undefined); setShowEditor(true); }}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-white rounded hover:bg-c-accent2"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
         >
           <Plus size={11} /> New Environment
         </button>

@@ -33,7 +33,7 @@ export default function ConfirmDialog() {
           </button>
           <button
             onClick={() => resolveConfirm(true)}
-            className="px-3 py-1.5 text-xs rounded bg-c-accent text-white hover:bg-c-accent2"
+            className="px-3 py-1.5 text-xs rounded bg-c-accent text-c-accent-text hover:bg-c-accent2"
           >
             Delete
           </button>

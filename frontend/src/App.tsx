@@ -89,7 +89,7 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
               <button
                 onClick={handleExport}
                 disabled={!selectedId}
-                className="flex-1 px-3 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2 disabled:opacity-40"
+                className="flex-1 px-3 py-1.5 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2 disabled:opacity-40"
               >
                 Export…
               </button>

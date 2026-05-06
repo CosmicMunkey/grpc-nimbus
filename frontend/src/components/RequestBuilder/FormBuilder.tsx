@@ -546,7 +546,7 @@ function RepeatedEditor({
       {value.map((item, i) => (
         <div key={i} className="flex items-start gap-1">
           <span className="text-[10px] text-c-text3 font-mono mt-1 w-5 shrink-0 text-right">{i}</span>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex">
             <FieldEditor
               schema={elementSchema}
               value={item}
@@ -612,7 +612,7 @@ function MapEntryRow({ mapKey, mapValue, valueSchema, onKeyChange, onValueChange
         placeholder="key"
       />
       <span className="text-c-text3 text-xs mt-0.5">→</span>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex">
         <FieldEditor
           schema={valueSchema}
           value={mapValue}

@@ -17,7 +17,7 @@ export default function ProtosetLoader() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reloading, setReloading] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const cancelledRef = useRef(false);
   // Extra import paths the user has added for multi-root proto setups.
   const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
@@ -132,7 +132,7 @@ export default function ProtosetLoader() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 flex items-center justify-center gap-1 py-1 text-[10px] transition-colors ${
-              tab === t.id ? 'bg-c-accent text-white' : 'text-c-text2 hover:bg-c-hover'
+              tab === t.id ? 'bg-c-accent text-c-accent-text' : 'text-c-text2 hover:bg-c-hover'
             }`}
           >
             {t.icon} {t.label}
@@ -232,7 +232,7 @@ export default function ProtosetLoader() {
             </div>
             <button
               onClick={() => setError(null)}
-              className="self-end px-4 py-1.5 text-xs bg-c-accent text-white rounded hover:bg-c-accent2"
+              className="self-end px-4 py-1.5 text-xs bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
             >
               Dismiss
             </button>
