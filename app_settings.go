@@ -26,6 +26,7 @@ type UserSettings struct {
 	ResponseWordWrap      bool                `json:"responseWordWrap"`
 	ResponseIndent        int                 `json:"responseIndent"`
 	EmitDefaults          bool                `json:"emitDefaults"`
+	EnvSortByCreated      bool                `json:"envSortByCreated"`
 	SidebarWidth          float64             `json:"sidebarWidth"`
 	PanelSplit            float64             `json:"panelSplit"`
 	DefaultTimeoutSeconds float64             `json:"defaultTimeoutSeconds"`
@@ -92,6 +93,9 @@ func (a *App) GetUserSettings() UserSettings {
 	}
 	if saved.EmitDefaults != nil {
 		result.EmitDefaults = *saved.EmitDefaults
+	}
+	if saved.EnvSortByCreated != nil {
+		result.EnvSortByCreated = *saved.EnvSortByCreated
 	}
 	if saved.SidebarWidth != nil {
 		result.SidebarWidth = *saved.SidebarWidth
@@ -192,6 +196,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.ResponseWordWrap = &s.ResponseWordWrap
 		settings.ResponseIndent = &s.ResponseIndent
 		settings.EmitDefaults = &s.EmitDefaults
+		settings.EnvSortByCreated = &s.EnvSortByCreated
 		settings.SidebarWidth = &s.SidebarWidth
 		settings.PanelSplit = &s.PanelSplit
 		settings.DefaultTimeoutSeconds = &s.DefaultTimeoutSeconds

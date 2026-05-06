@@ -309,7 +309,7 @@ function ThemesSection() {
 // ── Appearance section ────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent } = useAppStore();
+  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated } = useAppStore();
 
   return (
     <div className="space-y-5">
@@ -336,15 +336,6 @@ function AppearanceSection() {
         </div>
       </div>
 
-      {/* Response word wrap */}
-      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
-        <div className="pr-4">
-          <p className="text-xs font-medium text-c-text">Response word wrap</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
-        </div>
-        <Toggle checked={responseWordWrap} onChange={setResponseWordWrap} />
-      </div>
-
       {/* JSON indent */}
       <div className="flex items-center justify-between py-3 border-t border-c-border/40">
         <div className="pr-4">
@@ -366,6 +357,24 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Response word wrap */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Response word wrap</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
+        </div>
+        <Toggle checked={responseWordWrap} onChange={setResponseWordWrap} />
+      </div>
+
+      {/* Environment sort order */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Sort environments by creation time</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
+        </div>
+        <Toggle checked={envSortByCreated} onChange={setEnvSortByCreated} />
       </div>
     </div>
   );

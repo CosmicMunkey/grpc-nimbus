@@ -68,6 +68,7 @@ declare global {
             responseWordWrap?: boolean;
             responseIndent?: number;
             emitDefaults?: boolean;
+            envSortByCreated?: boolean;
             sidebarWidth?: number;
             panelSplit?: number;
             defaultTimeoutSeconds?: number;
@@ -88,6 +89,7 @@ declare global {
             responseWordWrap: boolean;
             responseIndent: number;
             emitDefaults: boolean;
+            envSortByCreated: boolean;
             sidebarWidth: number;
             panelSplit: number;
             defaultTimeoutSeconds: number;
@@ -144,7 +146,7 @@ export const api = {
   saveUserSettings: (s: {
     confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
     theme: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
-    fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean;
+    fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean; envSortByCreated: boolean;
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
     allowShellCommands: boolean;
@@ -156,7 +158,7 @@ export const api = {
 function saveAllSettings(s: Pick<AppState,
   'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
   'theme' | 'customThemes' | 'activeCustomThemeId' |
-  'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' |
+  'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' | 'envSortByCreated' |
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
   'allowShellCommands' |
@@ -173,6 +175,7 @@ function saveAllSettings(s: Pick<AppState,
     responseWordWrap: s.responseWordWrap,
     responseIndent: s.responseIndent,
     emitDefaults: s.emitDefaults,
+    envSortByCreated: s.envSortByCreated,
     sidebarWidth: s.sidebarWidth,
     panelSplit: s.panelSplit,
     defaultTimeoutSeconds: s.defaultTimeoutSeconds,
@@ -368,6 +371,12 @@ function normalizeEnvironments(environments: Environment[]): Environment[] {
   return environments.map(normalizeEnvironment);
 }
 
+function sortEnvironments(envs: Environment[], byCreated: boolean): Environment[] {
+  return [...envs].sort(byCreated
+    ? (a, b) => a.createdAt.localeCompare(b.createdAt)
+    : (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
 function normalizeStreamEvent(event: unknown): StreamEvent | null {
   if (!event || typeof event !== 'object') return null;
   const e = event as Record<string, unknown>;
@@ -492,6 +501,8 @@ interface AppState {
   setResponseIndent: (v: number) => void;
   emitDefaults: boolean;
   setEmitDefaults: (v: boolean) => void;
+  envSortByCreated: boolean;
+  setEnvSortByCreated: (v: boolean) => void;
   defaultTimeoutSeconds: number;
   setDefaultTimeoutSeconds: (v: number) => void;
   historyLimit: number;
@@ -1179,7 +1190,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadEnvironments: async () => {
     try {
       const envs = await api.listEnvironments();
-      set({ environments: normalizeEnvironments(envs ?? []) });
+      set({ environments: sortEnvironments(normalizeEnvironments(envs ?? []), get().envSortByCreated) });
     } catch { set({ environments: [] }); }
   },
 
@@ -1234,6 +1245,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   responseWordWrap: true,
   responseIndent: 2,
   emitDefaults: false,
+  envSortByCreated: false,
   defaultTimeoutSeconds: 0,
   historyLimit: 50,
   autoConnectOnStartup: false,
@@ -1275,6 +1287,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         responseWordWrap: s.responseWordWrap ?? true,
         responseIndent: s.responseIndent ?? 2,
         emitDefaults: s.emitDefaults ?? false,
+        envSortByCreated: s.envSortByCreated ?? false,
         sidebarWidth,
         panelSplit,
         defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
@@ -1393,6 +1406,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setEmitDefaults: (v) => {
     set({ emitDefaults: v });
+    saveAllSettings(get());
+  },
+
+  setEnvSortByCreated: (v) => {
+    set((s) => ({ envSortByCreated: v, environments: sortEnvironments(s.environments, v) }));
     saveAllSettings(get());
   },
 
