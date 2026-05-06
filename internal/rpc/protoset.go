@@ -100,39 +100,37 @@ func (m mergedDescriptorSource) AllExtensionsForType(typeName string) ([]*desc.F
 }
 
 // LoadProtosets parses the given protoset (FileDescriptorSet) file paths.
+// Each path is loaded in isolation so that identically-named files embedded in
+// different protosets (e.g. two teams each shipping their own "data.proto") do
+// not conflict. The results are merged via MergeDescriptors.
 func LoadProtosets(paths []string) (*ProtosetDescriptor, error) {
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("no protoset files provided")
 	}
-	src, err := grpcurl.DescriptorSourceFromProtoSets(paths...)
-	if err != nil {
-		return nil, fmt.Errorf("loading protoset files: %w", err)
-	}
-	pd, err := newDescriptor(src, nil)
-	if err != nil {
-		return nil, err
-	}
-	if len(pd.Services()) == 0 {
-		return nil, fmt.Errorf("no services found in loaded protoset files")
-	}
-	// Build service → source file mapping by probing each path individually.
-	pd.svcFiles = make(map[string]string)
+	var parts []*ProtosetDescriptor
 	for _, path := range paths {
-		singleSrc, err := grpcurl.DescriptorSourceFromProtoSets(path)
+		src, err := grpcurl.DescriptorSourceFromProtoSets(path)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("loading protoset file %q: %w", path, err)
 		}
-		svcNames, err := singleSrc.ListServices()
+		pd, err := newDescriptor(src, nil)
 		if err != nil {
-			continue
+			return nil, err
 		}
-		for _, svcName := range svcNames {
-			if _, exists := pd.svcFiles[svcName]; !exists {
+		pd.svcFiles = make(map[string]string)
+		svcNames, err := src.ListServices()
+		if err == nil {
+			for _, svcName := range svcNames {
 				pd.svcFiles[svcName] = path
 			}
 		}
+		parts = append(parts, pd)
 	}
-	return pd, nil
+	merged := MergeDescriptors(parts...)
+	if merged == nil || len(merged.Services()) == 0 {
+		return nil, fmt.Errorf("no services found in loaded protoset files")
+	}
+	return merged, nil
 }
 
 // LoadProtoFiles parses proto source files, resolving imports from importPaths.
