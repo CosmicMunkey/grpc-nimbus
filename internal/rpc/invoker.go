@@ -23,6 +23,7 @@ type InvokeRequest struct {
 	RequestJSON    string          `json:"requestJson"`
 	Metadata       []MetadataEntry `json:"metadata"`
 	TimeoutSeconds float64         `json:"timeoutSeconds"`
+	EmitDefaults   bool            `json:"emitDefaults"`
 }
 
 // MetadataEntry is a single gRPC metadata header key/value pair.
@@ -83,7 +84,7 @@ func InvokeUnary(
 	extraHeaders := buildHeaders(req.Metadata)
 
 	rf, formatter, err := grpcurl.RequestParserAndFormatterFor(
-		grpcurl.FormatJSON, pd.Source(), true, false,
+		grpcurl.FormatJSON, pd.Source(), req.EmitDefaults, false,
 		strings.NewReader(req.RequestJSON),
 	)
 	if err != nil {
@@ -132,7 +133,7 @@ func InvokeStream(
 	extraHeaders := buildHeaders(req.Metadata)
 
 	rf, formatter, err := grpcurl.RequestParserAndFormatterFor(
-		grpcurl.FormatJSON, pd.Source(), true, false,
+		grpcurl.FormatJSON, pd.Source(), req.EmitDefaults, false,
 		strings.NewReader(req.RequestJSON),
 	)
 	if err != nil {

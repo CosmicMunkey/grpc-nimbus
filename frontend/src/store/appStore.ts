@@ -67,6 +67,7 @@ declare global {
             fontSize?: number;
             responseWordWrap?: boolean;
             responseIndent?: number;
+            emitDefaults?: boolean;
             sidebarWidth?: number;
             panelSplit?: number;
             defaultTimeoutSeconds?: number;
@@ -86,6 +87,7 @@ declare global {
             fontSize: number;
             responseWordWrap: boolean;
             responseIndent: number;
+            emitDefaults: boolean;
             sidebarWidth: number;
             panelSplit: number;
             defaultTimeoutSeconds: number;
@@ -142,7 +144,7 @@ export const api = {
   saveUserSettings: (s: {
     confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
     theme: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
-    fontSize: number; responseWordWrap: boolean; responseIndent: number;
+    fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean;
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
     allowShellCommands: boolean;
@@ -154,7 +156,7 @@ export const api = {
 function saveAllSettings(s: Pick<AppState,
   'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
   'theme' | 'customThemes' | 'activeCustomThemeId' |
-  'fontSize' | 'responseWordWrap' | 'responseIndent' |
+  'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' |
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
   'allowShellCommands' |
@@ -170,6 +172,7 @@ function saveAllSettings(s: Pick<AppState,
     fontSize: s.fontSize,
     responseWordWrap: s.responseWordWrap,
     responseIndent: s.responseIndent,
+    emitDefaults: s.emitDefaults,
     sidebarWidth: s.sidebarWidth,
     panelSplit: s.panelSplit,
     defaultTimeoutSeconds: s.defaultTimeoutSeconds,
@@ -487,6 +490,8 @@ interface AppState {
   setResponseWordWrap: (v: boolean) => void;
   responseIndent: number;
   setResponseIndent: (v: number) => void;
+  emitDefaults: boolean;
+  setEmitDefaults: (v: boolean) => void;
   defaultTimeoutSeconds: number;
   setDefaultTimeoutSeconds: (v: number) => void;
   historyLimit: number;
@@ -1228,6 +1233,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   fontSize: 16,
   responseWordWrap: true,
   responseIndent: 2,
+  emitDefaults: false,
   defaultTimeoutSeconds: 0,
   historyLimit: 50,
   autoConnectOnStartup: false,
@@ -1268,6 +1274,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         fontSize,
         responseWordWrap: s.responseWordWrap ?? true,
         responseIndent: s.responseIndent ?? 2,
+        emitDefaults: s.emitDefaults ?? false,
         sidebarWidth,
         panelSplit,
         defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
@@ -1381,6 +1388,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setResponseIndent: (v) => {
     set({ responseIndent: v });
+    saveAllSettings(get());
+  },
+
+  setEmitDefaults: (v) => {
+    set({ emitDefaults: v });
     saveAllSettings(get());
   },
 

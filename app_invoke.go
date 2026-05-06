@@ -21,6 +21,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	env := a.activeEnv
 	defaultMeta := a.defaultMetadata
 	allowShell := a.allowShellCommands
+	emitDefaults := a.emitDefaults
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.unaryCancelSeq++
 	cancelSeq := a.unaryCancelSeq
@@ -45,6 +46,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 
 	// Apply environment variable interpolation.
 	req = interpolateRequest(req, defaultMeta, env, allowShell)
+	req.EmitDefaults = emitDefaults
 
 	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
 	if err != nil {
@@ -85,6 +87,7 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 	env := a.activeEnv
 	defaultMeta := a.defaultMetadata
 	allowShell := a.allowShellCommands
+	emitDefaults := a.emitDefaults
 	// Cancel any running stream first.
 	if a.streamCancel != nil {
 		a.streamCancel()
@@ -105,6 +108,7 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 	}
 
 	req = interpolateRequest(req, defaultMeta, env, allowShell)
+	req.EmitDefaults = emitDefaults
 
 	go func() {
 		defer func() {

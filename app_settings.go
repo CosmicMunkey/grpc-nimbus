@@ -25,6 +25,7 @@ type UserSettings struct {
 	FontSize              int                 `json:"fontSize"`
 	ResponseWordWrap      bool                `json:"responseWordWrap"`
 	ResponseIndent        int                 `json:"responseIndent"`
+	EmitDefaults          bool                `json:"emitDefaults"`
 	SidebarWidth          float64             `json:"sidebarWidth"`
 	PanelSplit            float64             `json:"panelSplit"`
 	DefaultTimeoutSeconds float64             `json:"defaultTimeoutSeconds"`
@@ -50,6 +51,7 @@ func (a *App) GetUserSettings() UserSettings {
 		FontSize:             16,
 		ResponseWordWrap:     true,
 		ResponseIndent:       2,
+		EmitDefaults:         false,
 		SidebarWidth:         256,
 		PanelSplit:           0.5,
 		HistoryLimit:         50,
@@ -87,6 +89,9 @@ func (a *App) GetUserSettings() UserSettings {
 	}
 	if saved.ResponseIndent != nil {
 		result.ResponseIndent = *saved.ResponseIndent
+	}
+	if saved.EmitDefaults != nil {
+		result.EmitDefaults = *saved.EmitDefaults
 	}
 	if saved.SidebarWidth != nil {
 		result.SidebarWidth = *saved.SidebarWidth
@@ -160,6 +165,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 	a.mu.Lock()
 	a.defaultMetadata = s.DefaultMetadata
 	a.allowShellCommands = s.AllowShellCommands
+	a.emitDefaults = s.EmitDefaults
 	a.mu.Unlock()
 	if a.histStore != nil {
 		// HistoryLimit: 0 = default (50), negative = unlimited
@@ -185,6 +191,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.FontSize = &s.FontSize
 		settings.ResponseWordWrap = &s.ResponseWordWrap
 		settings.ResponseIndent = &s.ResponseIndent
+		settings.EmitDefaults = &s.EmitDefaults
 		settings.SidebarWidth = &s.SidebarWidth
 		settings.PanelSplit = &s.PanelSplit
 		settings.DefaultTimeoutSeconds = &s.DefaultTimeoutSeconds

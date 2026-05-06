@@ -31,6 +31,9 @@ type App struct {
 	// allowShellCommands gates $(...) header interpolation at send time.
 	// Protected by mu; updated synchronously when SaveUserSettings is called.
 	allowShellCommands bool
+	// emitDefaults controls whether zero/default-value fields appear in response JSON.
+	// Protected by mu; updated synchronously when SaveUserSettings is called.
+	emitDefaults bool
 
 	// Loaded descriptor state is tracked by source family so proto files,
 	// protosets, and reflection can coexist.
@@ -119,6 +122,9 @@ func (a *App) startup(ctx context.Context) {
 	}
 	if saved.AllowShellCommands != nil {
 		a.allowShellCommands = *saved.AllowShellCommands
+	}
+	if saved.EmitDefaults != nil {
+		a.emitDefaults = *saved.EmitDefaults
 	}
 	a.mu.Unlock()
 	if saved.AutoConnectOnStartup != nil && *saved.AutoConnectOnStartup && saved.LastTarget != "" {

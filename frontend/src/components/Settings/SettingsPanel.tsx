@@ -458,6 +458,7 @@ function RequestsSection() {
     defaultTimeoutSeconds, setDefaultTimeoutSeconds,
     maxStreamMessages, setMaxStreamMessages,
     allowShellCommands, setAllowShellCommands,
+    emitDefaults, setEmitDefaults,
     defaultMetadata, setDefaultMetadata,
   } = useAppStore();
 
@@ -525,6 +526,15 @@ function RequestsSection() {
           <p className="text-[11px] text-c-text3 mt-0.5">Enables $(command) interpolation in metadata values. Keep off unless you trust the source.</p>
         </div>
         <Toggle checked={allowShellCommands} onChange={setAllowShellCommands} />
+      </div>
+
+      {/* Show default field values */}
+      <div className="flex items-center justify-between py-3">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Show default field values</p>
+          <p className="text-[11px] text-c-text3 mt-0.5">Include fields set to their default value (0, false, empty string, default enum) in the response JSON.</p>
+        </div>
+        <Toggle checked={emitDefaults} onChange={setEmitDefaults} />
       </div>
 
       {/* Default metadata */}
