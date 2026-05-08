@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 // CustomThemeEntry is a user-saved named color theme.

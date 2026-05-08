@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"grpc-nimbus/internal/rpc"
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 // App is the main Wails application struct. All exported methods are callable

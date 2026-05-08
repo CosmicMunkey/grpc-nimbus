@@ -44,7 +44,7 @@ xattr -dr com.apple.quarantine "/Applications/GRPC Nimbus.app"
 - Full **streaming** support — server, client, and bidirectional
 - **grpcurl** command generator for any request
 - Themes, custom color themes, and colorblind-friendly presets
-- **MCP server** — drive grpc-nimbus from an AI assistant (see below)
+- **MCP server** — drive grpc-nimbus from an AI assistant (`go install github.com/CosmicMunkey/grpc-nimbus/cmd/mcp-server@latest`)
 
 ---
 
@@ -83,7 +83,7 @@ Output is placed in `build/bin/`. For development with hot-reload: `wails dev`.
 ### MCP server
 
 ```bash
-make mcp   # → bin/grpc-nimbus-mcp
+go install github.com/CosmicMunkey/grpc-nimbus/cmd/mcp-server@latest
 ```
 
 The MCP binary has no UI dependency — pure Go, no Wails or WebView2 required.
@@ -128,7 +128,7 @@ The MCP binary has no UI dependency — pure Go, no Wails or WebView2 required.
 {
   "mcpServers": {
     "grpc-nimbus": {
-      "command": "/path/to/bin/grpc-nimbus-mcp"
+      "command": "grpc-nimbus-mcp"
     }
   }
 }
@@ -141,7 +141,7 @@ The MCP binary has no UI dependency — pure Go, no Wails or WebView2 required.
   "servers": {
     "grpc-nimbus": {
       "type": "stdio",
-      "command": "/path/to/bin/grpc-nimbus-mcp"
+      "command": "grpc-nimbus-mcp"
     }
   }
 }

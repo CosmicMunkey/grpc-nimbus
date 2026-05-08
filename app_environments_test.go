@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"grpc-nimbus/internal/rpc"
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 // newTestApp builds a minimal App with a temporary env store and settings store.

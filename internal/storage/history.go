@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 const defaultHistoryLimit = 50

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 func TestPortableExportImportPreservesProtoSources(t *testing.T) {

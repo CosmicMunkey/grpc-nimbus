@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 const appDirName = "grpc-nimbus"
