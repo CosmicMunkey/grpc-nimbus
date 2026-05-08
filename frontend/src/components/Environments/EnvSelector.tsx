@@ -104,7 +104,7 @@ export function EnvEditor({ initial, onClose }: EnvEditorProps) {
         <div className="flex flex-col gap-2 min-h-0">
           <div className="flex items-center justify-between">
             <span className="text-xs text-c-text2 font-medium">Default Headers</span>
-            <span className="text-[10px] text-c-text3 font-mono">Header-Name: value</span>
+            <span className="text-[0.625rem] text-c-text3 font-mono">Header-Name: value</span>
           </div>
           <div className="overflow-y-auto space-y-2 max-h-72">
             {rows.map((row, i) => (

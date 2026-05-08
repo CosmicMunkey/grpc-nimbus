@@ -73,7 +73,7 @@ function ExportCollectionModal({ onClose }: { onClose: () => void }) {
                     className="accent-c-accent"
                   />
                   <span className="text-xs text-c-text flex-1 truncate">{col.name}</span>
-                  <span className="text-[10px] text-c-text3 shrink-0">
+                  <span className="text-[0.625rem] text-c-text3 shrink-0">
                     {col.requests?.length ?? 0} req{(col.requests?.length ?? 0) !== 1 ? 's' : ''}
                   </span>
                 </label>
@@ -174,7 +174,12 @@ export default function App() {
 
     // Zoom — adjust root font size in 10% increments
     const STEP = 0.1;
-    const getZoom = () => parseFloat(document.documentElement.style.fontSize || '100') / 100;
+    const getZoom = () => {
+      const raw = document.documentElement.style.fontSize;
+      if (!raw) return 1.0;
+      if (raw.endsWith('%')) return parseFloat(raw) / 100;
+      return parseFloat(raw) / 16; // px value set by applyFontSize
+    };
     const offZoomIn    = rt.EventsOn('menu:zoomIn',    () => {
       const next = Math.min(2.0, getZoom() + STEP);
       document.documentElement.style.fontSize = `${Math.round(next * 100)}%`;

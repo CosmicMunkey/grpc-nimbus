@@ -34,7 +34,7 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
       >
         <AlertTriangle size={12} className="text-yellow-500 shrink-0" />
         <span className="font-semibold truncate opacity-60">{shortName}</span>
-        <span className="ml-auto text-c-text3 text-[10px] opacity-60">no descriptor</span>
+        <span className="ml-auto text-c-text3 text-[0.625rem] opacity-60">no descriptor</span>
       </div>
     );
   }
@@ -47,7 +47,7 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
       >
         {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <span className="font-semibold truncate" title={svc.name}>{shortName}</span>
-        <span className="ml-auto text-c-text3 text-[10px]">{svc.methods.length}</span>
+        <span className="ml-auto text-c-text3 text-[0.625rem]">{svc.methods.length}</span>
       </button>
       {expanded && (
         <div className="ml-3 space-y-0.5">

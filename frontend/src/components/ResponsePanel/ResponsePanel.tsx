@@ -111,7 +111,7 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
   if (evt.type === 'message') {
     return (
       <div className="border border-c-border rounded overflow-hidden">
-        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">message</div>
+        <div className="px-2 py-0.5 bg-c-hover text-[0.625rem] text-c-text2">message</div>
         <pre className={`p-2 text-c-text overflow-x-auto ${wrapClass}`}>{pretty}</pre>
       </div>
     );
@@ -121,10 +121,10 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
     if (entries.length === 0) return null;
     return (
       <div className="border border-c-border rounded overflow-hidden">
-        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">header</div>
+        <div className="px-2 py-0.5 bg-c-hover text-[0.625rem] text-c-text2">header</div>
         <div className="p-2 space-y-0.5">
           {entries.map((entry, i) => (
-            <div key={i} className="flex gap-2 text-[10px]">
+            <div key={i} className="flex gap-2 text-[0.625rem]">
               <span className="text-c-text2">{entry.key}:</span>
               <span className="text-c-text break-all">{entry.value}</span>
             </div>
@@ -142,8 +142,8 @@ function StreamMessage({ evt }: { evt: StreamEvent }) {
       : 'text-c-accent';
     return (
       <div className="border border-c-border rounded overflow-hidden">
-        <div className="px-2 py-0.5 bg-c-hover text-[10px] text-c-text2">trailer</div>
-        <div className="px-2 py-1 text-[10px]">
+        <div className="px-2 py-0.5 bg-c-hover text-[0.625rem] text-c-text2">trailer</div>
+        <div className="px-2 py-1 text-[0.625rem]">
           <span className={`font-medium ${statusCls}`}>
             {statusCode} {statusText}
           </span>
@@ -216,15 +216,15 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
         onClick={() => setExpanded((v) => !v)}
       >
         {expanded ? <ChevronDown size={11} className="shrink-0 text-c-text3" /> : <ChevronRight size={11} className="shrink-0 text-c-text3" />}
-        <span className="text-[10px] text-c-text3 shrink-0">
+        <span className="text-[0.625rem] text-c-text3 shrink-0">
           {new Date(entry.invokedAt).toLocaleTimeString()}
         </span>
         {entry.response && (
-          <span className={`text-[10px] font-medium shrink-0 ${entry.response.statusCode === 0 ? successCls : 'text-c-accent'}`}>
+          <span className={`text-[0.625rem] font-medium shrink-0 ${entry.response.statusCode === 0 ? successCls : 'text-c-accent'}`}>
             {entry.response.statusCode} {entry.response.status} · {formatDuration(entry.response.durationMs)}
           </span>
         )}
-        <pre className="text-[10px] text-c-text3 truncate flex-1 font-mono" title={entry.requestJson ?? undefined}>
+        <pre className="text-[0.625rem] text-c-text3 truncate flex-1 font-mono" title={entry.requestJson ?? undefined}>
           {entry.requestJson?.slice(0, 80)}
         </pre>
       </div>
@@ -233,8 +233,8 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
         <div className="px-3 pb-3 space-y-2 text-xs">
           {/* Request */}
           <div>
-            <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Request</span>
-            <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
+            <span className="text-[0.625rem] text-c-text3 uppercase font-medium tracking-wide">Request</span>
+            <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[0.625rem] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
               {formatJson(entry.requestJson, responseIndent)}
             </pre>
           </div>
@@ -242,10 +242,10 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {/* Metadata */}
           {entry.metadata && entry.metadata.length > 0 && (
             <div>
-              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Metadata</span>
+              <span className="text-[0.625rem] text-c-text3 uppercase font-medium tracking-wide">Metadata</span>
               <div className="mt-0.5 space-y-0.5">
                 {entry.metadata.map((m, i) => (
-                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                  <div key={i} className="flex gap-2 text-[0.625rem] font-mono">
                     <span className="text-c-text2">{m.key}:</span>
                     <span className="text-c-text3 break-all">{m.value}</span>
                   </div>
@@ -257,16 +257,16 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {/* Response */}
           {entry.response && (
             <div>
-              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Response</span>
+              <span className="text-[0.625rem] text-c-text3 uppercase font-medium tracking-wide">Response</span>
               {entry.response.responseJson?.trim() ? (
-                <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[10px] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                <pre className="mt-0.5 p-2 rounded bg-c-bg text-c-text2 text-[0.625rem] font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
                   {formatJson(entry.response.responseJson, responseIndent)}
                 </pre>
               ) : entry.response.statusCode !== 0 && entry.response.statusMessage ? (
-                <p className="mt-0.5 text-[10px] text-c-accent font-mono">{entry.response.statusMessage}</p>
+                <p className="mt-0.5 text-[0.625rem] text-c-accent font-mono">{entry.response.statusMessage}</p>
               ) : null}
               {entry.response.error && (
-                <p className="mt-0.5 text-[10px] text-c-accent">{entry.response.error}</p>
+                <p className="mt-0.5 text-[0.625rem] text-c-accent">{entry.response.error}</p>
               )}
             </div>
           )}
@@ -274,10 +274,10 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {/* Headers */}
           {entry.response?.headers && entry.response.headers.length > 0 && (
             <div>
-              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Headers</span>
+              <span className="text-[0.625rem] text-c-text3 uppercase font-medium tracking-wide">Headers</span>
               <div className="mt-0.5 space-y-0.5">
                 {entry.response.headers.map((h, i) => (
-                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                  <div key={i} className="flex gap-2 text-[0.625rem] font-mono">
                     <span className="text-c-text2">{h.key}:</span>
                     <span className="text-c-text3 break-all">{h.value}</span>
                   </div>
@@ -289,10 +289,10 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           {/* Trailers */}
           {entry.response?.trailers && entry.response.trailers.length > 0 && (
             <div>
-              <span className="text-[10px] text-c-text3 uppercase font-medium tracking-wide">Trailers</span>
+              <span className="text-[0.625rem] text-c-text3 uppercase font-medium tracking-wide">Trailers</span>
               <div className="mt-0.5 space-y-0.5">
                 {entry.response.trailers.map((t, i) => (
-                  <div key={i} className="flex gap-2 text-[10px] font-mono">
+                  <div key={i} className="flex gap-2 text-[0.625rem] font-mono">
                     <span className="text-c-text2">{t.key}:</span>
                     <span className="text-c-text3 break-all">{t.value}</span>
                   </div>
@@ -348,7 +348,7 @@ function HistoryPanel() {
           groups.map((group) => (
             <React.Fragment key={group.bucket}>
               <div className="sticky top-0 z-10 px-3 py-0.5 bg-c-bg border-b border-c-border">
-                <span className="text-[10px] font-medium text-c-text3 uppercase tracking-wider">{group.label}</span>
+                <span className="text-[0.625rem] font-medium text-c-text3 uppercase tracking-wider">{group.label}</span>
               </div>
               {group.entries.map((entry) => (
                 <HistoryEntryRow key={entry.id} entry={entry} />

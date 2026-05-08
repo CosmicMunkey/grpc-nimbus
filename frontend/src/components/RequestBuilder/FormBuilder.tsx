@@ -124,7 +124,7 @@ function TypeBadge({ schema }: { schema: FieldSchema }) {
   }
   const cls = isDark ? darkCls : lightCls;
   return (
-    <span className={`shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded ${cls}`}>
+    <span className={`shrink-0 text-[0.5625rem] font-mono px-1.5 py-0.5 rounded ${cls}`}>
       {label}
     </span>
   );
@@ -350,7 +350,7 @@ function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: st
               onChange={e => { setTimeText(e.target.value); tryEmit(dateText, e.target.value); }}
               className={`${inputCls} w-24 shrink-0`}
             />
-            <span className="text-[10px] text-c-text3 shrink-0">Z</span>
+            <span className="text-[0.625rem] text-c-text3 shrink-0">Z</span>
           </>
         )}
         <button
@@ -369,7 +369,7 @@ function TimestampEditor({ value, onChange }: { value: unknown; onChange: (v: st
         </button>
       </div>
       {hint && (
-        <span className="text-[10px] text-c-text3 pl-0.5">{hint}</span>
+        <span className="text-[0.625rem] text-c-text3 pl-0.5">{hint}</span>
       )}
     </div>
   );
@@ -492,13 +492,13 @@ function OneofGroup({
 
   return (
     <div className="border border-c-border rounded overflow-hidden">
-      <div className="flex items-center gap-1 px-2 py-0.5 bg-c-bg text-[10px] text-c-text2">
+      <div className="flex items-center gap-1 px-2 py-0.5 bg-c-bg text-[0.625rem] text-c-text2">
         <span className="text-c-text3 font-medium">oneof</span>
         <span className="text-c-accent">{name}</span>
         <select
           value={selected}
           onChange={e => handleSelect(e.target.value)}
-          className="ml-auto bg-c-input border border-c-border rounded pl-1 pr-5 py-px text-[10px] text-c-text outline-none focus:border-c-accent"
+          className="ml-auto bg-c-input border border-c-border rounded pl-1 pr-5 py-px text-[0.625rem] text-c-text outline-none focus:border-c-accent"
         >
           {fields.map(f => (
             <option key={f.jsonName} value={f.jsonName}>{f.name}</option>
@@ -545,7 +545,7 @@ function RepeatedEditor({
     <div className="w-full space-y-1">
       {value.map((item, i) => (
         <div key={i} className="flex items-start gap-1">
-          <span className="text-[10px] text-c-text3 font-mono mt-1 w-5 shrink-0 text-right">{i}</span>
+          <span className="text-[0.625rem] text-c-text3 font-mono mt-1 w-5 shrink-0 text-right">{i}</span>
           <div className="flex-1 min-w-0 flex">
             <FieldEditor
               schema={elementSchema}
@@ -835,7 +835,7 @@ function FieldRow({
             <span className="text-xs font-mono text-c-text">{schema.name}</span>
             <TypeBadge schema={schema} />
             {schema.oneofName && (
-              <span className="text-[9px] text-c-text3">oneof:{schema.oneofName}</span>
+              <span className="text-[0.5625rem] text-c-text3">oneof:{schema.oneofName}</span>
             )}
           </div>
         )}
