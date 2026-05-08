@@ -58,7 +58,7 @@ function renderBlock(block: ContentBlock, idx: number) {
       );
     case 'code':
       return (
-        <pre key={idx} className="text-xs font-mono bg-c-bg border border-c-border rounded px-3 py-2 text-c-accent my-1">
+        <pre key={idx} className="text-xs font-mono bg-c-bg border border-c-border rounded px-3 py-2 text-c-accent my-1 whitespace-pre-wrap break-all">
           {block.text}
         </pre>
       );
