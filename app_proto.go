@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"grpc-nimbus/internal/rpc"
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 // LoadedState bundles the currently loaded descriptor info for frontend restoration.

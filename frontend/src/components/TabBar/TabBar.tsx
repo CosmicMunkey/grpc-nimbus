@@ -53,11 +53,11 @@ export default function TabBar() {
                 }}
                 onBlur={() => commitEdit(tab.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 min-w-0 bg-c-bg border border-c-accent rounded px-1 py-0 text-[11px] text-c-text outline-none"
+                className="flex-1 min-w-0 bg-c-bg border border-c-accent rounded px-1 py-0 text-[0.6875rem] text-c-text outline-none"
               />
             ) : (
               <span
-                className="truncate flex-1 text-[11px]"
+                className="truncate flex-1 text-[0.6875rem]"
                 title={tab.savedRequestId ? `${tab.label} — double-click to rename` : tab.label}
                 onDoubleClick={(e) => startEdit(tab.id, tab.label, e)}
               >

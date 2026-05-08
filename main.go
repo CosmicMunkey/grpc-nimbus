@@ -12,7 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 //go:embed all:frontend/dist

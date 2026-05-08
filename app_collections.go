@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 // ListCollections returns all saved request collections.

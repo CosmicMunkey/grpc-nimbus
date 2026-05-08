@@ -188,7 +188,7 @@ function TokenEditor({
   return (
     <div className="mt-2 border border-c-border rounded p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wider">Edit colors</span>
+        <span className="text-[0.625rem] text-c-text3 font-medium uppercase tracking-wider">Edit colors</span>
         <button onClick={onClose} className="text-c-text3 hover:text-c-text p-0.5"><X size={11} /></button>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -296,7 +296,7 @@ function ThemesSection() {
 
       {/* Footer */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-c-border shrink-0">
-        <p className="text-[10px] text-c-text3">Tip: use the copy icon on any preset or custom theme to fork it</p>
+        <p className="text-[0.625rem] text-c-text3">Tip: use the copy icon on any preset or custom theme to fork it</p>
         <button
           onClick={() => forkTheme('nimbus')}
           className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
@@ -319,7 +319,7 @@ function AppearanceSection() {
       <div className="space-y-2">
         <div>
           <p className="text-xs font-medium text-c-text">Font size</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Controls the base text size throughout the app.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Controls the base text size throughout the app.</p>
         </div>
         <div className="flex gap-1 flex-wrap">
           {FONT_SIZE_PRESETS.map(({ label, value }) => (
@@ -342,7 +342,7 @@ function AppearanceSection() {
       <div className="flex items-center justify-between py-3 border-t border-c-border/40">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">JSON indent</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Spaces used for pretty-printing JSON in stream and history panels.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Spaces used for pretty-printing JSON in stream and history panels.</p>
         </div>
         <div className="flex gap-1">
           {[2, 4].map((n) => (
@@ -365,7 +365,7 @@ function AppearanceSection() {
       <div className="flex items-center justify-between py-3 border-t border-c-border/40">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Response word wrap</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Wrap long lines in stream message and history response panels.</p>
         </div>
         <Toggle checked={responseWordWrap} onChange={setResponseWordWrap} />
       </div>
@@ -374,7 +374,7 @@ function AppearanceSection() {
       <div className="flex items-center justify-between py-3 border-t border-c-border/40">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Sort environments by creation time</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
         </div>
         <Toggle checked={envSortByCreated} onChange={setEnvSortByCreated} />
       </div>
@@ -405,35 +405,35 @@ function BehaviorSection() {
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Confirm before delete</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Show a confirmation dialog before deleting requests, collections, and environments.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Show a confirmation dialog before deleting requests, collections, and environments.</p>
         </div>
         <Toggle checked={confirmDeletes} onChange={setConfirmDeletes} />
       </div>
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Confirm before clearing history</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Show a confirmation dialog before clearing request history for a method.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Show a confirmation dialog before clearing request history for a method.</p>
         </div>
         <Toggle checked={confirmClearHistory} onChange={setConfirmClearHistory} />
       </div>
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Enter timestamps in local time</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">When on, timestamp fields accept local time and convert to UTC. When off, enter UTC directly.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When on, timestamp fields accept local time and convert to UTC. When off, enter UTC directly.</p>
         </div>
         <Toggle checked={timestampInputLocal} onChange={setTimestampInputLocal} />
       </div>
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Auto-connect on startup</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Automatically reconnect to the last used target when the app launches.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Automatically reconnect to the last used target when the app launches.</p>
         </div>
         <Toggle checked={autoConnectOnStartup} onChange={setAutoConnectOnStartup} />
       </div>
       <div className="flex items-start justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">History limit per method</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Maximum number of past requests to keep per gRPC method. ∞ keeps all.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Maximum number of past requests to keep per gRPC method. ∞ keeps all.</p>
         </div>
         <div className="flex gap-1 shrink-0">
           {HISTORY_LIMIT_OPTIONS.map(({ label, value }) => (
@@ -492,7 +492,7 @@ function RequestsSection() {
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Default timeout</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Pre-fill the timeout field on new tabs. 0 means no timeout.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Pre-fill the timeout field on new tabs. 0 means no timeout.</p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <input
@@ -511,7 +511,7 @@ function RequestsSection() {
       <div className="flex items-start justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Max stream messages</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Maximum number of stream events kept in memory per stream. ∞ keeps all.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Maximum number of stream events kept in memory per stream. ∞ keeps all.</p>
         </div>
         <div className="flex gap-1 shrink-0">
           {MAX_STREAM_OPTIONS.map(({ label, value }) => (
@@ -534,7 +534,7 @@ function RequestsSection() {
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Allow shell commands in metadata</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Enables $(command) interpolation in metadata values. Keep off unless you trust the source.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Enables $(command) interpolation in metadata values. Keep off unless you trust the source.</p>
         </div>
         <Toggle checked={allowShellCommands} onChange={setAllowShellCommands} />
       </div>
@@ -543,7 +543,7 @@ function RequestsSection() {
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Show default field values</p>
-          <p className="text-[11px] text-c-text3 mt-0.5">Include fields set to their default value (0, false, empty string, default enum) in the response JSON.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Include fields set to their default value (0, false, empty string, default enum) in the response JSON.</p>
         </div>
         <Toggle checked={emitDefaults} onChange={setEmitDefaults} />
       </div>
@@ -553,7 +553,7 @@ function RequestsSection() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-medium text-c-text">Default metadata</p>
-            <p className="text-[11px] text-c-text3 mt-0.5">Headers sent with every request. Overridden by environment and per-request metadata.</p>
+            <p className="text-[0.6875rem] text-c-text3 mt-0.5">Headers sent with every request. Overridden by environment and per-request metadata.</p>
           </div>
           <button
             onClick={handleAddMetadata}
@@ -589,7 +589,7 @@ function RequestsSection() {
                       className={`w-full px-2 py-1 rounded border border-c-border bg-c-input text-c-text text-xs font-mono focus:outline-none focus:border-c-accent ${dynamic ? 'pr-6' : ''}`}
                     />
                     {dynamic && (
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[0.5625rem] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
                     )}
                   </div>
                   <button
@@ -603,7 +603,7 @@ function RequestsSection() {
             })}
           </div>
         )}
-        <p className="text-[10px] text-c-text3 leading-relaxed">
+        <p className="text-[0.625rem] text-c-text3 leading-relaxed">
           Values support <span className="font-mono text-c-accent/80">${'{VAR}'}</span> (OS env variable) and <span className="font-mono text-c-accent/80">$(command)</span> (shell output when enabled above) — resolved fresh on each send.
         </p>
       </div>
@@ -705,7 +705,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-c-text2">Metadata</p>
-              <p className="text-[10px] text-c-text3 mt-0.5">Applied to every request using this environment. Overridden by per-request metadata.</p>
+              <p className="text-[0.625rem] text-c-text3 mt-0.5">Applied to every request using this environment. Overridden by per-request metadata.</p>
             </div>
             <button
               onClick={addRow}
@@ -734,7 +734,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
                       className={`w-full bg-c-bg border border-c-border rounded px-2 py-1 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono ${dynamic ? 'pr-6' : ''}`}
                     />
                     {dynamic && (
-                      <span className="absolute right-1.5 top-1.5 text-[9px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
+                      <span className="absolute right-1.5 top-1.5 text-[0.5625rem] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
                     )}
                   </div>
                   <button
@@ -747,7 +747,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
               );
             })}
           </div>
-          <p className="text-[10px] text-c-text3 leading-relaxed">
+          <p className="text-[0.625rem] text-c-text3 leading-relaxed">
             Values support dynamic syntax — <span className="font-mono text-c-accent/80">${'{MY_VAR}'}</span> reads an OS environment variable, <span className="font-mono text-c-accent/80">$(command)</span> runs a shell command and uses its output.
           </p>
         </div>
@@ -819,10 +819,10 @@ function EnvironmentsSection() {
                     {env.name}
                   </span>
                   {isActive && (
-                    <span className="text-[10px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">active</span>
+                    <span className="text-[0.625rem] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">active</span>
                   )}
                 </div>
-                <p className="text-[10px] text-c-text3 mt-0.5">
+                <p className="text-[0.625rem] text-c-text3 mt-0.5">
                   {[
                     env.target && <span key="target" className="font-mono">{env.target}</span>,
                     headerCount > 0 && `${headerCount} header${headerCount !== 1 ? 's' : ''}`,
@@ -836,8 +836,8 @@ function EnvironmentsSection() {
               {confirmDeleteId === env.id ? (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-c-text2">Delete?</span>
-                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-c-accent-text rounded text-[11px] hover:bg-c-accent2">Yes</button>
-                  <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-0.5 border border-c-border text-c-text2 rounded text-[11px] hover:bg-c-hover">No</button>
+                  <button onClick={() => handleDelete(env.id)} className="px-2 py-0.5 bg-c-accent text-c-accent-text rounded text-[0.6875rem] hover:bg-c-accent2">Yes</button>
+                  <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-0.5 border border-c-border text-c-text2 rounded text-[0.6875rem] hover:bg-c-hover">No</button>
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
@@ -864,7 +864,7 @@ function EnvironmentsSection() {
 
       {/* Footer */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-c-border shrink-0">
-        <p className="text-[10px] text-c-text3">Click ● to activate an environment</p>
+        <p className="text-[0.625rem] text-c-text3">Click ● to activate an environment</p>
         <button
           onClick={() => { setEditingEnv(undefined); setShowEditor(true); }}
           className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-c-accent text-c-accent-text rounded hover:bg-c-accent2"
@@ -918,7 +918,7 @@ export default function SettingsPanel() {
           <div className="relative z-10 bg-c-panel border border-c-border rounded-lg shadow-xl w-[960px] max-w-[95vw] h-[720px] max-h-[90vh] flex overflow-hidden">
             {/* Left category nav */}
             <div className="w-44 shrink-0 border-r border-c-border bg-c-bg flex flex-col py-3">
-              <p className="px-4 pb-2 text-[10px] font-semibold text-c-text3 uppercase tracking-wider">Settings</p>
+              <p className="px-4 pb-2 text-[0.625rem] font-semibold text-c-text3 uppercase tracking-wider">Settings</p>
               {CATEGORIES.map(({ id, label, icon }) => (
                 <button
                   key={id}

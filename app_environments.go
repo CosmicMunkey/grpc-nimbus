@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 // ListEnvironments returns all stored environments.

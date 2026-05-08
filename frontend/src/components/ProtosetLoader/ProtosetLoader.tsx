@@ -131,7 +131,7 @@ export default function ProtosetLoader() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1 py-1 text-[10px] transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1 text-[0.625rem] transition-colors ${
               tab === t.id ? 'bg-c-accent text-c-accent-text' : 'text-c-text2 hover:bg-c-hover'
             }`}
           >
@@ -183,17 +183,17 @@ export default function ProtosetLoader() {
           {tab === 'proto' && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-c-text3 uppercase tracking-wide font-medium">Import paths</span>
+                <span className="text-[0.625rem] text-c-text3 uppercase tracking-wide font-medium">Import paths</span>
                 <button
                   onClick={handleAddImportPath}
                   title="Add an import path directory"
-                  className="flex items-center gap-1 text-[10px] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
+                  className="flex items-center gap-1 text-[0.625rem] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
                 >
                   <FolderOpen size={10} /> Add…
                 </button>
               </div>
               {extraImportPaths.length === 0 ? (
-                <p className="text-[10px] text-c-text3 leading-relaxed">
+                <p className="text-[0.625rem] text-c-text3 leading-relaxed">
                   Load the service-entry `.proto`, not just shared message files. Import roots are auto-detected when possible; add extras here for layouts that still fail.
                 </p>
               ) : (
@@ -203,7 +203,7 @@ export default function ProtosetLoader() {
                     return (
                       <div key={dir} className="flex items-center gap-1.5 group">
                         <FolderOpen size={10} className="shrink-0 text-c-text3" />
-                        <span className="flex-1 truncate text-[10px] text-c-text2" title={dir}>{name}</span>
+                        <span className="flex-1 truncate text-[0.625rem] text-c-text2" title={dir}>{name}</span>
                         <button
                           onClick={() => handleRemoveImportPath(dir)}
                           className="opacity-0 group-hover:opacity-100 text-c-text3 hover:text-c-accent transition-opacity"
@@ -253,7 +253,7 @@ export default function ProtosetLoader() {
               {collapsed
                 ? <ChevronRight size={11} />
                 : <ChevronDown size={11} />}
-              <span className="text-[10px] font-medium uppercase tracking-wide">
+              <span className="text-[0.625rem] font-medium uppercase tracking-wide">
                 {loadMode === 'reflection' ? 'Loaded via reflection' : `Loaded (${protosetPaths.length})`}
               </span>
             </div>
@@ -263,7 +263,7 @@ export default function ProtosetLoader() {
                   onClick={handleReload}
                   disabled={reloading}
                   title="Re-read files from disk (picks up regenerated protosets)"
-                  className="flex items-center gap-1 text-[10px] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
+                  className="flex items-center gap-1 text-[0.625rem] text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-border"
                 >
                   <RefreshCw size={10} className={reloading ? 'animate-spin' : ''} />
                   Reload
@@ -272,7 +272,7 @@ export default function ProtosetLoader() {
               <button
                 onClick={handleClear}
                 title="Clear all loaded files"
-                className="flex items-center gap-1 text-[10px] text-c-accent/70 hover:text-c-accent px-1.5 py-0.5 rounded hover:bg-c-border"
+                className="flex items-center gap-1 text-[0.625rem] text-c-accent/70 hover:text-c-accent px-1.5 py-0.5 rounded hover:bg-c-border"
               >
                 <Trash2 size={10} />
                 Clear
@@ -287,7 +287,7 @@ export default function ProtosetLoader() {
                 return (
                   <div key={p} className="flex items-center gap-1.5 px-2 py-1 group hover:bg-c-hover">
                     <FileCode size={10} className="shrink-0 text-c-accent" />
-                    <span className="flex-1 truncate text-[11px] text-c-text2" title={p}>{name}</span>
+                    <span className="flex-1 truncate text-[0.6875rem] text-c-text2" title={p}>{name}</span>
                     <button
                       onClick={() => handleRemove(p)}
                       title="Remove this file"

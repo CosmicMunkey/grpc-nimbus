@@ -234,9 +234,11 @@ export const helpTopics: HelpTopic[] = [
     keywords: ['mcp', 'ai', 'llm', 'claude', 'cursor', 'automation', 'regression', 'test', 'grpc-nimbus-mcp'],
     content: [
       { type: 'paragraph', text: 'GRPC Nimbus ships a standalone MCP (Model Context Protocol) server that lets AI assistants like Claude, Cursor, or any MCP-compatible tool drive gRPC requests programmatically.' },
-      { type: 'heading', text: 'Building the MCP Server' },
-      { type: 'code', text: 'make mcp' },
-      { type: 'paragraph', text: 'This produces a binary at bin/grpc-nimbus-mcp. Register it as a stdio MCP server in your AI tool\'s config.' },
+      { type: 'heading', text: 'Installing the MCP Server' },
+      { type: 'code', text: 'go install github.com/CosmicMunkey/grpc-nimbus/cmd/grpc-nimbus-mcp@latest' },
+      { type: 'paragraph', text: 'This installs grpc-nimbus-mcp to your $GOPATH/bin. Make sure that directory is on your PATH, then register it as a stdio MCP server in your AI tool\'s config.' },
+      { type: 'heading', text: 'Claude / Cursor config snippet' },
+      { type: 'code', text: '{\n  "mcpServers": {\n    "grpc-nimbus": {\n      "command": "grpc-nimbus-mcp",\n      "args": []\n    }\n  }\n}' },
       { type: 'heading', text: 'What the AI Can Do' },
       { type: 'bullets', items: [
         'Load protosets and connect to gRPC servers.',

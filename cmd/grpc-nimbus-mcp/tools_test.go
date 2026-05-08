@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"grpc-nimbus/internal/rpc"
-	"grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 func TestHandleInvokeUnaryRejectsInvalidTimeout(t *testing.T) {

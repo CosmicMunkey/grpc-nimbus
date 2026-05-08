@@ -25,7 +25,7 @@ function renderBlock(block: ContentBlock, idx: number) {
   switch (block.type) {
     case 'heading':
       return (
-        <h3 key={idx} className="text-[11px] font-semibold uppercase tracking-wider text-c-text mt-4 mb-1.5 first:mt-0">
+        <h3 key={idx} className="text-[0.6875rem] font-semibold uppercase tracking-wider text-c-text mt-4 mb-1.5 first:mt-0">
           {block.text}
         </h3>
       );
@@ -58,7 +58,7 @@ function renderBlock(block: ContentBlock, idx: number) {
       );
     case 'code':
       return (
-        <pre key={idx} className="text-xs font-mono bg-c-bg border border-c-border rounded px-3 py-2 text-c-accent my-1">
+        <pre key={idx} className="text-xs font-mono bg-c-bg border border-c-border rounded px-3 py-2 text-c-accent my-1 whitespace-pre-wrap break-all">
           {block.text}
         </pre>
       );
@@ -172,7 +172,7 @@ export default function HelpDialog({ onClose }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1 bg-transparent text-sm text-c-text placeholder-c-text3 outline-none"
         />
-        <kbd className="hidden sm:inline text-[10px] text-c-text3 border border-c-border rounded px-1 py-0.5">ESC</kbd>
+        <kbd className="hidden sm:inline text-[0.625rem] text-c-text3 border border-c-border rounded px-1 py-0.5">ESC</kbd>
       </div>
 
       {/* Body: list + detail */}
@@ -212,7 +212,7 @@ export default function HelpDialog({ onClose }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-c-border shrink-0 flex items-center gap-3 text-[10px] text-c-text3">
+      <div className="px-4 py-2 border-t border-c-border shrink-0 flex items-center gap-3 text-[0.625rem] text-c-text3">
         <span><kbd className="border border-c-border rounded px-1">↑↓</kbd> navigate</span>
         <span><kbd className="border border-c-border rounded px-1">ESC</kbd> close</span>
       </div>

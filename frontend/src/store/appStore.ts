@@ -1270,7 +1270,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const customThemes: CustomThemeEntry[] = s.customThemes ?? [];
       const activeCustomThemeId = s.activeCustomThemeId ?? '';
       const activeTokens = customThemes.find((t) => t.id === activeCustomThemeId)?.tokens ?? {};
-      const fontSize = s.fontSize ?? 16;
+      const fontSize = s.fontSize === 14 ? 16 : (s.fontSize ?? 16);
       const sidebarWidth = s.sidebarWidth ?? 256;
       const panelSplit = s.panelSplit ?? 0.5;
       const resolved = resolveTheme(themeId, activeTokens);

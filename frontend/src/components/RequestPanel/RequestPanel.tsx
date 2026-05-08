@@ -29,7 +29,7 @@ function MetadataTable() {
       {/* Default metadata from Settings (read-only) */}
       {defaultMeta.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">
+          <span className="text-[0.625rem] text-c-text3 font-medium uppercase tracking-wide">
             Default · Settings
           </span>
           <div className="space-y-1">
@@ -51,7 +51,7 @@ function MetadataTable() {
       {/* Environment headers (read-only) */}
       {envHeaders.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">
+          <span className="text-[0.625rem] text-c-text3 font-medium uppercase tracking-wide">
             From environment · {activeEnv?.name}
           </span>
           <div className="space-y-1">
@@ -73,7 +73,7 @@ function MetadataTable() {
       {/* Per-request metadata (editable) */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-c-text3 font-medium uppercase tracking-wide">Request metadata</span>
+          <span className="text-[0.625rem] text-c-text3 font-medium uppercase tracking-wide">Request metadata</span>
           <button
             onClick={addRow}
             className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-1.5 py-0.5 rounded hover:bg-c-hover"
@@ -105,7 +105,7 @@ function MetadataTable() {
                       className={`w-full bg-c-bg border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono ${dynamic ? 'pr-6' : ''}`}
                     />
                     {dynamic && (
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[0.5625rem] font-mono text-c-accent bg-c-accent/10 px-1 rounded leading-tight pointer-events-none">$</span>
                     )}
                   </div>
                   <button
@@ -257,7 +257,7 @@ function GrpcurlTab() {
   return (
     <div className="h-full flex flex-col p-3 gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-c-text3 font-mono">grpcurl command</span>
+        <span className="text-[0.625rem] text-c-text3 font-mono">grpcurl command</span>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-c-border text-c-text2 hover:text-c-text hover:bg-c-hover"
@@ -270,12 +270,12 @@ function GrpcurlTab() {
         {command}
       </pre>
       {loadMode === 'proto' && (
-        <p className="text-[10px] text-c-text3">
+        <p className="text-[0.625rem] text-c-text3">
           Note: Proto file import paths may need <span className="font-mono text-c-text2">-import-path</span> and <span className="font-mono text-c-text2">-proto</span> flags added manually.
         </p>
       )}
       {loadMode === 'reflection' && (
-        <p className="text-[10px] text-c-text3">
+        <p className="text-[0.625rem] text-c-text3">
           Using server reflection — no <span className="font-mono text-c-text2">-protoset</span> flag needed.
         </p>
       )}
@@ -374,7 +374,7 @@ export default function RequestPanel() {
             {showCancel ? 'Cancel' : 'Send'}
           </button>
         </div>
-        <span className="text-[10px] font-mono text-c-text3 truncate px-3 pb-1.5" title={selectedMethod.fullName}>
+        <span className="text-[0.625rem] font-mono text-c-text3 truncate px-3 pb-1.5" title={selectedMethod.fullName}>
           {selectedMethod.fullName}
         </span>
       </div>

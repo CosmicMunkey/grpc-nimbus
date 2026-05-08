@@ -13,7 +13,7 @@ dev:
 
 # Build the standalone MCP server binary.
 mcp:
-	go build -o bin/grpc-nimbus-mcp ./cmd/mcp-server
+	go build -o bin/grpc-nimbus-mcp ./cmd/grpc-nimbus-mcp
 
 clean:
 	rm -rf build/bin bin

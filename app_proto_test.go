@@ -8,7 +8,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"google.golang.org/protobuf/proto"
-	"grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 func writeProtosetFixture(t *testing.T, importPaths []string, entryProto string) string {

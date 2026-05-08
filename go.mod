@@ -1,6 +1,6 @@
-module grpc-nimbus
+module github.com/CosmicMunkey/grpc-nimbus
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/fullstorydev/grpcurl v1.9.3
