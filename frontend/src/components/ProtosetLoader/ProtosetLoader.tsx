@@ -240,7 +240,7 @@ export default function ProtosetLoader() {
               <AlertCircle size={18} className="text-c-accent shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1 overflow-auto">
                 <p className="text-sm font-semibold text-c-text mb-1">Failed to load</p>
-                <p className="text-xs text-c-text2 leading-relaxed whitespace-pre-wrap break-all">{error}</p>
+                <p className="text-xs text-c-text2 leading-relaxed whitespace-pre-wrap break-words">{error}</p>
               </div>
             </div>
             <button
