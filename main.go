@@ -77,6 +77,7 @@ func main() {
 		OnStartup:        startupWithRestore,
 		OnBeforeClose:    func(ctx context.Context) bool { app.SaveWindowState(ctx); return false },
 		Menu:             buildAppMenu(app),
+		DragAndDrop:      &options.DragAndDrop{EnableFileDrop: true},
 		Linux: &linux.Options{
 			Icon:             appIcon,
 			WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand,

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/appStore';
 import { Upload, FileCode, Radio, FileType, RefreshCw, X, Trash2, ChevronDown, ChevronRight, AlertCircle, FolderOpen } from 'lucide-react';
+import { OnFileDrop, OnFileDropOff } from '../../../wailsjs/runtime/runtime';
 
 type LoadMode = 'protoset' | 'proto' | 'reflection';
 
@@ -14,18 +15,42 @@ export default function ProtosetLoader() {
   } = useAppStore();
   const [tab, setTab] = useState<LoadMode>('protoset');
   const [dragging, setDragging] = useState(false);
+  // Extra import paths the user has added for multi-root proto setups.
+  const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
+  const draggingRef = useRef(false);
+  const tabRef = useRef(tab);
+  const extraImportPathsRef = useRef(extraImportPaths);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   const cancelledRef = useRef(false);
-  // Extra import paths the user has added for multi-root proto setups.
-  const [extraImportPaths, setExtraImportPaths] = useState<string[]>([]);
 
   useEffect(() => {
     if (loadMode === 'proto' || loadMode === 'mixed') setExtraImportPaths(protoImportPaths ?? []);
     else if (loadMode !== 'protoset') setExtraImportPaths([]);
   }, [protoImportPaths, loadMode]);
+
+  // Keep refs in sync so the OnFileDrop callback (captured once) can read current values.
+  useEffect(() => { tabRef.current = tab; }, [tab]);
+  useEffect(() => { extraImportPathsRef.current = extraImportPaths; }, [extraImportPaths]);
+
+  // Use Wails' OnFileDrop to get real filesystem paths — standard HTML5 File.path is
+  // Electron-specific and is never populated in Wails' WebKit/WebView2 context.
+  useEffect(() => {
+    OnFileDrop((_x, _y, paths) => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      setDragging(false);
+      if (!paths.length) return;
+      if (tabRef.current === 'protoset') {
+        withLoading(() => loadProtosets(paths));
+      } else {
+        withLoading(() => loadProtoFiles(extraImportPathsRef.current, paths));
+      }
+    }, false);
+    return () => OnFileDropOff();
+  }, [loadProtosets, loadProtoFiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const withLoading = async (fn: () => Promise<void>) => {
     setError(null);
@@ -46,17 +71,6 @@ export default function ProtosetLoader() {
         if (paths?.length) await loadProtoFiles(extraImportPaths, paths);
       });
     }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const paths = Array.from(e.dataTransfer.files).map(
-      (f) => (f as File & { path?: string }).path ?? f.name
-    );
-    if (!paths.length) return;
-    if (tab === 'protoset') withLoading(() => loadProtosets(paths));
-    else withLoading(() => loadProtoFiles(extraImportPaths, paths));
   };
 
   const handleAddImportPath = async () => {
@@ -163,9 +177,8 @@ export default function ProtosetLoader() {
       ) : (
         <>
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); draggingRef.current = true; setDragging(true); }}
+            onDragLeave={() => { draggingRef.current = false; setDragging(false); }}
             onClick={handlePickFiles}
             className={`flex flex-col items-center justify-center gap-1 rounded border-2 border-dashed cursor-pointer py-3 transition-colors ${
               dragging ? 'border-c-accent bg-c-accent/10' : 'border-c-border hover:border-c-text3 hover:bg-c-hover'
