@@ -191,7 +191,8 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
 }
 
 // Wrap in double quotes, escaping backslashes and double quotes inside.
-// Use for header values so shell can expand $() substitutions.
+// Shell variable/command expansion (e.g. $TOKEN) is intentionally preserved so
+// users can reference env vars in header values when running the copied command.
 function doubleQuote(s: string): string {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }

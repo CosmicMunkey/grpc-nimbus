@@ -345,7 +345,7 @@ function HistoryPanel() {
         {history.length === 0 ? (
           <p className="p-4 text-xs text-c-text3 text-center">No history yet</p>
         ) : (
-          groups.map((group) => (
+          groups.map((group, groupIdx) => (
             <React.Fragment key={group.bucket}>
               <div className="sticky top-0 z-10 px-3 py-0.5 bg-c-bg border-b border-c-border">
                 <span className="text-[0.625rem] font-medium text-c-text3 uppercase tracking-wider">{group.label}</span>
@@ -354,7 +354,7 @@ function HistoryPanel() {
                 <HistoryEntryRow
                   key={entry.id}
                   entry={entry}
-                  initialExpanded={groups.indexOf(group) === 0 && entryIdx === 0}
+                  initialExpanded={groupIdx === 0 && entryIdx === 0}
                 />
               ))}
             </React.Fragment>

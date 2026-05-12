@@ -991,7 +991,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Use basename matching so we don't double-load a file that's already present
     // at a different absolute path (e.g. Downloads copy vs the app's protosets dir).
-    const pathBasename = (p: string) => p.split(/[/\\]/).pop() ?? p;
+    const pathBasename = (p: string) => {
+      const trimmed = p.replace(/[/\\]+$/, '');
+      const base = trimmed.split(/[/\\]/).pop();
+      return base || p;
+    };
     const loadedProtosetBasenames = new Set(loadedProtosetPaths.map(pathBasename));
     const allLoadedBasenames = new Set([
       ...loadedProtosetPaths.map(pathBasename),
@@ -1014,10 +1018,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (needsProtoFiles) {
       // Re-check after protoset load so we don't add proto files now covered by a new protoset.
-      const { loadedProtosetPaths: currentProtosets } = get();
+      const { loadedProtosetPaths: currentProtosets, protoImportPaths: currentImportPaths } = get();
       const currentProtosetBasenames = new Set(currentProtosets.map(pathBasename));
       const filteredFiles = newProtoFiles.filter((p) => !currentProtosetBasenames.has(pathBasename(p)));
-      if (filteredFiles.length > 0 || !includesAll(protoImportPaths, normalized.protoImportPaths)) {
+      if (filteredFiles.length > 0 || !includesAll(currentImportPaths, normalized.protoImportPaths)) {
         await get().loadProtoFiles(normalized.protoImportPaths, filteredFiles);
       }
     }

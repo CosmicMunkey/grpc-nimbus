@@ -265,7 +265,7 @@ func (a *App) storeDescriptorState(pd *rpc.ProtosetDescriptor, protosets, import
 	protosetSet := make(map[string]bool, len(protosets))
 	for _, p := range protosets {
 		cp := filepath.Clean(p)
-		if cp != "" && !protosetSet[cp] {
+		if cp != "" && cp != "." && !protosetSet[cp] {
 			protosetSet[cp] = true
 			cleanedProtosets = append(cleanedProtosets, cp)
 		}
@@ -274,7 +274,7 @@ func (a *App) storeDescriptorState(pd *rpc.ProtosetDescriptor, protosets, import
 	seenFiles := make(map[string]bool, len(protoFiles))
 	for _, p := range protoFiles {
 		cp := filepath.Clean(p)
-		if cp != "" && !protosetSet[cp] && !seenFiles[cp] {
+		if cp != "" && cp != "." && !protosetSet[cp] && !seenFiles[cp] {
 			seenFiles[cp] = true
 			cleanedProtoFiles = append(cleanedProtoFiles, cp)
 		}
