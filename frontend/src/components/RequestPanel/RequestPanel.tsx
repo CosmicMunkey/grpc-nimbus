@@ -190,9 +190,24 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function shellQuote(s: string): string {
-  // Wrap in single quotes, escaping any embedded single quotes.
+// Wrap in double quotes, escaping backslashes and double quotes inside.
+// Shell variable/command expansion (e.g. $TOKEN) is intentionally preserved so
+// users can reference env vars in header values when running the copied command.
+function doubleQuote(s: string): string {
+  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+// Wrap in single quotes, escaping any embedded single quotes.
+// Use for JSON body — single quotes are safest when content contains double quotes.
+function singleQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+// Return the string unquoted if it is shell-safe, otherwise double-quote it.
+// Use for paths, target, and method — they are usually safe and read more cleanly without quotes.
+function smartQuote(s: string): string {
+  if (/[^a-zA-Z0-9._/:@%-]/.test(s)) return doubleQuote(s);
+  return s;
 }
 
 function buildGrpcurlCommand(opts: {
@@ -211,20 +226,20 @@ function buildGrpcurlCommand(opts: {
   if (tls === 'none') args.push('-plaintext');
 
   if (loadMode === 'protoset' && protosetPath) {
-    args.push(`-protoset ${shellQuote(protosetPath)}`);
+    args.push(`-protoset ${smartQuote(protosetPath)}`);
   }
 
   for (const h of [...envHeaders, ...metadata]) {
-    if (h.key.trim()) args.push(`-H ${shellQuote(`${h.key}: ${h.value}`)}`);
+    if (h.key.trim()) args.push(`-H ${doubleQuote(`${h.key}: ${h.value}`)}`);
   }
 
   // Omit -d when body is empty or an empty object.
   const body = requestJson?.trim() || '{}';
   const isEmpty = (() => { try { const p = JSON.parse(body); return typeof p === 'object' && p !== null && Object.keys(p).length === 0; } catch { return false; } })();
-  if (!isEmpty) args.push(`-d ${shellQuote(body)}`);
+  if (!isEmpty) args.push(`-d ${singleQuote(body)}`);
 
-  args.push(shellQuote(target || 'localhost:50051'));
-  args.push(shellQuote(methodPath));
+  args.push(smartQuote(target || 'localhost:50051'));
+  args.push(smartQuote(methodPath));
 
   return args.join(' \\\n  ');
 }
