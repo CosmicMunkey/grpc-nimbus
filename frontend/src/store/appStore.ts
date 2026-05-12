@@ -988,17 +988,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadCollectionDescriptors: async (collection) => {
     const normalized = normalizeCollection(collection);
     const { loadedProtosetPaths, loadedProtoFilePaths, protoImportPaths } = get();
-    const needsProtosets = normalized.protosetPaths.length > 0
-      && !includesAll(loadedProtosetPaths, normalized.protosetPaths);
-    const needsProtoFiles = normalized.protoFilePaths.length > 0
-      && (!includesAll(loadedProtoFilePaths, normalized.protoFilePaths)
-        || !includesAll(protoImportPaths, normalized.protoImportPaths));
+
+    // Use basename matching so we don't double-load a file that's already present
+    // at a different absolute path (e.g. Downloads copy vs the app's protosets dir).
+    const pathBasename = (p: string) => p.split(/[/\\]/).pop() ?? p;
+    const loadedProtosetBasenames = new Set(loadedProtosetPaths.map(pathBasename));
+    const allLoadedBasenames = new Set([
+      ...loadedProtosetPaths.map(pathBasename),
+      ...loadedProtoFilePaths.map(pathBasename),
+    ]);
+
+    // Only load protosets not already covered by a loaded protoset (exact path or same basename).
+    const newProtosets = normalized.protosetPaths.filter(
+      (p) => !loadedProtosetPaths.includes(p) && !loadedProtosetBasenames.has(pathBasename(p))
+    );
+    const needsProtosets = newProtosets.length > 0;
+
+    // Only load proto files not already covered by any loaded descriptor (same basename).
+    const newProtoFiles = normalized.protoFilePaths.filter((p) => !allLoadedBasenames.has(pathBasename(p)));
+    const needsProtoFiles = newProtoFiles.length > 0
+      || !includesAll(protoImportPaths, normalized.protoImportPaths);
 
     if (needsProtosets) {
-      await get().loadProtosets(normalized.protosetPaths);
+      await get().loadProtosets(newProtosets);
     }
     if (needsProtoFiles) {
-      await get().loadProtoFiles(normalized.protoImportPaths, normalized.protoFilePaths);
+      // Re-check after protoset load so we don't add proto files now covered by a new protoset.
+      const { loadedProtosetPaths: currentProtosets } = get();
+      const currentProtosetBasenames = new Set(currentProtosets.map(pathBasename));
+      const filteredFiles = newProtoFiles.filter((p) => !currentProtosetBasenames.has(pathBasename(p)));
+      if (filteredFiles.length > 0 || !includesAll(protoImportPaths, normalized.protoImportPaths)) {
+        await get().loadProtoFiles(normalized.protoImportPaths, filteredFiles);
+      }
     }
   },
 

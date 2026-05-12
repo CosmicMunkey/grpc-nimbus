@@ -258,11 +258,33 @@ func (a *App) rebuildDescriptor(ctx context.Context, protosets, importPaths, pro
 }
 
 func (a *App) storeDescriptorState(pd *rpc.ProtosetDescriptor, protosets, importPaths, protoFiles []string, withReflection bool) {
+	// Normalize all paths and ensure no path appears in both lists.
+	// If a path is in protosets, it wins; remove it from protoFiles to prevent
+	// double-tracking that would show the same file twice in the UI.
+	cleanedProtosets := make([]string, 0, len(protosets))
+	protosetSet := make(map[string]bool, len(protosets))
+	for _, p := range protosets {
+		cp := filepath.Clean(p)
+		if cp != "" && !protosetSet[cp] {
+			protosetSet[cp] = true
+			cleanedProtosets = append(cleanedProtosets, cp)
+		}
+	}
+	cleanedProtoFiles := make([]string, 0, len(protoFiles))
+	seenFiles := make(map[string]bool, len(protoFiles))
+	for _, p := range protoFiles {
+		cp := filepath.Clean(p)
+		if cp != "" && !protosetSet[cp] && !seenFiles[cp] {
+			seenFiles[cp] = true
+			cleanedProtoFiles = append(cleanedProtoFiles, cp)
+		}
+	}
+
 	a.mu.Lock()
 	old := a.protoset
 	a.protoset = pd
-	a.loadedProtosetPaths = append([]string(nil), protosets...)
-	a.loadedProtoFiles = append([]string(nil), protoFiles...)
+	a.loadedProtosetPaths = cleanedProtosets
+	a.loadedProtoFiles = cleanedProtoFiles
 	a.loadImportPaths = append([]string(nil), importPaths...)
 	a.loadReflection = withReflection
 	a.mu.Unlock()
