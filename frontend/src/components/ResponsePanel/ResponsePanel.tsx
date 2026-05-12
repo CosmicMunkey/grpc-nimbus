@@ -203,10 +203,10 @@ function dateBucket(dateStr: string): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
-function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+function HistoryEntryRow({ entry, initialExpanded }: { entry: HistoryEntry; initialExpanded?: boolean }) {
   const isDark = useAppStore(s => s.isDark);
   const responseIndent = useAppStore(s => s.responseIndent);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initialExpanded ?? false);
   const successCls = isDark ? 'text-green-400' : 'text-green-600';
 
   return (
@@ -350,8 +350,12 @@ function HistoryPanel() {
               <div className="sticky top-0 z-10 px-3 py-0.5 bg-c-bg border-b border-c-border">
                 <span className="text-[0.625rem] font-medium text-c-text3 uppercase tracking-wider">{group.label}</span>
               </div>
-              {group.entries.map((entry) => (
-                <HistoryEntryRow key={entry.id} entry={entry} />
+              {group.entries.map((entry, entryIdx) => (
+                <HistoryEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  initialExpanded={groups.indexOf(group) === 0 && entryIdx === 0}
+                />
               ))}
             </React.Fragment>
           ))
