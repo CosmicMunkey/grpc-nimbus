@@ -46,8 +46,6 @@ frontend/dist/
 # Frontend dependencies
 frontend/node_modules/
 
-# Wails dev bindings (auto-generated)
-frontend/wailsjs/
 .github/copilot-instructions.md
 .github/project-context.md
 
