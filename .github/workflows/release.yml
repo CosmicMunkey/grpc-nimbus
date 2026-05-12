@@ -8,6 +8,8 @@ on:
 env:
   WAILS_CLI_VERSION: v2.12.0
 
+permissions: {}
+
 jobs:
   test-go:
     name: Go tests

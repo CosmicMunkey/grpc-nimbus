@@ -58,14 +58,14 @@ jobs:
         run: |
           rm -rf release-assets
           mkdir -p release-assets
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.version.outputs.tag }}"
           gh release download "${TAG}" \
             --repo ${{ github.repository }} \
             --pattern "*-darwin-arm64.zip" \
             --pattern "*-darwin-x86_64.zip" \
             --dir release-assets
         env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute SHA256
@@ -85,9 +85,6 @@ jobs:
 
       - name: Update cask formula
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ARM64="${{ steps.sha.outputs.arm64 }}"
-          AMD64="${{ steps.sha.outputs.amd64 }}"
           CASK="tap/Casks/grpc-nimbus.rb"
 
           # Update version
@@ -101,6 +98,10 @@ jobs:
 
           echo "Updated cask to version ${VERSION}"
           cat "${CASK}"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARM64: ${{ steps.sha.outputs.arm64 }}
+          AMD64: ${{ steps.sha.outputs.amd64 }}
 
       - name: Commit and push
         run: |
@@ -108,5 +109,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/grpc-nimbus.rb
-          git commit -m "Update grpc-nimbus to v${{ steps.version.outputs.version }}"
+          git commit -m "Update grpc-nimbus to v${VERSION}"
           git push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
