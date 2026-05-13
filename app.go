@@ -41,6 +41,10 @@ type App struct {
 	loadedProtoFiles    []string
 	loadImportPaths     []string
 	loadReflection      bool
+	// virtualImportDirs holds temp directories created for module-path import
+	// resolution (symlink trees bridging Go module paths to on-disk roots).
+	// These are not persisted to settings; they are re-created on each load.
+	virtualImportDirs []string
 
 	// streamCancel cancels the active streaming invocation, if any.
 	streamCancel    context.CancelFunc
@@ -99,17 +103,18 @@ func (a *App) startup(ctx context.Context) {
 		a.loadedProtosetPaths = append(a.loadedProtosetPaths, path)
 	}
 	if len(saved.ProtoFilePaths) > 0 {
-		pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
+		pd, _, virtualDirs, err := resolveProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
 		if err != nil {
 			// Try each file individually so unrelated files still load.
 			for _, file := range saved.ProtoFilePaths {
-				pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, []string{file})
+				pd, _, vd, err := resolveProtoFiles(saved.ProtoImportPaths, []string{file})
 				if err != nil {
 					fmt.Printf("warning: auto-restore proto file %q skipped: %v\n", file, err)
 					continue
 				}
 				parts = append(parts, pd)
 				a.loadedProtoFiles = append(a.loadedProtoFiles, file)
+				a.virtualImportDirs = append(a.virtualImportDirs, vd...)
 			}
 			if len(a.loadedProtoFiles) > 0 {
 				a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
@@ -118,6 +123,7 @@ func (a *App) startup(ctx context.Context) {
 			parts = append(parts, pd)
 			a.loadedProtoFiles = append([]string(nil), saved.ProtoFilePaths...)
 			a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
+			a.virtualImportDirs = append(a.virtualImportDirs, virtualDirs...)
 		}
 	}
 	if merged := rpc.MergeDescriptors(parts...); merged != nil {

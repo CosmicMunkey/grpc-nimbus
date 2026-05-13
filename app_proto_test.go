@@ -159,6 +159,47 @@ func TestDescriptorSourcesAccumulateAcrossProtoAndProtosetLoads(t *testing.T) {
 	}
 }
 
+func TestLoadProtoFilesAutoResolvesModulePathImports(t *testing.T) {
+	moduleRoot, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport", "module"))
+	if err != nil {
+		t.Fatalf("resolve fixture root: %v", err)
+	}
+
+	protoFile := filepath.Join(moduleRoot, "service", "service.proto")
+
+	a := &App{}
+	services, err := a.LoadProtoFiles(nil, []string{protoFile})
+	if err != nil {
+		t.Fatalf("LoadProtoFiles: %v", err)
+	}
+
+	if len(services) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(services))
+	}
+	if services[0].Name != "service.v1.ModuleService" {
+		t.Fatalf("expected service service.v1.ModuleService, got %q", services[0].Name)
+	}
+	if len(services[0].Methods) != 1 || services[0].Methods[0].MethodName != "Greet" {
+		t.Fatalf("expected Greet method, got %+v", services[0].Methods)
+	}
+
+	// Virtual dirs should be tracked and cleaned up on clear.
+	a.mu.Lock()
+	vdCount := len(a.virtualImportDirs)
+	a.mu.Unlock()
+	if vdCount == 0 {
+		t.Fatal("expected at least one virtual import dir to be tracked")
+	}
+	a.ClearLoadedProtos()
+	a.mu.Lock()
+	vdCountAfter := len(a.virtualImportDirs)
+	a.mu.Unlock()
+	if vdCountAfter != 0 {
+		t.Fatalf("expected virtual import dirs to be cleared, got %d", vdCountAfter)
+	}
+}
+
+
 func serviceNames(services []rpc.ServiceInfo, err error) ([]string, error) {
 	if err != nil {
 		return nil, err
