@@ -473,6 +473,7 @@ interface AppState {
   activeEnvironmentId: string;
   loadEnvironments: () => Promise<void>;
   saveEnvironment: (env: Environment) => Promise<void>;
+  cloneEnvironment: (env: Environment) => Promise<void>;
   deleteEnvironment: (id: string) => Promise<void>;
   setActiveEnvironment: (id: string) => Promise<void>;
 
@@ -1239,6 +1240,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await api.deleteEnvironment(id);
     if (get().activeEnvironmentId === id) await get().setActiveEnvironment('');
     await get().loadEnvironments();
+  },
+
+  cloneEnvironment: async (env) => {
+    const now = new Date().toISOString();
+    await get().saveEnvironment({
+      ...env,
+      id: crypto.randomUUID(),
+      name: `${env.name} copy`,
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 
   setActiveEnvironment: async (id) => {

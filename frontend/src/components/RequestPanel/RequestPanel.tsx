@@ -214,20 +214,40 @@ function buildGrpcurlCommand(opts: {
   target: string;
   tls: string;
   protosetPath: string | undefined;
-  loadMode: string;
+  protoImportPaths: string[];
+  loadedProtoFilePaths: string[];
   envHeaders: { key: string; value: string }[];
   metadata: MetadataEntry[];
   requestJson: string;
   methodPath: string;
 }): string {
-  const { target, tls, protosetPath, loadMode, envHeaders, metadata, requestJson, methodPath } = opts;
+  const { target, tls, protosetPath, protoImportPaths, loadedProtoFilePaths, envHeaders, metadata, requestJson, methodPath } = opts;
   const args: string[] = ['grpcurl'];
 
   if (tls === 'none') args.push('-plaintext');
 
-  if (loadMode === 'protoset' && protosetPath) {
+  if (protosetPath) {
+    // Service was loaded from a protoset file — use -protoset (works in protoset and mixed modes).
     args.push(`-protoset ${smartQuote(protosetPath)}`);
+  } else if (loadedProtoFilePaths.length > 0) {
+    // Service was loaded from proto files — use -import-path / -proto flags (proto and mixed modes).
+    for (const importPath of protoImportPaths) {
+      args.push(`-import-path ${smartQuote(importPath)}`);
+    }
+    for (const filePath of loadedProtoFilePaths) {
+      // Compute path relative to a matching import root, falling back to the full path.
+      let protoArg = filePath;
+      for (const importPath of protoImportPaths) {
+        const prefix = importPath.endsWith('/') ? importPath : importPath + '/';
+        if (filePath.startsWith(prefix)) {
+          protoArg = filePath.slice(prefix.length);
+          break;
+        }
+      }
+      args.push(`-proto ${smartQuote(protoArg)}`);
+    }
   }
+  // reflection mode: no descriptor flags needed
 
   for (const h of [...envHeaders, ...metadata]) {
     if (h.key.trim()) args.push(`-H ${doubleQuote(`${h.key}: ${h.value}`)}`);
@@ -245,7 +265,7 @@ function buildGrpcurlCommand(opts: {
 }
 
 function GrpcurlTab() {
-  const { services, connectionConfig, loadMode, environments, activeEnvironmentId } = useAppStore();
+  const { services, connectionConfig, environments, activeEnvironmentId, protoImportPaths, loadedProtoFilePaths } = useAppStore();
   const { requestJson, requestMetadata, selectedMethod } = useActiveTab();
   const [copied, setCopied] = useState(false);
 
@@ -256,7 +276,8 @@ function GrpcurlTab() {
     target: connectionConfig.target,
     tls: connectionConfig.tls,
     protosetPath: sourceFile,
-    loadMode,
+    protoImportPaths,
+    loadedProtoFilePaths,
     envHeaders: activeEnv?.headers ?? [],
     metadata: requestMetadata,
     requestJson,
@@ -281,15 +302,10 @@ function GrpcurlTab() {
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
-      <pre className="flex-1 overflow-auto bg-c-bg border border-c-border rounded p-3 text-xs font-mono text-c-text leading-relaxed whitespace-pre select-all">
+      <pre key={command} className="flex-1 overflow-auto bg-c-bg border border-c-border rounded p-3 text-xs font-mono text-c-text leading-relaxed whitespace-pre select-all">
         {command}
       </pre>
-      {loadMode === 'proto' && (
-        <p className="text-[0.625rem] text-c-text3">
-          Note: Proto file import paths may need <span className="font-mono text-c-text2">-import-path</span> and <span className="font-mono text-c-text2">-proto</span> flags added manually.
-        </p>
-      )}
-      {loadMode === 'reflection' && (
+      {!sourceFile && loadedProtoFilePaths.length === 0 && (
         <p className="text-[0.625rem] text-c-text3">
           Using server reflection — no <span className="font-mono text-c-text2">-protoset</span> flag needed.
         </p>

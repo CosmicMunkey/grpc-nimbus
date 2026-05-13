@@ -773,7 +773,7 @@ function InlineEnvEditor({ initial, onBack }: InlineEnvEditorProps) {
 // ── Environments List ─────────────────────────────────────────────────────────
 
 function EnvironmentsSection() {
-  const { environments, activeEnvironmentId, setActiveEnvironment, deleteEnvironment } = useAppStore();
+  const { environments, activeEnvironmentId, setActiveEnvironment, deleteEnvironment, cloneEnvironment } = useAppStore();
   const [editingEnv, setEditingEnv] = useState<Environment | undefined>(undefined);
   const [showEditor, setShowEditor] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -847,6 +847,13 @@ function EnvironmentsSection() {
                     className="p-1.5 text-c-text3 hover:text-c-text hover:bg-c-border rounded"
                   >
                     <Pencil size={12} />
+                  </button>
+                  <button
+                    onClick={() => cloneEnvironment(env)}
+                    title="Clone"
+                    className="p-1.5 text-c-text3 hover:text-c-text hover:bg-c-border rounded"
+                  >
+                    <Copy size={12} />
                   </button>
                   <button
                     onClick={() => setConfirmDeleteId(env.id)}
