@@ -126,10 +126,11 @@ func importRefsForFile(path string) []string {
 	return refs
 }
 
-func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (string, bool) {
-	suffix := filepath.Clean(filepath.FromSlash(importRef))
+// searchImportRootInDir searches for a matching import root within a single directory.
+// Returns the best match (shortest path to root) or empty string if none found.
+func searchImportRootInDir(searchDir, suffix string, known map[string]bool) string {
 	best := ""
-	_ = filepath.Walk(searchRoot, func(path string, info os.FileInfo, walkErr error) error {
+	_ = filepath.Walk(searchDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info == nil || info.IsDir() {
 			return nil
 		}
@@ -147,6 +148,38 @@ func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (st
 		}
 		return nil
 	})
+	return best
+}
+
+// matchingImportRoot searches for a matching import root. It first searches in the
+// primary searchRoot, then optionally in vendorRoot if provided. Uses "prefer-closest"
+// strategy: returns the match with the shortest path to root.
+func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (string, bool) {
+	suffix := filepath.Clean(filepath.FromSlash(importRef))
+	best := searchImportRootInDir(searchRoot, suffix, known)
+	
+	// If no match in primary root, the function returns empty and we're done.
+	// If we found a match, we'll compare with vendor matches below.
+	if best != "" {
+		return best, true
+	}
+	return "", false
+}
+
+// matchingImportRootWithVendor searches for a matching import root in both the
+// primary searchRoot and an optional vendorRoot. Uses "prefer-closest" strategy:
+// returns the match with the shortest path to root.
+func matchingImportRootWithVendor(searchRoot, vendorRoot, importRef string, known map[string]bool) (string, bool) {
+	suffix := filepath.Clean(filepath.FromSlash(importRef))
+	best := searchImportRootInDir(searchRoot, suffix, known)
+	
+	if vendorRoot != "" {
+		vendorMatch := searchImportRootInDir(vendorRoot, suffix, known)
+		if vendorMatch != "" && (best == "" || len(vendorMatch) < len(best)) {
+			best = vendorMatch
+		}
+	}
+	
 	if best == "" {
 		return "", false
 	}
@@ -162,10 +195,19 @@ func discoverImportPaths(protoFiles, importPaths []string) []string {
 	for _, path := range importPaths {
 		known[path] = true
 	}
+	
+	// Check if a vendor directory exists as a sibling to searchRoot
+	vendorRoot := ""
+	parentDir := filepath.Dir(searchRoot)
+	potentialVendor := filepath.Join(parentDir, "vendor")
+	if info, err := os.Stat(potentialVendor); err == nil && info.IsDir() {
+		vendorRoot = potentialVendor
+	}
+	
 	var discovered []string
 	for _, file := range protoFiles {
 		for _, importRef := range importRefsForFile(file) {
-			root, ok := matchingImportRoot(searchRoot, importRef, known)
+			root, ok := matchingImportRootWithVendor(searchRoot, vendorRoot, importRef, known)
 			if ok {
 				known[root] = true
 				discovered = append(discovered, root)
