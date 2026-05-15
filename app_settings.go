@@ -19,6 +19,7 @@ type UserSettings struct {
 	ConfirmDeletes        bool                `json:"confirmDeletes"`
 	TimestampInputLocal   bool                `json:"timestampInputLocal"`
 	ConfirmClearHistory   bool                `json:"confirmClearHistory"`
+	ThemeBadge            string              `json:"themeBadge"`
 	Theme                 string              `json:"theme"`
 	CustomThemes          []CustomThemeEntry  `json:"customThemes"`
 	ActiveCustomThemeID   string              `json:"activeCustomThemeId"`
@@ -79,6 +80,7 @@ func (a *App) GetUserSettings() UserSettings {
 	if saved.ConfirmClearHistory != nil {
 		result.ConfirmClearHistory = *saved.ConfirmClearHistory
 	}
+	result.ThemeBadge = saved.ThemeBadge
 	if saved.Theme != "" {
 		result.Theme = saved.Theme
 	}
@@ -184,6 +186,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.ConfirmDeletes = &s.ConfirmDeletes
 		settings.TimestampInputLocal = &s.TimestampInputLocal
 		settings.ConfirmClearHistory = &s.ConfirmClearHistory
+		settings.ThemeBadge = s.ThemeBadge
 		settings.Theme = s.Theme
 		settings.ActiveCustomThemeID = s.ActiveCustomThemeID
 		settings.CustomTheme = nil // clear legacy field once new list is in use

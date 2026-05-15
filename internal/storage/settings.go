@@ -40,6 +40,7 @@ type AppSettings struct {
 
 	// Appearance
 	EnvSortByCreated    *bool              `json:"envSortByCreated,omitempty"`    // nil → false (alphabetical); true → by creation time
+	ThemeBadge          string             `json:"themeBadge,omitempty"`          // decorative icon badge: "" | "rainbow" | "trans" | "nonbinary"
 	Theme               string             `json:"theme,omitempty"`               // "nimbus" | "dark" | "light" | "custom" | colorblind presets
 	CustomTheme         map[string]string  `json:"customTheme,omitempty"`         // legacy single custom theme (migrated on load)
 	CustomThemes        []CustomThemeEntry `json:"customThemes,omitempty"`        // named custom themes

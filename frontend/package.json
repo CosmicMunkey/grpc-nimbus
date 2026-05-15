@@ -15,6 +15,7 @@
     "@codemirror/view": "^6.39.16",
     "@lezer/highlight": "^1.0.0",
     "@uiw/react-codemirror": "^4.25.7",
+    "canvas-confetti": "^1.9.3",
     "lucide-react": "^1.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

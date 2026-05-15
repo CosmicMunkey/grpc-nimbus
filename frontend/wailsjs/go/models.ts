@@ -66,6 +66,7 @@ export namespace main {
 	    confirmDeletes: boolean;
 	    timestampInputLocal: boolean;
 	    confirmClearHistory: boolean;
+	    themeBadge: string;
 	    theme: string;
 	    customThemes: CustomThemeEntry[];
 	    activeCustomThemeId: string;
@@ -96,6 +97,7 @@ export namespace main {
 	        this.confirmDeletes = source["confirmDeletes"];
 	        this.timestampInputLocal = source["timestampInputLocal"];
 	        this.confirmClearHistory = source["confirmClearHistory"];
+	        this.themeBadge = source["themeBadge"];
 	        this.theme = source["theme"];
 	        this.customThemes = this.convertValues(source["customThemes"], CustomThemeEntry);
 	        this.activeCustomThemeId = source["activeCustomThemeId"];

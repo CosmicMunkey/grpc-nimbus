@@ -62,6 +62,7 @@ declare global {
             timestampInputLocal: boolean;
             confirmClearHistory?: boolean;
             theme: string;
+            themeBadge?: string;
             customThemes?: CustomThemeEntry[];
             activeCustomThemeId?: string;
             fontSize?: number;
@@ -83,6 +84,7 @@ declare global {
             timestampInputLocal: boolean;
             confirmClearHistory: boolean;
             theme: string;
+            themeBadge: string;
             customThemes: CustomThemeEntry[];
             activeCustomThemeId: string;
             fontSize: number;
@@ -145,7 +147,7 @@ export const api = {
   getUserSettings: () => window.go.main.App.GetUserSettings(),
   saveUserSettings: (s: {
     confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
-    theme: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
+    theme: string; themeBadge: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
     fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean; envSortByCreated: boolean;
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
@@ -157,7 +159,7 @@ export const api = {
 // Persist all user settings from the current store state.
 function saveAllSettings(s: Pick<AppState,
   'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
-  'theme' | 'customThemes' | 'activeCustomThemeId' |
+  'theme' | 'themeBadge' | 'customThemes' | 'activeCustomThemeId' |
   'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' | 'envSortByCreated' |
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
@@ -169,6 +171,7 @@ function saveAllSettings(s: Pick<AppState,
     timestampInputLocal: s.timestampInputLocal,
     confirmClearHistory: s.confirmClearHistory,
     theme: s.theme,
+    themeBadge: s.themeBadge,
     customThemes: s.customThemes,
     activeCustomThemeId: s.activeCustomThemeId,
     fontSize: s.fontSize,
@@ -496,6 +499,8 @@ interface AppState {
   deleteCustomTheme: (id: string) => void;
   fontSize: number;
   setFontSize: (size: number) => void;
+  themeBadge: string;
+  setThemeBadge: (badge: string) => void;
   responseWordWrap: boolean;
   setResponseWordWrap: (v: boolean) => void;
   responseIndent: number;
@@ -1278,6 +1283,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeThemeTokens: THEMES.nimbus,
   customThemes: [],
   activeCustomThemeId: '',
+  themeBadge: '',
   fontSize: 16,
   responseWordWrap: true,
   responseIndent: 2,
@@ -1320,6 +1326,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeThemeTokens: resolved,
         customThemes,
         activeCustomThemeId,
+        themeBadge: s.themeBadge ?? '',
         fontSize,
         responseWordWrap: s.responseWordWrap ?? true,
         responseIndent: s.responseIndent ?? 2,
@@ -1428,6 +1435,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFontSize: (size) => {
     set({ fontSize: size });
     applyFontSize(size);
+    saveAllSettings(get());
+  },
+
+  setThemeBadge: (badge) => {
+    set({ themeBadge: badge });
     saveAllSettings(get());
   },
 

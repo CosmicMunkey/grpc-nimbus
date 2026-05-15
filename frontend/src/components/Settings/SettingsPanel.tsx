@@ -210,8 +210,130 @@ function TokenEditor({
 
 // ── Themes section ────────────────────────────────────────────────────────────
 
+// ── Flair options ─────────────────────────────────────────────────────────────
+type FlairItem = { id: string; label: string; icon: React.ReactNode };
+const FLAIR_GROUPS: { label: string; items: FlairItem[] }[] = [
+  {
+    label: 'Holidays',
+    items: [
+      { id: 'xmas',         label: 'Christmas',      icon: <span className="text-base leading-none">🎄</span> },
+      { id: 'hanukkah',     label: 'Hanukkah',       icon: <span className="text-base leading-none">🕎</span> },
+      { id: 'newyear',      label: "New Year's",     icon: <span className="text-base leading-none">✨</span> },
+      { id: 'valentine',    label: "Valentine's",    icon: <span className="text-base leading-none">❤️</span> },
+      { id: 'stpatricks',   label: "St. Patrick's",  icon: <span className="text-base leading-none">🍀</span> },
+      { id: 'easter',       label: 'Easter',         icon: <span className="text-base leading-none">🐣</span> },
+      { id: 'july4',        label: '4th of July',    icon: <span className="text-base leading-none">🎆</span> },
+      { id: 'halloween',    label: 'Halloween',      icon: <span className="text-base leading-none">🎃</span> },
+      { id: 'thanksgiving', label: 'Thanksgiving',   icon: <span className="text-base leading-none">🦃</span> },
+      { id: 'diwali',       label: 'Diwali',         icon: <span className="text-base leading-none">🪔</span> },
+    ],
+  },
+  {
+    label: 'Pride',
+    items: [
+      { id: 'rainbow', label: 'Rainbow', icon: (
+        <span className="text-base leading-none">🌈</span>
+      )},
+      { id: 'progress', label: 'Progress', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"     width="20" height="2.34" fill="#e40303"/>
+          <rect y="2.34"  width="20" height="2.33" fill="#ff8c00"/>
+          <rect y="4.67"  width="20" height="2.33" fill="#ffed00"/>
+          <rect y="7"     width="20" height="2.33" fill="#008026"/>
+          <rect y="9.33"  width="20" height="2.34" fill="#004dff"/>
+          <rect y="11.67" width="20" height="2.33" fill="#750787"/>
+          <polygon points="0,0 7,7 0,14"   fill="#000000"/>
+          <polygon points="0,0 5.8,7 0,14" fill="#784f17"/>
+          <polygon points="0,0 4.6,7 0,14" fill="#ffffff"/>
+          <polygon points="0,0 3.4,7 0,14" fill="#ffafc8"/>
+          <polygon points="0,0 2.2,7 0,14" fill="#74d7ee"/>
+        </svg>
+      )},
+      { id: 'lesbian', label: 'Lesbian', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="2.8" fill="#d52d00"/>
+          <rect y="2.8"  width="20" height="2.8" fill="#ff9a56"/>
+          <rect y="5.6"  width="20" height="2.8" fill="#ffffff"/>
+          <rect y="8.4"  width="20" height="2.8" fill="#d362a4"/>
+          <rect y="11.2" width="20" height="2.8" fill="#a50062"/>
+        </svg>
+      )},
+      { id: 'trans', label: 'Trans', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="2.8" fill="#74d7ee"/>
+          <rect y="2.8"  width="20" height="2.8" fill="#ffafc8"/>
+          <rect y="5.6"  width="20" height="2.8" fill="#ffffff"/>
+          <rect y="8.4"  width="20" height="2.8" fill="#ffafc8"/>
+          <rect y="11.2" width="20" height="2.8" fill="#74d7ee"/>
+        </svg>
+      )},
+      { id: 'bisexual', label: 'Bisexual', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"   width="20" height="5.6" fill="#d60270"/>
+          <rect y="5.6" width="20" height="2.8" fill="#9b4f96"/>
+          <rect y="8.4" width="20" height="5.6" fill="#0038a8"/>
+        </svg>
+      )},
+      { id: 'pansexual', label: 'Pansexual', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="4.67" fill="#ff218c"/>
+          <rect y="4.67" width="20" height="4.66" fill="#ffd800"/>
+          <rect y="9.33" width="20" height="4.67" fill="#21b1ff"/>
+        </svg>
+      )},
+      { id: 'nonbinary', label: 'Non-binary', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="3.5" fill="#fcf434"/>
+          <rect y="3.5"  width="20" height="3.5" fill="#ffffff"/>
+          <rect y="7"    width="20" height="3.5" fill="#9c59d1"/>
+          <rect y="10.5" width="20" height="3.5" fill="#2d2d2d"/>
+        </svg>
+      )},
+      { id: 'asexual', label: 'Asexual', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="3.5" fill="#000000"/>
+          <rect y="3.5"  width="20" height="3.5" fill="#a4a4a4"/>
+          <rect y="7"    width="20" height="3.5" fill="#ffffff"/>
+          <rect y="10.5" width="20" height="3.5" fill="#810081"/>
+        </svg>
+      )},
+      { id: 'genderfluid', label: 'Genderfluid', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="2.8" fill="#ff76a4"/>
+          <rect y="2.8"  width="20" height="2.8" fill="#ffffff"/>
+          <rect y="5.6"  width="20" height="2.8" fill="#c011d7"/>
+          <rect y="8.4"  width="20" height="2.8" fill="#000000"/>
+          <rect y="11.2" width="20" height="2.8" fill="#2c2ecc"/>
+        </svg>
+      )},
+      { id: 'genderqueer', label: 'Genderqueer', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="4.67" fill="#b77fdd"/>
+          <rect y="4.67" width="20" height="4.66" fill="#ffffff"/>
+          <rect y="9.33" width="20" height="4.67" fill="#49821e"/>
+        </svg>
+      )},
+      { id: 'aromantic', label: 'Aromantic', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect y="0"    width="20" height="2.8" fill="#3da542"/>
+          <rect y="2.8"  width="20" height="2.8" fill="#a8d47a"/>
+          <rect y="5.6"  width="20" height="2.8" fill="#ffffff"/>
+          <rect y="8.4"  width="20" height="2.8" fill="#a9a9a9"/>
+          <rect y="11.2" width="20" height="2.8" fill="#000000"/>
+        </svg>
+      )},
+      { id: 'intersex', label: 'Intersex', icon: (
+        <svg width="20" height="14" viewBox="0 0 20 14" style={{ display: 'block', borderRadius: 1 }}>
+          <rect width="20" height="14" fill="#ffd800"/>
+          <circle cx="10" cy="7" r="4.5" fill="none" stroke="#7902aa" strokeWidth="2"/>
+        </svg>
+      )},
+    ],
+  },
+];
+
 function ThemesSection() {
-  const { theme, customThemes, activeCustomThemeId, setTheme, forkTheme, updateCustomTheme, renameCustomTheme, deleteCustomTheme } = useAppStore();
+  const { theme, themeBadge, setThemeBadge, customThemes, activeCustomThemeId, setTheme, forkTheme, updateCustomTheme, renameCustomTheme, deleteCustomTheme } = useAppStore();
   const [editingTokensId, setEditingTokensId] = useState<string | null>(null);
 
   function handlePresetSelect(id: Exclude<ThemeId, 'custom'>) {
@@ -260,6 +382,31 @@ function ThemesSection() {
               />
             ))}
           </div>
+        </div>
+
+        {/* Flair */}
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Flair</p>
+            <p className="text-xs text-c-text3 mb-1">Adds a fun icon to the connection bar — click it to celebrate 🎉</p>
+          </div>
+          {FLAIR_GROUPS.map(({ label: groupLabel, items }) => (
+            <div key={groupLabel}>
+              <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">{groupLabel}</p>
+              <div className="flex flex-wrap gap-2">
+                {items.map(({ id, label, icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setThemeBadge(themeBadge === id ? '' : id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs transition-colors ${themeBadge === id ? 'border-c-accent bg-c-hover' : 'border-c-border bg-c-input hover:bg-c-hover'}`}
+                  >
+                    {icon}
+                    <span className={themeBadge === id ? 'text-c-accent' : 'text-c-text2'}>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Custom themes */}
