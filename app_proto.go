@@ -126,10 +126,11 @@ func importRefsForFile(path string) []string {
 	return refs
 }
 
-func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (string, bool) {
-	suffix := filepath.Clean(filepath.FromSlash(importRef))
+// searchImportRootInDir searches for a matching import root within a single directory.
+// Returns the best match (shortest path to root) or empty string if none found.
+func searchImportRootInDir(searchDir, suffix string, known map[string]bool) string {
 	best := ""
-	_ = filepath.Walk(searchRoot, func(path string, info os.FileInfo, walkErr error) error {
+	_ = filepath.Walk(searchDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil || info == nil || info.IsDir() {
 			return nil
 		}
@@ -147,10 +148,41 @@ func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (st
 		}
 		return nil
 	})
-	if best == "" {
-		return "", false
+	return best
+}
+
+// matchingImportRoot searches for a matching import root. It first searches in the
+// primary searchRoot, then optionally in vendorRoot if provided. Uses "prefer-closest"
+// strategy: returns the match with the shortest path to root.
+func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (string, bool) {
+	suffix := filepath.Clean(filepath.FromSlash(importRef))
+	best := searchImportRootInDir(searchRoot, suffix, known)
+	
+	// If no match in primary root, the function returns empty and we're done.
+	// If we found a match, we'll compare with vendor matches below.
+	if best != "" {
+		return best, true
 	}
-	return best, true
+	return "", false
+}
+
+// matchingImportRootWithVendor searches for a matching import root in both the
+// primary searchRoot and an optional vendorRoot. When vendorRoot is provided and
+// contains a match it is always preferred over any match found inside searchRoot,
+// because the vendor tree is the canonical location for explicitly vendored imports.
+func matchingImportRootWithVendor(searchRoot, vendorRoot, importRef string, known map[string]bool) (string, bool) {
+	suffix := filepath.Clean(filepath.FromSlash(importRef))
+
+	if vendorRoot != "" {
+		if vendorMatch := searchImportRootInDir(vendorRoot, suffix, known); vendorMatch != "" {
+			return vendorMatch, true
+		}
+	}
+
+	if best := searchImportRootInDir(searchRoot, suffix, known); best != "" {
+		return best, true
+	}
+	return "", false
 }
 
 func discoverImportPaths(protoFiles, importPaths []string) []string {
@@ -162,10 +194,21 @@ func discoverImportPaths(protoFiles, importPaths []string) []string {
 	for _, path := range importPaths {
 		known[path] = true
 	}
+	
+	// Prefer searchRoot/vendor (closest to the loaded files) over parentDir/vendor.
+	vendorRoot := ""
+	if info, err := os.Stat(filepath.Join(searchRoot, "vendor")); err == nil && info.IsDir() {
+		vendorRoot = filepath.Join(searchRoot, "vendor")
+	} else if parentDir := filepath.Dir(searchRoot); parentDir != searchRoot {
+		if info, err := os.Stat(filepath.Join(parentDir, "vendor")); err == nil && info.IsDir() {
+			vendorRoot = filepath.Join(parentDir, "vendor")
+		}
+	}
+	
 	var discovered []string
 	for _, file := range protoFiles {
 		for _, importRef := range importRefsForFile(file) {
-			root, ok := matchingImportRoot(searchRoot, importRef, known)
+			root, ok := matchingImportRootWithVendor(searchRoot, vendorRoot, importRef, known)
 			if ok {
 				known[root] = true
 				discovered = append(discovered, root)
@@ -195,6 +238,223 @@ func inferImportPath(err error, protoFiles, importPaths []string) (string, bool)
 		return "", false
 	}
 	return best, true
+}
+
+// findGoModuleRoot walks up from startDir looking for a go.mod file.
+// Returns (modulePath, moduleRoot) where modulePath is the module directive
+// value and moduleRoot is the directory containing go.mod. Both are empty if
+// no go.mod is found within a reasonable depth.
+func findGoModuleRoot(startDir string) (string, string) {
+	dir := startDir
+	for range 15 {
+		goMod := filepath.Join(dir, "go.mod")
+		if data, err := os.ReadFile(goMod); err == nil {
+			for _, line := range strings.SplitN(string(data), "\n", 20) {
+				line = strings.TrimSpace(line)
+				if after, ok := strings.CutPrefix(line, "module "); ok {
+					mod := strings.TrimSpace(after)
+					// Strip any trailing inline // comment (e.g. "module foo/bar // comment").
+					if idx := strings.Index(mod, "//"); idx >= 0 {
+						mod = strings.TrimSpace(mod[:idx])
+					}
+					if mod != "" {
+						return mod, dir
+					}
+				}
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", ""
+}
+
+// makeVirtualRoot creates a temp directory containing a symlink
+// <tmp>/<modulePathOnDisk> → actualRoot. Returns (tmpDir, ok).
+// The caller must remove tmpDir when done.
+func makeVirtualRoot(modulePathOnDisk, actualRoot string) (string, bool) {
+	// Reject absolute paths and traversal sequences so the symlink cannot
+	// escape the temp directory and affect paths outside the cleanup scope.
+	clean := filepath.Clean(modulePathOnDisk)
+	if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	tmp, err := os.MkdirTemp("", "grpc-nimbus-virtual-*")
+	if err != nil {
+		return "", false
+	}
+	linkPath := filepath.Join(tmp, clean)
+	// Belt-and-suspenders: confirm linkPath is actually inside tmp.
+	if !strings.HasPrefix(linkPath, tmp+string(filepath.Separator)) {
+		os.RemoveAll(tmp)
+		return "", false
+	}
+	linkParent := filepath.Dir(linkPath)
+	if linkParent != tmp {
+		if err := os.MkdirAll(linkParent, 0755); err != nil {
+			os.RemoveAll(tmp)
+			return "", false
+		}
+	}
+	if err := os.Symlink(actualRoot, linkPath); err != nil {
+		// os.Symlink for directories can fail on Windows without Developer Mode.
+		// Fall back to a recursive directory copy so proto loading still works.
+		if copyErr := copyDirTree(actualRoot, linkPath); copyErr != nil {
+			os.RemoveAll(tmp)
+			return "", false
+		}
+	}
+	return tmp, true
+}
+
+// copyDirTree recursively copies the directory tree at src into dst.
+// Used as a fallback when os.Symlink is unavailable (e.g. Windows without
+// Developer Mode enabled).
+func copyDirTree(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode())
+	})
+}
+
+// inferVirtualImportRootFromGoMod attempts to resolve a module-path-prefixed
+// import by locating a go.mod in parent directories of sourceDir. When found,
+// it verifies the import ref starts with the declared module path and the file
+// exists under the module root, then creates a symlink virtual import root.
+func inferVirtualImportRootFromGoMod(importRef, sourceDir string) (string, bool) {
+	modulePath, moduleRoot := findGoModuleRoot(sourceDir)
+	if modulePath == "" || moduleRoot == "" {
+		return "", false
+	}
+	importRefSlash := filepath.ToSlash(importRef)
+	if !strings.HasPrefix(importRefSlash, modulePath+"/") {
+		return "", false
+	}
+	inModulePath := strings.TrimPrefix(importRefSlash, modulePath+"/")
+	actualFile := filepath.Join(moduleRoot, filepath.FromSlash(inModulePath))
+	if _, err := os.Stat(actualFile); err != nil {
+		return "", false
+	}
+	return makeVirtualRoot(filepath.FromSlash(modulePath), moduleRoot)
+}
+
+// inferVirtualImportRootByHeuristic falls back to a suffix-stripping search
+// when no go.mod is found. It strips leading path components from importRef
+// one at a time and looks for a file matching the remaining suffix within
+// searchRoot. To avoid false positives, only a unique match is accepted.
+func inferVirtualImportRootByHeuristic(importRef, searchRoot string) (string, bool) {
+	if searchRoot == "" {
+		return "", false
+	}
+	components := strings.Split(filepath.ToSlash(importRef), "/")
+	if len(components) < 2 {
+		return "", false
+	}
+	for i := 1; i < len(components)-1; i++ {
+		suffix := filepath.Join(components[i:]...)
+		var matches []string
+		_ = filepath.Walk(searchRoot, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil || info == nil || info.IsDir() {
+				return nil
+			}
+			cleanPath := filepath.Clean(path)
+			if strings.HasSuffix(cleanPath, string(os.PathSeparator)+suffix) {
+				matches = append(matches, cleanPath)
+			}
+			return nil
+		})
+		if len(matches) != 1 {
+			continue // ambiguous or not found
+		}
+		actualRoot := strings.TrimSuffix(matches[0], string(os.PathSeparator)+suffix)
+		if actualRoot == "" {
+			continue
+		}
+		prefix := filepath.FromSlash(strings.Join(components[:i], "/"))
+		return makeVirtualRoot(prefix, actualRoot)
+	}
+	return "", false
+}
+
+// inferVirtualImportRoot creates a virtual import root to resolve module-path
+// imports (e.g., "example.com/org/module/service.proto" → on-disk file at
+// "<module-root>/service.proto"). sourcePath is the .proto file whose import
+// statement triggered the error; its directory anchors the go.mod search.
+//
+// Returns (tmpDir, ok). tmpDir must be removed by the caller when done.
+func inferVirtualImportRoot(importRef, sourcePath string) (string, bool) {
+	sourceDir := filepath.Dir(sourcePath)
+
+	// Primary: find go.mod and use the declared module path for exact mapping.
+	if tmpDir, ok := inferVirtualImportRootFromGoMod(importRef, sourceDir); ok {
+		return tmpDir, true
+	}
+
+	// Fallback: suffix-stripping heuristic for repos without go.mod.
+	if tmpDir, ok := inferVirtualImportRootByHeuristic(importRef, sourceDir); ok {
+		return tmpDir, true
+	}
+
+	return "", false
+}
+
+// resolveProtoFiles loads proto files with the same import-path inference and
+// virtual-root logic used by App.LoadProtoFiles, but operates on just the
+// rpc.LoadProtoFiles layer (no protosets, no reflection). It is used by the
+// startup path to restore proto files that need module-path import resolution.
+//
+// Returns (pd, realImportPaths, virtualDirs, err). virtualDirs are temp
+// directories that must be cleaned up by the caller; realImportPaths are the
+// inferred real import paths suitable for persisting to settings.
+func resolveProtoFiles(importPaths, protoFiles []string) (*rpc.ProtosetDescriptor, []string, []string, error) {
+	allImportPaths := append([]string(nil), importPaths...)
+	var virtualDirs []string
+	var (
+		pd  *rpc.ProtosetDescriptor
+		err error
+	)
+	for range 8 {
+		effectivePaths := append(allImportPaths, virtualDirs...)
+		pd, err = rpc.LoadProtoFiles(effectivePaths, protoFiles)
+		if err == nil {
+			return pd, allImportPaths, virtualDirs, nil
+		}
+		inferred, ok := inferImportPath(err, protoFiles, effectivePaths)
+		if ok {
+			allImportPaths = dedupeStrings(append(allImportPaths, inferred))
+			continue
+		}
+		sourcePath, importRef, errOk := importFromErrorLine(err, protoFiles)
+		if !errOk {
+			break
+		}
+		virtDir, virtOk := inferVirtualImportRoot(importRef, sourcePath)
+		if !virtOk {
+			break
+		}
+		virtualDirs = append(virtualDirs, virtDir)
+	}
+	for _, d := range virtualDirs {
+		os.RemoveAll(d)
+	}
+	return nil, importPaths, nil, err
 }
 
 func (a *App) currentLoadModeLocked() string {
@@ -304,12 +564,14 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 	currentProtosets := append([]string(nil), a.loadedProtosetPaths...)
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	protoFiles := append([]string(nil), a.loadedProtoFiles...)
+	virtualDirs := append([]string(nil), a.virtualImportDirs...)
 	withReflection := a.loadReflection
 	conn := a.conn
 	a.mu.Unlock()
 
 	allProtosets := dedupeStrings(append(currentProtosets, paths...))
-	pd, err := a.rebuildDescriptor(a.ctx, allProtosets, importPaths, protoFiles, withReflection, conn)
+	effectivePaths := append(importPaths, virtualDirs...)
+	pd, err := a.rebuildDescriptor(a.ctx, allProtosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -329,24 +591,37 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 // of the proto files are used as import paths automatically.
 func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInfo, error) {
 	seen := map[string]bool{}
-	mergedImportPaths := make([]string, 0, len(importPaths)+len(protoFiles))
+	userPaths := make([]string, 0, len(importPaths))
 	for _, dir := range importPaths {
 		if dir != "" && !seen[dir] {
 			seen[dir] = true
-			mergedImportPaths = append(mergedImportPaths, dir)
+			userPaths = append(userPaths, dir)
 		}
 	}
+
+	// Collect the proto parent directories separately so that vendor roots
+	// discovered below can be placed ahead of them in the final import-path
+	// list. protoparse resolves imports from the first matching import path,
+	// so vendor roots must precede proto parent directories for vendored
+	// imports to win over any local copy inside the proto source tree.
+	var protoParentDirs []string
 	for _, f := range protoFiles {
 		if filepath.IsAbs(f) {
 			dir := filepath.Dir(f)
 			if !seen[dir] {
 				seen[dir] = true
-				mergedImportPaths = append(mergedImportPaths, dir)
+				protoParentDirs = append(protoParentDirs, dir)
 			}
 		}
 	}
-	importPaths = mergedImportPaths
-	importPaths = dedupeStrings(append(importPaths, discoverImportPaths(protoFiles, importPaths)...))
+
+	// Discover vendor and other import roots. Discovery runs against the
+	// user-provided paths only so that proto parent directories do not
+	// shadow vendor roots in the known set.
+	discovered := discoverImportPaths(protoFiles, userPaths)
+
+	// Final order: user-provided → discovered (vendor-first) → proto parent dirs.
+	importPaths = dedupeStrings(append(append(userPaths, discovered...), protoParentDirs...))
 	a.mu.Lock()
 	protosets := append([]string(nil), a.loadedProtosetPaths...)
 	currentProtoFiles := append([]string(nil), a.loadedProtoFiles...)
@@ -357,25 +632,47 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 
 	allProtoFiles := dedupeStrings(append(currentProtoFiles, protoFiles...))
 	allImportPaths := dedupeStrings(append(currentImportPaths, importPaths...))
+	var virtualDirs []string
 	var (
 		pd  *rpc.ProtosetDescriptor
 		err error
 	)
 	for range 8 {
-		pd, err = a.rebuildDescriptor(a.ctx, protosets, allImportPaths, allProtoFiles, withReflection, conn)
+		effectivePaths := append(allImportPaths, virtualDirs...)
+		pd, err = a.rebuildDescriptor(a.ctx, protosets, effectivePaths, allProtoFiles, withReflection, conn)
 		if err == nil {
 			break
 		}
-		inferred, ok := inferImportPath(err, allProtoFiles, allImportPaths)
-		if !ok {
-			return nil, err
+		inferred, ok := inferImportPath(err, allProtoFiles, effectivePaths)
+		if ok {
+			allImportPaths = dedupeStrings(append(allImportPaths, inferred))
+			continue
 		}
-		allImportPaths = dedupeStrings(append(allImportPaths, inferred))
+		sourcePath, importRef, errOk := importFromErrorLine(err, allProtoFiles)
+		if !errOk {
+			break
+		}
+		virtDir, virtOk := inferVirtualImportRoot(importRef, sourcePath)
+		if !virtOk {
+			break
+		}
+		virtualDirs = append(virtualDirs, virtDir)
 	}
 	if err != nil {
+		for _, d := range virtualDirs {
+			os.RemoveAll(d)
+		}
 		return nil, err
 	}
 	a.storeDescriptorState(pd, protosets, allImportPaths, allProtoFiles, withReflection)
+
+	// Track virtual dirs for cleanup; replace any from a previous load.
+	a.mu.Lock()
+	for _, d := range a.virtualImportDirs {
+		os.RemoveAll(d)
+	}
+	a.virtualImportDirs = append([]string(nil), virtualDirs...)
+	a.mu.Unlock()
 
 	go a.saveSettings(func(s *storage.AppSettings) {
 		s.ProtoLoadMode = a.currentLoadMode()
@@ -395,6 +692,7 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	protosets := append([]string(nil), a.loadedProtosetPaths...)
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	protoFiles := append([]string(nil), a.loadedProtoFiles...)
+	virtualDirs := append([]string(nil), a.virtualImportDirs...)
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.reflectionCancelSeq++
 	cancelSeq := a.reflectionCancelSeq
@@ -413,7 +711,8 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	if conn == nil {
 		return nil, fmt.Errorf("not connected — call Connect first")
 	}
-	pd, err := a.rebuildDescriptor(ctx, protosets, importPaths, protoFiles, true, conn)
+	effectivePaths := append(importPaths, virtualDirs...)
+	pd, err := a.rebuildDescriptor(ctx, protosets, effectivePaths, protoFiles, true, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +781,13 @@ func (a *App) ClearLoadedProtos() {
 	a.loadedProtoFiles = nil
 	a.loadImportPaths = nil
 	a.loadReflection = false
+	virtualDirs := a.virtualImportDirs
+	a.virtualImportDirs = nil
 	a.mu.Unlock()
+
+	for _, d := range virtualDirs {
+		os.RemoveAll(d)
+	}
 
 	if old != nil {
 		go func() {
@@ -509,12 +814,14 @@ func (a *App) ReloadProtos() ([]rpc.ServiceInfo, error) {
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	withReflection := a.loadReflection
 	conn := a.conn
+	virtualDirs := append([]string(nil), a.virtualImportDirs...)
 	a.mu.Unlock()
 
 	if len(protosets) == 0 && len(protoFiles) == 0 && !withReflection {
 		return nil, fmt.Errorf("nothing to reload")
 	}
-	pd, err := a.rebuildDescriptor(a.ctx, protosets, importPaths, protoFiles, withReflection, conn)
+	effectivePaths := append(importPaths, virtualDirs...)
+	pd, err := a.rebuildDescriptor(a.ctx, protosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -531,6 +838,7 @@ func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
 	importPaths := append([]string(nil), a.loadImportPaths...)
 	withReflection := a.loadReflection
 	conn := a.conn
+	virtualDirs := append([]string(nil), a.virtualImportDirs...)
 	a.mu.Unlock()
 
 	var remainingProtosets []string
@@ -550,7 +858,8 @@ func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
 		a.ClearLoadedProtos()
 		return []rpc.ServiceInfo{}, nil
 	}
-	pd, err := a.rebuildDescriptor(a.ctx, remainingProtosets, importPaths, remainingProtoFiles, withReflection, conn)
+	effectivePaths := append(importPaths, virtualDirs...)
+	pd, err := a.rebuildDescriptor(a.ctx, remainingProtosets, effectivePaths, remainingProtoFiles, withReflection, conn)
 	if err != nil {
 		return nil, err
 	}

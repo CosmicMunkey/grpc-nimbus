@@ -76,6 +76,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        startupWithRestore,
 		OnBeforeClose:    func(ctx context.Context) bool { app.SaveWindowState(ctx); return false },
+		OnShutdown:       app.shutdown,
 		Menu:             buildAppMenu(app),
 		DragAndDrop:      &options.DragAndDrop{EnableFileDrop: true},
 		Linux: &linux.Options{
