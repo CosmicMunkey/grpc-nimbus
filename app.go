@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -217,4 +218,17 @@ func (a *App) SaveWindowState(ctx context.Context) {
 		s.WindowX = &x
 		s.WindowY = &y
 	})
+}
+
+// shutdown is called by Wails on application close. It removes any temp
+// directories created for virtual import roots so they are not left behind
+// across app runs.
+func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	virtualDirs := a.virtualImportDirs
+	a.virtualImportDirs = nil
+	a.mu.Unlock()
+	for _, d := range virtualDirs {
+		os.RemoveAll(d)
+	}
 }

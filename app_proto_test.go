@@ -291,40 +291,45 @@ message ProcessResponse {
 	}
 }
 
-func TestLoadProtoFilesVendorPreferClosestMatch(t *testing.T) {
+// TestLoadProtoFilesVendorWinsOverProtoParentDirWhenBothHaveFile verifies that
+// when the same logical import path exists in both the proto file's own source
+// tree and a sibling vendor directory, the vendor copy is resolved first.
+//
+// discoverImportPaths always prefers the explicit vendorRoot over any match
+// found by walking searchRoot, and LoadProtoFiles places discovered paths
+// (including vendor roots) before proto parent directories in the import-path
+// list. Together these ensure protoparse finds the vendored copy first.
+//
+// The two copies use distinct proto packages (types.local.v1 vs types.vendor.v1)
+// so the test actually fails if the wrong root is resolved, rather than silently
+// passing because both copies look identical.
+func TestLoadProtoFilesVendorWinsOverProtoParentDirWhenBothHaveFile(t *testing.T) {
 	tmp := t.TempDir()
 
-	// Create directory structure with file in both service area and vendor
+	// tmp/
+	//   service/
+	//     service.proto           ← entry point; references types.vendor.v1.Data
+	//     types/
+	//       types.proto           ← package types.local.v1  (local copy, loses)
+	//   vendor/
+	//     types/
+	//       types.proto           ← package types.vendor.v1 (vendor copy, wins)
 	serviceDir := filepath.Join(tmp, "service")
-	vendorDir := filepath.Join(tmp, "vendor", "types")
+	vendorTypesDir := filepath.Join(tmp, "vendor", "types")
 	serviceTypesDir := filepath.Join(tmp, "service", "types")
 
-	if err := os.MkdirAll(vendorDir, 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	if err := os.MkdirAll(serviceTypesDir, 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
+	for _, dir := range []string{vendorTypesDir, serviceTypesDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", dir, err)
+		}
 	}
 
-	// Create types.proto in both locations (vendor should win as it's closer)
-	vendorTypesProto := filepath.Join(vendorDir, "types.proto")
-	if err := os.WriteFile(vendorTypesProto, []byte(`
+	// Local copy: deliberately different package so the test fails if this
+	// root were somehow resolved instead of the vendor copy.
+	if err := os.WriteFile(filepath.Join(serviceTypesDir, "types.proto"), []byte(`
 syntax = "proto3";
 
-package types.v1;
-
-message Data {
-  string content = 1;
-}
-`), 0644); err != nil {
-		t.Fatalf("WriteFile vendor types.proto: %v", err)
-	}
-
-	serviceTypesProto := filepath.Join(serviceTypesDir, "types.proto")
-	if err := os.WriteFile(serviceTypesProto, []byte(`
-syntax = "proto3";
-
-package types.v1;
+package types.local.v1;
 
 message Data {
   string content = 1;
@@ -333,9 +338,22 @@ message Data {
 		t.Fatalf("WriteFile service types.proto: %v", err)
 	}
 
-	// Create service.proto that imports types/types.proto
-	serviceProto := filepath.Join(serviceDir, "service.proto")
-	if err := os.WriteFile(serviceProto, []byte(`
+	// Vendor copy: package types.vendor.v1 — this must win.
+	if err := os.WriteFile(filepath.Join(vendorTypesDir, "types.proto"), []byte(`
+syntax = "proto3";
+
+package types.vendor.v1;
+
+message Data {
+  string content = 1;
+}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile vendor types.proto: %v", err)
+	}
+
+	// service.proto references types.vendor.v1.Data: only compiles when the
+	// vendor copy is the active import root.
+	if err := os.WriteFile(filepath.Join(serviceDir, "service.proto"), []byte(`
 syntax = "proto3";
 
 package api.v1;
@@ -351,16 +369,16 @@ message GetDataRequest {
 }
 
 message GetDataResponse {
-  types.v1.Data data = 1;
+  types.vendor.v1.Data data = 1;
 }
 `), 0644); err != nil {
 		t.Fatalf("WriteFile service.proto: %v", err)
 	}
 
 	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{serviceProto})
+	services, err := a.LoadProtoFiles(nil, []string{filepath.Join(serviceDir, "service.proto")})
 	if err != nil {
-		t.Fatalf("LoadProtoFiles: %v", err)
+		t.Fatalf("LoadProtoFiles: %v (vendor import root was not preferred)", err)
 	}
 
 	if len(services) != 1 {
@@ -485,6 +503,97 @@ message ServiceMessage {
 		t.Logf("discovered paths: %v", discovered)
 		t.Logf("vendor/api dir: %s", vendorApiDir)
 		t.Fatal("expected vendor directory to be discovered")
+	}
+}
+
+
+// TestFindGoModuleRootStripsInlineComment verifies that the go.mod parser
+// strips trailing // comments from the module directive. Without this fix,
+// "module example.com/foo // comment" would return the full string including
+// the comment, causing inferVirtualImportRootFromGoMod to never match any
+// import prefix that starts with "example.com/foo".
+func TestFindGoModuleRootStripsInlineComment(t *testing.T) {
+	tmp := t.TempDir()
+	goMod := filepath.Join(tmp, "go.mod")
+	if err := os.WriteFile(goMod, []byte("module example.com/foo // inline comment\n\ngo 1.21\n"), 0644); err != nil {
+		t.Fatalf("WriteFile go.mod: %v", err)
+	}
+
+	// Start the search from a subdirectory so the walk-up logic is exercised.
+	subDir := filepath.Join(tmp, "service")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	mod, root := findGoModuleRoot(subDir)
+	if mod != "example.com/foo" {
+		t.Fatalf("expected module path %q, got %q (inline comment not stripped)", "example.com/foo", mod)
+	}
+	if root != tmp {
+		t.Fatalf("expected module root %q, got %q", tmp, root)
+	}
+}
+
+// TestMakeVirtualRootRejectsUnsafePaths verifies that makeVirtualRoot returns
+// (false, "") for any modulePathOnDisk that could escape the temp directory.
+// This prevents a malformed module path or import prefix from creating
+// symlinks outside the temp tree that would not be cleaned up correctly.
+func TestMakeVirtualRootRejectsUnsafePaths(t *testing.T) {
+	tmp := t.TempDir() // a real directory to use as actualRoot
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"dotdot", ".."},
+		{"dotdot-segment", "../escaped"},
+		{"dotdot-nested", "../../etc"},
+		{"absolute", "/absolute/path"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, ok := makeVirtualRoot(tc.path, tmp)
+			if ok || dir != "" {
+				// Clean up if something was created despite the guard.
+				if dir != "" {
+					os.RemoveAll(dir)
+				}
+				t.Fatalf("makeVirtualRoot(%q) = (%q, %v); want (\"\", false)", tc.path, dir, ok)
+			}
+		})
+	}
+}
+
+func TestMakeVirtualRootFallsBackToCopyWhenSymlinkTargetExists(t *testing.T) {
+	// Verify copyDirTree produces the same directory layout that a symlink would.
+	src := t.TempDir()
+	subDir := filepath.Join(src, "sub")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "root.proto"), []byte("syntax = \"proto3\";"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "nested.proto"), []byte("syntax = \"proto3\";"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dst := t.TempDir()
+	target := filepath.Join(dst, "copy")
+	if err := copyDirTree(src, target); err != nil {
+		t.Fatalf("copyDirTree: %v", err)
+	}
+
+	for _, rel := range []string{"root.proto", filepath.Join("sub", "nested.proto")} {
+		got, err := os.ReadFile(filepath.Join(target, rel))
+		if err != nil {
+			t.Errorf("missing %s after copy: %v", rel, err)
+			continue
+		}
+		want, _ := os.ReadFile(filepath.Join(src, rel))
+		if string(got) != string(want) {
+			t.Errorf("%s content mismatch: got %q want %q", rel, got, want)
+		}
 	}
 }
 
