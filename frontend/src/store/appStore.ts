@@ -72,35 +72,37 @@ declare global {
             envSortByCreated?: boolean;
             sidebarWidth?: number;
             panelSplit?: number;
-            defaultTimeoutSeconds?: number;
-            historyLimit?: number;
-            autoConnectOnStartup?: boolean;
-            allowShellCommands?: boolean;
-            maxStreamMessages?: number;
-            defaultMetadata?: MetadataEntry[];
-          }>;
-          SaveUserSettings(s: {
-            confirmDeletes: boolean;
-            timestampInputLocal: boolean;
-            confirmClearHistory: boolean;
-            theme: string;
-            themeBadge: string;
-            customThemes: CustomThemeEntry[];
-            activeCustomThemeId: string;
-            fontSize: number;
-            responseWordWrap: boolean;
-            responseIndent: number;
-            emitDefaults: boolean;
-            envSortByCreated: boolean;
-            sidebarWidth: number;
-            panelSplit: number;
-            defaultTimeoutSeconds: number;
-            historyLimit: number;
-            autoConnectOnStartup: boolean;
-            allowShellCommands: boolean;
-            maxStreamMessages: number;
-            defaultMetadata: MetadataEntry[];
-          }): Promise<void>;
+             defaultTimeoutSeconds?: number;
+             historyLimit?: number;
+             autoConnectOnStartup?: boolean;
+             allowShellCommands?: boolean;
+             inheritShellEnv?: boolean;
+             maxStreamMessages?: number;
+             defaultMetadata?: MetadataEntry[];
+           }>;
+            SaveUserSettings(s: {
+              confirmDeletes: boolean;
+              timestampInputLocal: boolean;
+              confirmClearHistory: boolean;
+              theme: string;
+              themeBadge: string;
+              customThemes: CustomThemeEntry[];
+              activeCustomThemeId: string;
+              fontSize: number;
+              responseWordWrap: boolean;
+              responseIndent: number;
+              emitDefaults: boolean;
+              envSortByCreated: boolean;
+              sidebarWidth: number;
+              panelSplit: number;
+              defaultTimeoutSeconds: number;
+              historyLimit: number;
+              autoConnectOnStartup: boolean;
+              allowShellCommands: boolean;
+              inheritShellEnv: boolean;
+              maxStreamMessages: number;
+              defaultMetadata: MetadataEntry[];
+            }): Promise<void>;
           GetVersion(): Promise<string>;
         };
       };
@@ -151,7 +153,7 @@ export const api = {
     fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean; envSortByCreated: boolean;
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
-    allowShellCommands: boolean;
+    allowShellCommands: boolean; inheritShellEnv: boolean;
     maxStreamMessages: number; defaultMetadata: MetadataEntry[];
   }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
@@ -163,7 +165,7 @@ function saveAllSettings(s: Pick<AppState,
   'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' | 'envSortByCreated' |
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
-  'allowShellCommands' |
+  'allowShellCommands' | 'inheritShellEnv' |
   'maxStreamMessages' | 'defaultMetadata'
 >) {
   api.saveUserSettings({
@@ -185,6 +187,7 @@ function saveAllSettings(s: Pick<AppState,
     historyLimit: s.historyLimit,
     autoConnectOnStartup: s.autoConnectOnStartup,
     allowShellCommands: s.allowShellCommands,
+    inheritShellEnv: s.inheritShellEnv,
     maxStreamMessages: s.maxStreamMessages,
     defaultMetadata: s.defaultMetadata,
   }).catch(() => {});
@@ -517,6 +520,8 @@ interface AppState {
   setAutoConnectOnStartup: (v: boolean) => void;
   allowShellCommands: boolean;
   setAllowShellCommands: (v: boolean) => void;
+  inheritShellEnv: boolean;
+  setInheritShellEnv: (v: boolean) => void;
   maxStreamMessages: number;
   setMaxStreamMessages: (v: number) => void;
   defaultMetadata: MetadataEntry[];
@@ -1293,6 +1298,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   historyLimit: 50,
   autoConnectOnStartup: false,
   allowShellCommands: false,
+  inheritShellEnv: false,
   maxStreamMessages: 200,
   defaultMetadata: [],
   confirmDialog: null,
@@ -1328,23 +1334,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeCustomThemeId,
         themeBadge: s.themeBadge ?? '',
         fontSize,
-        responseWordWrap: s.responseWordWrap ?? true,
-        responseIndent: s.responseIndent ?? 2,
-        emitDefaults: s.emitDefaults ?? false,
-        envSortByCreated: s.envSortByCreated ?? false,
-        sidebarWidth,
-        panelSplit,
-        defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
-        historyLimit: s.historyLimit ?? 50,
-        autoConnectOnStartup: s.autoConnectOnStartup ?? false,
-        allowShellCommands: s.allowShellCommands ?? false,
-        maxStreamMessages: s.maxStreamMessages ?? 200,
-        defaultMetadata: s.defaultMetadata ?? [],
-      });
-      applyTheme(resolved);
-      applyFontSize(fontSize);
-    } catch { /* use defaults */ }
-  },
+         responseWordWrap: s.responseWordWrap ?? true,
+         responseIndent: s.responseIndent ?? 2,
+         emitDefaults: s.emitDefaults ?? false,
+         envSortByCreated: s.envSortByCreated ?? false,
+         sidebarWidth,
+         panelSplit,
+         defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
+         historyLimit: s.historyLimit ?? 50,
+         autoConnectOnStartup: s.autoConnectOnStartup ?? false,
+         allowShellCommands: s.allowShellCommands ?? false,
+         inheritShellEnv: s.inheritShellEnv ?? false,
+         maxStreamMessages: s.maxStreamMessages ?? 200,
+         defaultMetadata: s.defaultMetadata ?? [],
+       });
+       applyTheme(resolved);
+       applyFontSize(fontSize);
+     } catch { /* use defaults */ }
+   },
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
@@ -1480,6 +1487,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setAllowShellCommands: (v) => {
     set({ allowShellCommands: v });
+    saveAllSettings(get());
+  },
+
+  setInheritShellEnv: (v) => {
+    set({ inheritShellEnv: v });
     saveAllSettings(get());
   },
 

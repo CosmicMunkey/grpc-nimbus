@@ -58,6 +58,7 @@ type AppSettings struct {
 	HistoryLimit          *int                `json:"historyLimit,omitempty"`          // nil → 50; 0 = use default; negative = unlimited
 	AutoConnectOnStartup  *bool               `json:"autoConnectOnStartup,omitempty"`  // nil → false
 	AllowShellCommands    *bool               `json:"allowShellCommands,omitempty"`    // nil → false
+	InheritShellEnv       *bool               `json:"inheritShellEnv,omitempty"`       // nil → false
 	MaxStreamMessages     *int                `json:"maxStreamMessages,omitempty"`     // nil → 200; 0 = unlimited
 	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata,omitempty"`       // global headers for all requests
 

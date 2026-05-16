@@ -683,6 +683,7 @@ function RequestsSection() {
     defaultTimeoutSeconds, setDefaultTimeoutSeconds,
     maxStreamMessages, setMaxStreamMessages,
     allowShellCommands, setAllowShellCommands,
+    inheritShellEnv, setInheritShellEnv,
     emitDefaults, setEmitDefaults,
     defaultMetadata, setDefaultMetadata,
   } = useAppStore();
@@ -748,9 +749,18 @@ function RequestsSection() {
       <div className="flex items-center justify-between py-3">
         <div className="pr-4">
           <p className="text-xs font-medium text-c-text">Allow shell commands in metadata</p>
-          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Enables $(command) interpolation in metadata values. Keep off unless you trust the source.</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">Enables $(command) syntax in metadata values to execute shell commands and capture output. Requires "Inherit shell environment" to access shell variables and environment.</p>
         </div>
         <Toggle checked={allowShellCommands} onChange={setAllowShellCommands} />
+      </div>
+
+      {/* Inherit shell environment */}
+      <div className="flex items-center justify-between py-3">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Inherit shell environment</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When enabled, shell commands ($(command)) and variable substitution (${'{VAR}'}) have access to your parent shell's environment variables and PATH. Keep off unless you trust the environments/requests being used.</p>
+        </div>
+        <Toggle checked={inheritShellEnv} onChange={setInheritShellEnv} />
       </div>
 
       {/* Show default field values */}

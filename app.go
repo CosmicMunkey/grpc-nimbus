@@ -32,6 +32,9 @@ type App struct {
 	// allowShellCommands gates $(...) header interpolation at send time.
 	// Protected by mu; updated synchronously when SaveUserSettings is called.
 	allowShellCommands bool
+	// inheritShellEnv allows shell commands and env vars to access parent process environment.
+	// Protected by mu; updated synchronously when SaveUserSettings is called.
+	inheritShellEnv bool
 	// emitDefaults controls whether zero/default-value fields appear in response JSON.
 	// Protected by mu; updated synchronously when SaveUserSettings is called.
 	emitDefaults bool
@@ -141,6 +144,9 @@ func (a *App) startup(ctx context.Context) {
 	}
 	if saved.AllowShellCommands != nil {
 		a.allowShellCommands = *saved.AllowShellCommands
+	}
+	if saved.InheritShellEnv != nil {
+		a.inheritShellEnv = *saved.InheritShellEnv
 	}
 	if saved.EmitDefaults != nil {
 		a.emitDefaults = *saved.EmitDefaults

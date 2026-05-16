@@ -81,6 +81,7 @@ export namespace main {
 	    historyLimit: number;
 	    autoConnectOnStartup: boolean;
 	    allowShellCommands: boolean;
+	    inheritShellEnv: boolean;
 	    maxStreamMessages: number;
 	    defaultMetadata: rpc.MetadataEntry[];
 	    windowWidth: number;
@@ -112,6 +113,7 @@ export namespace main {
 	        this.historyLimit = source["historyLimit"];
 	        this.autoConnectOnStartup = source["autoConnectOnStartup"];
 	        this.allowShellCommands = source["allowShellCommands"];
+	        this.inheritShellEnv = source["inheritShellEnv"];
 	        this.maxStreamMessages = source["maxStreamMessages"];
 	        this.defaultMetadata = this.convertValues(source["defaultMetadata"], rpc.MetadataEntry);
 	        this.windowWidth = source["windowWidth"];

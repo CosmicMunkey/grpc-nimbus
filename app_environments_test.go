@@ -199,7 +199,7 @@ func TestInterpolateRequestRequestMetadataOverridesEnvHeadersCaseInsensitive(t *
 		},
 	}
 
-	got := interpolateRequest(req, nil, env, false)
+	got := interpolateRequest(req, nil, env, false, false)
 	if len(got.Metadata) != 3 {
 		t.Fatalf("expected 3 metadata entries, got %d", len(got.Metadata))
 	}

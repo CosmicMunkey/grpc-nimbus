@@ -34,6 +34,7 @@ type UserSettings struct {
 	HistoryLimit          int                 `json:"historyLimit"`
 	AutoConnectOnStartup  bool                `json:"autoConnectOnStartup"`
 	AllowShellCommands    bool                `json:"allowShellCommands"`
+	InheritShellEnv       bool                `json:"inheritShellEnv"`
 	MaxStreamMessages     int                 `json:"maxStreamMessages"`
 	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata"`
 	WindowWidth           int                 `json:"windowWidth"`
@@ -58,6 +59,7 @@ func (a *App) GetUserSettings() UserSettings {
 		PanelSplit:           0.5,
 		HistoryLimit:         50,
 		AllowShellCommands:   false,
+		InheritShellEnv:      false,
 		MaxStreamMessages:    200,
 		DefaultMetadata:      []rpc.MetadataEntry{},
 		WindowWidth:          1280,
@@ -117,6 +119,9 @@ func (a *App) GetUserSettings() UserSettings {
 	if saved.AllowShellCommands != nil {
 		result.AllowShellCommands = *saved.AllowShellCommands
 	}
+	if saved.InheritShellEnv != nil {
+		result.InheritShellEnv = *saved.InheritShellEnv
+	}
 	if saved.MaxStreamMessages != nil {
 		result.MaxStreamMessages = *saved.MaxStreamMessages
 	}
@@ -171,6 +176,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 	a.mu.Lock()
 	a.defaultMetadata = s.DefaultMetadata
 	a.allowShellCommands = s.AllowShellCommands
+	a.inheritShellEnv = s.InheritShellEnv
 	a.emitDefaults = s.EmitDefaults
 	a.mu.Unlock()
 	if a.histStore != nil {
@@ -206,6 +212,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.HistoryLimit = &s.HistoryLimit
 		settings.AutoConnectOnStartup = &s.AutoConnectOnStartup
 		settings.AllowShellCommands = &s.AllowShellCommands
+		settings.InheritShellEnv = &s.InheritShellEnv
 		settings.MaxStreamMessages = &s.MaxStreamMessages
 		settings.DefaultMetadata = s.DefaultMetadata
 		settings.WindowWidth = &s.WindowWidth

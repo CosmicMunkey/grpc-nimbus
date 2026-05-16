@@ -26,7 +26,7 @@ var (
 //
 // Resolution failures are logged and replaced with an empty string so the
 // request still proceeds. Values without either syntax are returned unchanged.
-func resolveHeaderValue(val string, allowShell bool) string {
+func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
 	hasEnvVar := strings.Contains(val, "${")
 	hasShellCmd := strings.Contains(val, "$(")
 	if !hasEnvVar && !hasShellCmd {
@@ -38,7 +38,7 @@ func resolveHeaderValue(val string, allowShell bool) string {
 		// result, so any ${VAR} in command output will be evaluated in the second pass.
 		val = reShellCmd.ReplaceAllStringFunc(val, func(match string) string {
 			cmd := reShellCmd.FindStringSubmatch(match)[1]
-			out, err := runShellCommand(cmd)
+			out, err := runShellCommand(cmd, inheritEnv)
 			if err != nil {
 				fmt.Printf("warning: header command %q failed: %v\n", cmd, err)
 				return ""
@@ -60,7 +60,8 @@ func resolveHeaderValue(val string, allowShell bool) string {
 
 // runShellCommand executes cmd via the platform shell and returns trimmed stdout.
 // A 5-second context deadline prevents hangs.
-func runShellCommand(cmd string) (string, error) {
+// When inheritEnv is true, the command has access to the parent process environment.
+func runShellCommand(cmd string, inheritEnv bool) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -69,6 +70,11 @@ func runShellCommand(cmd string) (string, error) {
 		c = exec.CommandContext(ctx, "cmd", "/c", cmd)
 	} else {
 		c = exec.CommandContext(ctx, "sh", "-c", cmd)
+	}
+
+	// If inheritEnv is true, inherit the parent process environment.
+	if inheritEnv {
+		c.Env = os.Environ()
 	}
 
 	var stdout, stderr bytes.Buffer

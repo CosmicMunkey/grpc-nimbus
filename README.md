@@ -40,6 +40,7 @@ xattr -dr com.apple.quarantine "/Applications/GRPC Nimbus.app"
 - Type-aware **form builder** — scalars, enums, nested messages, repeated fields, maps, oneof
 - Switch freely between the form and a raw **JSON editor**
 - **Environments** — switch server configs (host, TLS, default metadata) with one click; metadata values support `${ENV_VAR}` and `$(shell command)` interpolation
+- **Inherit shell environment** — optionally enable access to parent shell environment variables and command execution in metadata values (opt-in setting for security)
 - **Collections** — save and organize requests; export as a portable `.json` bundle that embeds the protoset so teammates can import and run it on any machine
 - Full **streaming** support — server, client, and bidirectional
 - **grpcurl** command generator for any request

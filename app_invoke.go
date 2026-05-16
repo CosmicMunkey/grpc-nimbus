@@ -21,6 +21,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	env := a.activeEnv
 	defaultMeta := a.defaultMetadata
 	allowShell := a.allowShellCommands
+	inheritEnv := a.inheritShellEnv
 	emitDefaults := a.emitDefaults
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.unaryCancelSeq++
@@ -45,7 +46,7 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	}
 
 	// Apply environment variable interpolation.
-	req = interpolateRequest(req, defaultMeta, env, allowShell)
+	req = interpolateRequest(req, defaultMeta, env, allowShell, inheritEnv)
 	req.EmitDefaults = emitDefaults
 
 	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
@@ -87,6 +88,7 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 	env := a.activeEnv
 	defaultMeta := a.defaultMetadata
 	allowShell := a.allowShellCommands
+	inheritEnv := a.inheritShellEnv
 	emitDefaults := a.emitDefaults
 	// Cancel any running stream first.
 	if a.streamCancel != nil {
@@ -107,7 +109,7 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 		return fmt.Errorf("no descriptor loaded")
 	}
 
-	req = interpolateRequest(req, defaultMeta, env, allowShell)
+	req = interpolateRequest(req, defaultMeta, env, allowShell, inheritEnv)
 	req.EmitDefaults = emitDefaults
 
 	go func() {
@@ -143,10 +145,10 @@ func (a *App) CancelStream() {
 	}
 }
 
-func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, env *storage.Environment, allowShell bool) rpc.InvokeRequest {
+func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, env *storage.Environment, allowShell bool, inheritEnv bool) rpc.InvokeRequest {
 	// Resolve dynamic syntax in per-request metadata values.
 	for i, m := range req.Metadata {
-		if resolved := resolveHeaderValue(m.Value, allowShell); resolved != m.Value {
+		if resolved := resolveHeaderValue(m.Value, allowShell, inheritEnv); resolved != m.Value {
 			req.Metadata[i].Value = resolved
 		}
 	}
@@ -180,7 +182,7 @@ func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, 
 				continue
 			}
 			envKeys[lower] = true
-			envMeta = append(envMeta, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(h.Value, allowShell)})
+			envMeta = append(envMeta, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(h.Value, allowShell, inheritEnv)})
 		}
 	}
 
@@ -195,7 +197,7 @@ func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, 
 		if requestKeys[lower] || envKeys[lower] {
 			continue
 		}
-		defaultOut = append(defaultOut, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(m.Value, allowShell)})
+		defaultOut = append(defaultOut, rpc.MetadataEntry{Key: key, Value: resolveHeaderValue(m.Value, allowShell, inheritEnv)})
 	}
 
 	req.Metadata = append(defaultOut, append(envMeta, req.Metadata...)...)
