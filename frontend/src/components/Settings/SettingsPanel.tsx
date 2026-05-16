@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, X, Palette, SlidersHorizontal, Send, Plus, Pencil, Trash2, Copy, Paintbrush, Globe, ArrowLeft } from 'lucide-react';
+import { Settings, X, Palette, SlidersHorizontal, Send, Plus, Pencil, Trash2, Copy, Paintbrush, Globe, ArrowLeft, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { ThemeId, ThemeTokens, CustomThemeEntry, THEMES, DEFAULT_CUSTOM_THEME, FONT_SIZE_PRESETS } from '../../themes';
 import { MetadataEntry, Environment } from '../../types';
@@ -330,10 +330,60 @@ const FLAIR_GROUPS: { label: string; items: FlairItem[] }[] = [
       )},
     ],
   },
+  {
+    label: 'Animals',
+    items: [
+      { id: 'cat',      label: 'Cat',      icon: <span className="text-base leading-none">🐱</span> },
+      { id: 'dog',      label: 'Dog',      icon: <span className="text-base leading-none">🐶</span> },
+      { id: 'fox',      label: 'Fox',      icon: <span className="text-base leading-none">🦊</span> },
+      { id: 'octopus',  label: 'Octopus',  icon: <span className="text-base leading-none">🐙</span> },
+      { id: 'bee',      label: 'Bee',      icon: <span className="text-base leading-none">🐝</span> },
+      { id: 'penguin',  label: 'Penguin',  icon: <span className="text-base leading-none">🐧</span> },
+    ],
+  },
+  {
+    label: 'Nature & Weather',
+    items: [
+      { id: 'sun',        label: 'Sun',        icon: <span className="text-base leading-none">☀️</span> },
+      { id: 'moon',       label: 'Moon',       icon: <span className="text-base leading-none">🌙</span> },
+      { id: 'cloud',      label: 'Cloud',      icon: <span className="text-base leading-none">☁️</span> },
+      { id: 'lightning',  label: 'Lightning',  icon: <span className="text-base leading-none">⚡</span> },
+    ],
+  },
+  {
+    label: 'Space',
+    items: [
+      { id: 'rocket',  label: 'Rocket',   icon: <span className="text-base leading-none">🚀</span> },
+      { id: 'planet',  label: 'Planet',   icon: <span className="text-base leading-none">🪐</span> },
+      { id: 'stars',   label: 'Stars',    icon: <span className="text-base leading-none">🌟</span> },
+      { id: 'comet',   label: 'Comet',    icon: <span className="text-base leading-none">☄️</span> },
+      { id: 'ufo',     label: 'UFO',      icon: <span className="text-base leading-none">🛸</span> },
+    ],
+  },
+  {
+    label: 'Food & Drinks',
+    items: [
+      { id: 'coffee',  label: 'Coffee',   icon: <span className="text-base leading-none">☕</span> },
+      { id: 'pizza',   label: 'Pizza',    icon: <span className="text-base leading-none">🍕</span> },
+      { id: 'donut',   label: 'Donut',    icon: <span className="text-base leading-none">🍩</span> },
+      { id: 'ramen',   label: 'Ramen',    icon: <span className="text-base leading-none">🍜</span> },
+      { id: 'taco',    label: 'Taco',     icon: <span className="text-base leading-none">🌮</span> },
+    ],
+  },
+  {
+    label: 'Tech & Play',
+    items: [
+      { id: 'robot',      label: 'Robot',      icon: <span className="text-base leading-none">🤖</span> },
+      { id: 'gamepad',    label: 'Gamepad',    icon: <span className="text-base leading-none">🎮</span> },
+      { id: 'joystick',   label: 'Joystick',   icon: <span className="text-base leading-none">🕹️</span> },
+      { id: 'pixelheart', label: 'Pixel Heart', icon: <span className="text-base leading-none">🧡</span> },
+      { id: 'sparkles',   label: 'Sparkles',   icon: <span className="text-base leading-none">✨</span> },
+    ],
+  },
 ];
 
 function ThemesSection() {
-  const { theme, themeBadge, setThemeBadge, customThemes, activeCustomThemeId, setTheme, forkTheme, updateCustomTheme, renameCustomTheme, deleteCustomTheme } = useAppStore();
+  const { theme, customThemes, activeCustomThemeId, setTheme, forkTheme, updateCustomTheme, renameCustomTheme, deleteCustomTheme } = useAppStore();
   const [editingTokensId, setEditingTokensId] = useState<string | null>(null);
 
   function handlePresetSelect(id: Exclude<ThemeId, 'custom'>) {
@@ -384,31 +434,6 @@ function ThemesSection() {
           </div>
         </div>
 
-        {/* Flair */}
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Flair</p>
-            <p className="text-xs text-c-text3 mb-1">Adds a fun icon to the connection bar — click it to celebrate 🎉</p>
-          </div>
-          {FLAIR_GROUPS.map(({ label: groupLabel, items }) => (
-            <div key={groupLabel}>
-              <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">{groupLabel}</p>
-              <div className="flex flex-wrap gap-2">
-                {items.map(({ id, label, icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setThemeBadge(themeBadge === id ? '' : id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs transition-colors ${themeBadge === id ? 'border-c-accent bg-c-hover' : 'border-c-border bg-c-input hover:bg-c-hover'}`}
-                  >
-                    {icon}
-                    <span className={themeBadge === id ? 'text-c-accent' : 'text-c-text2'}>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Custom themes */}
         <div>
           <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Custom themes</p>
@@ -451,6 +476,36 @@ function ThemesSection() {
           <Plus size={11} /> New Theme
         </button>
       </div>
+    </div>
+  );
+}
+
+function FlairSection() {
+  const { themeBadge, setThemeBadge } = useAppStore();
+
+  return (
+    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <div>
+        <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">Flair</p>
+        <p className="text-xs text-c-text3 mb-1">Adds a fun icon to the connection bar — click it to celebrate 🎉</p>
+      </div>
+      {FLAIR_GROUPS.map(({ label: groupLabel, items }) => (
+        <div key={groupLabel}>
+          <p className="text-xs font-medium text-c-text3 uppercase tracking-wider mb-2">{groupLabel}</p>
+          <div className="flex flex-wrap gap-2">
+            {items.map(({ id, label, icon }) => (
+              <button
+                key={id}
+                onClick={() => setThemeBadge(themeBadge === id ? '' : id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs transition-colors ${themeBadge === id ? 'border-c-accent bg-c-hover' : 'border-c-border bg-c-input hover:bg-c-hover'}`}
+              >
+                {icon}
+                <span className={themeBadge === id ? 'text-c-accent' : 'text-c-text2'}>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1032,11 +1087,12 @@ function EnvironmentsSection() {
 
 // ── Category nav ──────────────────────────────────────────────────────────────
 
-type Category = 'appearance' | 'themes' | 'behavior' | 'requests' | 'environments';
+type Category = 'appearance' | 'themes' | 'flair' | 'behavior' | 'requests' | 'environments';
 
 const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance',   label: 'Appearance',   icon: <Palette size={14} /> },
   { id: 'themes',       label: 'Themes',       icon: <Paintbrush size={14} /> },
+  { id: 'flair',        label: 'Flair',        icon: <Sparkles size={14} /> },
   { id: 'behavior',     label: 'Behavior',     icon: <SlidersHorizontal size={14} /> },
   { id: 'requests',     label: 'Requests',     icon: <Send size={14} /> },
   { id: 'environments', label: 'Environments', icon: <Globe size={14} /> },
@@ -1101,7 +1157,7 @@ export default function SettingsPanel() {
 
               {/* Content */}
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                {category !== 'environments' && category !== 'themes' && (
+                {category !== 'environments' && category !== 'themes' && category !== 'flair' && (
                   <div className="flex-1 overflow-y-auto px-5 py-4">
                     {category === 'appearance'   && <AppearanceSection />}
                     {category === 'behavior'     && <BehaviorSection />}
@@ -1109,6 +1165,7 @@ export default function SettingsPanel() {
                   </div>
                 )}
                 {category === 'themes'       && <ThemesSection />}
+                {category === 'flair'        && <FlairSection />}
                 {category === 'environments' && <EnvironmentsSection />}
               </div>
             </div>

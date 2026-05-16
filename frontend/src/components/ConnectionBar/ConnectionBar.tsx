@@ -11,7 +11,11 @@ import {
   fireChristmasConfetti, fireHanukkahConfetti, fireNewYearConfetti,
   fireValentineConfetti, fireStPatricksConfetti, fireEasterConfetti,
   fireJuly4Confetti, fireHalloweenConfetti, fireThanksgivingConfetti,
-  fireDiwaliConfetti,
+  fireDiwaliConfetti, fireCatRunnerConfetti, fireDogConfetti, fireFoxConfetti,
+  fireOctopusConfetti, fireBeeConfetti, firePenguinConfetti,
+  fireNatureConfetti, fireLightningStormConfetti, fireSpaceConfetti, fireUfoSweepConfetti,
+  fireFoodConfetti, fireCoffeeSteamConfetti, fireRobotConfetti, fireGamepadConfetti,
+  fireJoystickConfetti, firePixelHeartConfetti, fireSparklesTrailConfetti,
 } from '../../utils/confetti';
 
 const TLS_OPTIONS = [
@@ -40,7 +44,7 @@ function StatusDot({ status }: { status: ConnStatus }) {
 }
 
 
-// ── Pride badge config ────────────────────────────────────────────────────────
+// ── Flair badge config ────────────────────────────────────────────────────────
 // Maps themeBadge id → { display title, confetti fn, connection-bar icon }.
 const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: React.ReactNode }> = {
   rainbow: {
@@ -236,6 +240,131 @@ const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: Reac
     fire: fireDiwaliConfetti,
     icon: <span className="text-xl leading-none select-none">🪔</span>,
   },
+  cat: {
+    title: 'Cat',
+    fire: fireCatRunnerConfetti,
+    icon: <span className="text-xl leading-none select-none">🐱</span>,
+  },
+  dog: {
+    title: 'Dog',
+    fire: fireDogConfetti,
+    icon: <span className="text-xl leading-none select-none">🐶</span>,
+  },
+  fox: {
+    title: 'Fox',
+    fire: fireFoxConfetti,
+    icon: <span className="text-xl leading-none select-none">🦊</span>,
+  },
+  octopus: {
+    title: 'Octopus',
+    fire: fireOctopusConfetti,
+    icon: <span className="text-xl leading-none select-none">🐙</span>,
+  },
+  bee: {
+    title: 'Bee',
+    fire: fireBeeConfetti,
+    icon: <span className="text-xl leading-none select-none">🐝</span>,
+  },
+  penguin: {
+    title: 'Penguin',
+    fire: firePenguinConfetti,
+    icon: <span className="text-xl leading-none select-none">🐧</span>,
+  },
+  sun: {
+    title: 'Sun',
+    fire: fireNatureConfetti,
+    icon: <span className="text-xl leading-none select-none">☀️</span>,
+  },
+  moon: {
+    title: 'Moon',
+    fire: fireNatureConfetti,
+    icon: <span className="text-xl leading-none select-none">🌙</span>,
+  },
+  cloud: {
+    title: 'Cloud',
+    fire: fireNatureConfetti,
+    icon: <span className="text-xl leading-none select-none">☁️</span>,
+  },
+  lightning: {
+    title: 'Lightning',
+    fire: fireLightningStormConfetti,
+    icon: <span className="text-xl leading-none select-none">⚡</span>,
+  },
+  rocket: {
+    title: 'Rocket',
+    fire: fireSpaceConfetti,
+    icon: <span className="text-xl leading-none select-none">🚀</span>,
+  },
+  planet: {
+    title: 'Planet',
+    fire: fireSpaceConfetti,
+    icon: <span className="text-xl leading-none select-none">🪐</span>,
+  },
+  stars: {
+    title: 'Stars',
+    fire: fireSpaceConfetti,
+    icon: <span className="text-xl leading-none select-none">🌟</span>,
+  },
+  comet: {
+    title: 'Comet',
+    fire: fireSpaceConfetti,
+    icon: <span className="text-xl leading-none select-none">☄️</span>,
+  },
+  ufo: {
+    title: 'UFO',
+    fire: fireUfoSweepConfetti,
+    icon: <span className="text-xl leading-none select-none">🛸</span>,
+  },
+  coffee: {
+    title: 'Coffee',
+    fire: fireCoffeeSteamConfetti,
+    icon: <span className="text-xl leading-none select-none">☕</span>,
+  },
+  pizza: {
+    title: 'Pizza',
+    fire: fireFoodConfetti,
+    icon: <span className="text-xl leading-none select-none">🍕</span>,
+  },
+  donut: {
+    title: 'Donut',
+    fire: fireFoodConfetti,
+    icon: <span className="text-xl leading-none select-none">🍩</span>,
+  },
+  ramen: {
+    title: 'Ramen',
+    fire: fireFoodConfetti,
+    icon: <span className="text-xl leading-none select-none">🍜</span>,
+  },
+  taco: {
+    title: 'Taco',
+    fire: fireFoodConfetti,
+    icon: <span className="text-xl leading-none select-none">🌮</span>,
+  },
+  robot: {
+    title: 'Robot',
+    fire: fireRobotConfetti,
+    icon: <span className="text-xl leading-none select-none">🤖</span>,
+  },
+  gamepad: {
+    title: 'Gamepad',
+    fire: fireGamepadConfetti,
+    icon: <span className="text-xl leading-none select-none">🎮</span>,
+  },
+  joystick: {
+    title: 'Joystick',
+    fire: fireJoystickConfetti,
+    icon: <span className="text-xl leading-none select-none">🕹️</span>,
+  },
+  pixelheart: {
+    title: 'Pixel Heart',
+    fire: firePixelHeartConfetti,
+    icon: <span className="text-xl leading-none select-none">🧡</span>,
+  },
+  sparkles: {
+    title: 'Sparkles',
+    fire: fireSparklesTrailConfetti,
+    icon: <span className="text-xl leading-none select-none">✨</span>,
+  },
 };
 
 export default function ConnectionBar() {
@@ -410,7 +539,7 @@ export default function ConnectionBar() {
       {/* Environment selector */}
       <EnvSelector />
 
-      {/* Pride flair badge — shown when a badge is selected in Settings > Flair */}
+      {/* Flair badge — shown when a badge is selected in Settings > Flair */}
       {themeBadge && BADGE_CONFIG[themeBadge] && (
         <button
           onClick={BADGE_CONFIG[themeBadge].fire}

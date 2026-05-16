@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
@@ -139,7 +139,7 @@ function SaveRequestModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div data-enter-send-exempt="true" className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-c-panel border border-c-border rounded-lg p-4 w-72 shadow-xl">
         <h3 className="text-sm font-semibold text-c-text mb-3">Save Request</h3>
         <div className="space-y-2">
@@ -334,6 +334,21 @@ export default function RequestPanel() {
   const [tab, setTab] = useState<'form' | 'body' | 'metadata' | 'grpcurl'>('form');
   const [showSave, setShowSave] = useState(false);
 
+  const handleSendOrCancel = useCallback(() => {
+    if (!showCancel && hasOtherActiveStream) return;
+    void (showCancel ? cancelInvoke() : invoke());
+  }, [cancelInvoke, hasOtherActiveStream, invoke, showCancel]);
+
+  const handlePanelEnter = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.nativeEvent.isComposing) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('[data-enter-send-exempt="true"]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleSendOrCancel();
+  }, [handleSendOrCancel]);
+
   if (!selectedMethod) {
     return (
       <div className="flex-1 flex items-center justify-center text-c-text3 text-sm select-none">
@@ -343,7 +358,7 @@ export default function RequestPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0" onKeyDownCapture={handlePanelEnter}>
       {/* Method header bar */}
       <div className="flex flex-col border-b border-c-border bg-c-panel">
         <div className="flex items-center gap-2 px-3 pt-2 pb-1">
@@ -392,7 +407,7 @@ export default function RequestPanel() {
           )}
           {/* Send / Cancel */}
           <button
-            onClick={() => { void (showCancel ? cancelInvoke() : invoke()); }}
+            onClick={handleSendOrCancel}
             disabled={!showCancel && hasOtherActiveStream}
             title={!showCancel && hasOtherActiveStream ? 'Another tab is currently streaming' : undefined}
             className={`flex items-center gap-1 text-xs px-3 py-1 rounded font-medium transition-colors ${

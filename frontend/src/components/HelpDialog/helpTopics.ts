@@ -78,7 +78,7 @@ export const helpTopics: HelpTopic[] = [
     title: 'Invoking an RPC',
     keywords: ['invoke', 'send', 'request', 'unary', 'stream', 'rpc', 'call', 'run'],
     content: [
-      { type: 'paragraph', text: 'Click Send (or press Enter when focused in the JSON editor) to invoke a RPC. The response panel shows the result, status code, latency, and any response metadata.' },
+      { type: 'paragraph', text: 'Click Send (or press Enter anywhere in the request panel) to invoke a RPC. If a call is in progress, Enter triggers Cancel. The response panel shows the result, status code, latency, and any response metadata.' },
       { type: 'heading', text: 'Unary RPCs' },
       { type: 'paragraph', text: 'A single request produces a single response. The response body is shown as formatted JSON. Status 0 (OK) is shown in green; any error code in red with a message.' },
       { type: 'heading', text: 'Streaming RPCs' },
@@ -168,6 +168,7 @@ export const helpTopics: HelpTopic[] = [
       { type: 'heading', text: 'Appearance' },
       { type: 'bullets', items: [
         'Theme — choose from built-in themes (Nimbus, Dark, Light, high-contrast, colorblind presets) or create a fully custom theme.',
+        'Flair — pick a connection bar badge from the dedicated Flair settings tab.',
         'Font size — adjust editor and UI font size. Also controllable with Cmd/Ctrl+Plus / Minus / 0.',
         'Sort environments by creation time — when off (default), environments are listed alphabetically.',
       ]},
