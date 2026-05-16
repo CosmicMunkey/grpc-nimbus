@@ -373,11 +373,23 @@ const FLAIR_GROUPS: { label: string; items: FlairItem[] }[] = [
   {
     label: 'Tech & Play',
     items: [
-      { id: 'robot',      label: 'Robot',      icon: <span className="text-base leading-none">🤖</span> },
-      { id: 'gamepad',    label: 'Gamepad',    icon: <span className="text-base leading-none">🎮</span> },
-      { id: 'joystick',   label: 'Joystick',   icon: <span className="text-base leading-none">🕹️</span> },
+      { id: 'robot',      label: 'Robot',       icon: <span className="text-base leading-none">🤖</span> },
+      { id: 'gamepad',    label: 'Gamepad',     icon: <span className="text-base leading-none">🎮</span> },
+      { id: 'joystick',   label: 'Joystick',    icon: <span className="text-base leading-none">🕹️</span> },
       { id: 'pixelheart', label: 'Pixel Heart', icon: <span className="text-base leading-none">🧡</span> },
-      { id: 'sparkles',   label: 'Sparkles',   icon: <span className="text-base leading-none">✨</span> },
+      { id: 'sparkles',   label: 'Sparkles',    icon: <span className="text-base leading-none">✨</span> },
+    ],
+  },
+  {
+    label: 'Memes',
+    items: [
+      { id: 'nyancat',     label: 'Nyan Cat',     icon: <span className="text-base leading-none">🌈</span> },
+      { id: 'doge',        label: 'Doge',         icon: <span className="text-base leading-none">🐕</span> },
+      { id: 'trollface',   label: 'Trollface',    icon: <span className="text-base leading-none">😈</span> },
+      { id: 'amongus',     label: 'Among Us',     icon: <span className="text-base leading-none">🔴</span> },
+      { id: 'partyparrot', label: 'Party Parrot', icon: <span className="text-base leading-none">🦜</span> },
+      { id: 'rickroll',    label: 'Rickroll',     icon: <span className="text-base leading-none">🎵</span> },
+      { id: 'thisisfine',  label: 'This Is Fine', icon: <span className="text-base leading-none">🔥</span> },
     ],
   },
 ];

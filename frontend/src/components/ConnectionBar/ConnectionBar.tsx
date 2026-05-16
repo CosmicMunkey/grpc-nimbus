@@ -11,11 +11,15 @@ import {
   fireChristmasConfetti, fireHanukkahConfetti, fireNewYearConfetti,
   fireValentineConfetti, fireStPatricksConfetti, fireEasterConfetti,
   fireJuly4Confetti, fireHalloweenConfetti, fireThanksgivingConfetti,
-  fireDiwaliConfetti, fireCatRunnerConfetti, fireDogConfetti, fireFoxConfetti,
+  fireDiwaliConfetti,
+  fireCatRunnerConfetti, fireDogConfetti, fireFoxConfetti,
   fireOctopusConfetti, fireBeeConfetti, firePenguinConfetti,
-  fireNatureConfetti, fireLightningStormConfetti, fireSpaceConfetti, fireUfoSweepConfetti,
-  fireFoodConfetti, fireCoffeeSteamConfetti, fireRobotConfetti, fireGamepadConfetti,
-  fireJoystickConfetti, firePixelHeartConfetti, fireSparklesTrailConfetti,
+  fireSunConfetti, fireMoonConfetti, fireCloudConfetti, fireLightningStormConfetti,
+  fireRocketConfetti, firePlanetConfetti, fireStarsConfetti, fireCometConfetti, fireUfoSweepConfetti,
+  fireCoffeeSteamConfetti, firePizzaConfetti, fireDonutConfetti, fireRamenConfetti, fireTacoConfetti,
+  fireRobotConfetti, fireGamepadConfetti, fireJoystickConfetti, firePixelHeartConfetti, fireSparklesTrailConfetti,
+  fireNyanCatConfetti, fireDogeConfetti, fireTrollfaceConfetti, fireAmongUsConfetti,
+  firePartyParrotConfetti, fireRickrollConfetti, fireThisIsFineConfetti,
 } from '../../utils/confetti';
 
 const TLS_OPTIONS = [
@@ -272,17 +276,17 @@ const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: Reac
   },
   sun: {
     title: 'Sun',
-    fire: fireNatureConfetti,
+    fire: fireSunConfetti,
     icon: <span className="text-xl leading-none select-none">☀️</span>,
   },
   moon: {
     title: 'Moon',
-    fire: fireNatureConfetti,
+    fire: fireMoonConfetti,
     icon: <span className="text-xl leading-none select-none">🌙</span>,
   },
   cloud: {
     title: 'Cloud',
-    fire: fireNatureConfetti,
+    fire: fireCloudConfetti,
     icon: <span className="text-xl leading-none select-none">☁️</span>,
   },
   lightning: {
@@ -292,22 +296,22 @@ const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: Reac
   },
   rocket: {
     title: 'Rocket',
-    fire: fireSpaceConfetti,
+    fire: fireRocketConfetti,
     icon: <span className="text-xl leading-none select-none">🚀</span>,
   },
   planet: {
     title: 'Planet',
-    fire: fireSpaceConfetti,
+    fire: firePlanetConfetti,
     icon: <span className="text-xl leading-none select-none">🪐</span>,
   },
   stars: {
     title: 'Stars',
-    fire: fireSpaceConfetti,
+    fire: fireStarsConfetti,
     icon: <span className="text-xl leading-none select-none">🌟</span>,
   },
   comet: {
     title: 'Comet',
-    fire: fireSpaceConfetti,
+    fire: fireCometConfetti,
     icon: <span className="text-xl leading-none select-none">☄️</span>,
   },
   ufo: {
@@ -322,22 +326,22 @@ const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: Reac
   },
   pizza: {
     title: 'Pizza',
-    fire: fireFoodConfetti,
+    fire: firePizzaConfetti,
     icon: <span className="text-xl leading-none select-none">🍕</span>,
   },
   donut: {
     title: 'Donut',
-    fire: fireFoodConfetti,
+    fire: fireDonutConfetti,
     icon: <span className="text-xl leading-none select-none">🍩</span>,
   },
   ramen: {
     title: 'Ramen',
-    fire: fireFoodConfetti,
+    fire: fireRamenConfetti,
     icon: <span className="text-xl leading-none select-none">🍜</span>,
   },
   taco: {
     title: 'Taco',
-    fire: fireFoodConfetti,
+    fire: fireTacoConfetti,
     icon: <span className="text-xl leading-none select-none">🌮</span>,
   },
   robot: {
@@ -364,6 +368,41 @@ const BADGE_CONFIG: Record<string, { title: string; fire: () => void; icon: Reac
     title: 'Sparkles',
     fire: fireSparklesTrailConfetti,
     icon: <span className="text-xl leading-none select-none">✨</span>,
+  },
+  nyancat: {
+    title: 'Nyan Cat',
+    fire: fireNyanCatConfetti,
+    icon: <span className="text-xl leading-none select-none">🌈</span>,
+  },
+  doge: {
+    title: 'Doge',
+    fire: fireDogeConfetti,
+    icon: <span className="text-xl leading-none select-none">🐕</span>,
+  },
+  trollface: {
+    title: 'Trollface',
+    fire: fireTrollfaceConfetti,
+    icon: <span className="text-xl leading-none select-none">😈</span>,
+  },
+  amongus: {
+    title: 'Among Us',
+    fire: fireAmongUsConfetti,
+    icon: <span className="text-xl leading-none select-none">🔴</span>,
+  },
+  partyparrot: {
+    title: 'Party Parrot',
+    fire: firePartyParrotConfetti,
+    icon: <span className="text-xl leading-none select-none">🦜</span>,
+  },
+  rickroll: {
+    title: 'Rickroll',
+    fire: fireRickrollConfetti,
+    icon: <span className="text-xl leading-none select-none">🎵</span>,
+  },
+  thisisfine: {
+    title: 'This Is Fine',
+    fire: fireThisIsFineConfetti,
+    icon: <span className="text-xl leading-none select-none">🔥</span>,
   },
 };
 
