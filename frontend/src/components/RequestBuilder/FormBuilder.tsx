@@ -166,8 +166,11 @@ function NumberEditor({ value, onChange, type }: { value: unknown; onChange: (v:
   // (e.g., "-" or "1.") while the user is typing without snapping back.
   const [raw, setRaw] = useState(String(numericValue));
 
-  // Sync display when the value is changed externally (schema reset, JSON tab edit)
+  // Sync display when the value is changed externally (schema reset, JSON tab edit),
+  // but don't snap back while the user is mid-edit (empty, lone minus, trailing dot).
   useEffect(() => {
+    const isPartial = raw === '' || raw === '-' || (isFloat && /^-?\d*\.$/.test(raw));
+    if (isPartial) return;
     const parsed = isFloat ? parseFloat(raw) : parseInt(raw, 10);
     if (isNaN(parsed) || parsed !== numericValue) {
       setRaw(String(numericValue));
@@ -187,7 +190,6 @@ function NumberEditor({ value, onChange, type }: { value: unknown; onChange: (v:
           setRaw(s);
           const n = isFloat ? parseFloat(s) : parseInt(s, 10);
           if (!isNaN(n)) onChange(n);
-          else if (s === '') onChange(0);
         }
       }}
       onBlur={() => {
