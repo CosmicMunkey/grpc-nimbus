@@ -187,7 +187,6 @@ function NumberEditor({ value, onChange, type }: { value: unknown; onChange: (v:
           setRaw(s);
           const n = isFloat ? parseFloat(s) : parseInt(s, 10);
           if (!isNaN(n)) onChange(n);
-          else if (s === '') onChange(0);
         }
       }}
       onBlur={() => {

@@ -51,5 +51,5 @@ frontend/node_modules/
 
 .DS_Store
 /mcp-server
-# CocoIndex Code (ccc)
-/.cocoindex_code/
+# Code Index
+.codegraph/
