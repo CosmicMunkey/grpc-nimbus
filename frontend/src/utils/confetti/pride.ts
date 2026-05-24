@@ -2,7 +2,9 @@ import { FLAG_COLORS, firePrideConfetti } from './core';
 
 export const fireRainbowConfetti     = () => firePrideConfetti(FLAG_COLORS.rainbow);
 export const fireProgressConfetti    = () => firePrideConfetti(FLAG_COLORS.progress);
-export const fireLesibianConfetti    = () => firePrideConfetti(FLAG_COLORS.lesbian);
+export const fireLesbianConfetti     = () => firePrideConfetti(FLAG_COLORS.lesbian);
+// @deprecated Use fireLesbianConfetti instead (this is a typo variant kept for backward compatibility)
+export const fireLesibianConfetti    = fireLesbianConfetti;
 export const fireTransConfetti       = () => firePrideConfetti(FLAG_COLORS.trans);
 export const fireBisexualConfetti    = () => firePrideConfetti(FLAG_COLORS.bisexual);
 export const firePansexualConfetti   = () => firePrideConfetti(FLAG_COLORS.pansexual);

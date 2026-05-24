@@ -119,11 +119,18 @@ func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error
 	}
 
 	e.mu.Lock()
-	if e.conn != nil {
-		_ = e.conn.Close()
-	}
+	old := e.conn
 	e.conn = conn
 	e.mu.Unlock()
+
+	// Close the old connection asynchronously to give in-flight operations
+	// time to complete before the connection is actually closed.
+	if old != nil {
+		go func() {
+			time.Sleep(1 * time.Second)
+			_ = old.Close()
+		}()
+	}
 
 	e.saveSettings(func(s *storage.AppSettings) {
 		s.LastTarget = cfg.Target
@@ -371,7 +378,13 @@ func (e *MCPEngine) storeDescriptorState(
 	e.mu.Unlock()
 
 	if old != nil {
-		old.Close()
+		// Delay closing the old descriptor to allow in-flight InvokeUnary calls
+		// to complete. InvokeUnary snapshots the descriptor under lock, then uses
+		// it without the lock, so we need to give those operations time to finish.
+		go func() {
+			time.Sleep(5 * time.Second)
+			old.Close()
+		}()
 	}
 }
 

@@ -144,11 +144,48 @@ func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) er
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {
-	// Sanitize method path for use as a filename: replace / and . with _
-	safe := sanitize(methodPath)
-	return filepath.Join(s.dir, safe+".json")
+	// First try the new base64 RawURLEncoding format (avoids padding)
+	newSafe := sanitizeNew(methodPath)
+	newPath := filepath.Join(s.dir, newSafe+".json")
+	
+	if _, err := os.Stat(newPath); err == nil {
+		return newPath
+	}
+	
+	// Fall back to old underscore-based format for backward compatibility
+	oldSafe := sanitizeOld(methodPath)
+	oldPath := filepath.Join(s.dir, oldSafe+".json")
+	
+	if _, err := os.Stat(oldPath); err == nil {
+		// Attempt to migrate old file to new format
+		if err := os.Rename(oldPath, newPath); err == nil {
+			return newPath
+		}
+		// If migration fails, use the old path
+		return oldPath
+	}
+	
+	// Neither exists, use new format as the default
+	return newPath
 }
 
-func sanitize(s string) string {
-	return base64.URLEncoding.EncodeToString([]byte(s))
+// sanitizeNew uses base64 RawURLEncoding to encode the method path
+// RawURLEncoding avoids '=' padding that URLEncoding would add
+func sanitizeNew(s string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(s))
+}
+
+// sanitizeOld was the previous sanitization method: replacing /, ., and spaces with _
+// It's kept for backward compatibility when looking up existing history files
+func sanitizeOld(s string) string {
+	out := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '/' || c == '.' || c == ' ' {
+			out[i] = '_'
+		} else {
+			out[i] = c
+		}
+	}
+	return string(out)
 }

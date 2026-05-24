@@ -1,5 +1,5 @@
 import confetti from 'canvas-confetti';
-import { spawnFloatingEmojis, runEmojiAcrossBottomWithTrail, pulseEmojiCenter } from './core';
+import { spawnFloatingEmojis, runEmojiAcrossBottomWithTrail } from './core';
 
 export function fireRobotConfetti(): void {
   if (typeof document !== 'undefined') {

@@ -1,5 +1,5 @@
 import confetti from 'canvas-confetti';
-import { spawnFloatingEmojis, runEmojiAcrossBottomWithTrail, pulseEmojiCenter, burst } from './core';
+import { spawnFloatingEmojis, runEmojiAcrossBottomWithTrail } from './core';
 
 export function fireCatRunnerConfetti(): void {
   spawnFloatingEmojis(['🐾', '🐟', '🧶'], 10, 2000);
