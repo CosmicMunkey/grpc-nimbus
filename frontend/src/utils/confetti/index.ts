@@ -11,6 +11,7 @@ export {
 export {
   fireRainbowConfetti,
   fireProgressConfetti,
+  fireLesbianConfetti,
   fireLesibianConfetti,
   fireTransConfetti,
   fireBisexualConfetti,

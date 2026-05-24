@@ -36,6 +36,10 @@ type MCPEngine struct {
 	descs      descriptorBundle
 	activeEnv  *storage.Environment
 	nextID     atomic.Int64
+	// inflight tracks in-flight InvokeUnary calls. Connect and storeDescriptorState
+	// wait on this before closing stale connections/descriptors, so they are never
+	// closed while an active RPC is still using them.
+	inflight sync.WaitGroup
 
 	store     *storage.Store
 	envStore  *storage.EnvStore
@@ -123,11 +127,11 @@ func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error
 	e.conn = conn
 	e.mu.Unlock()
 
-	// Close the old connection asynchronously to give in-flight operations
-	// time to complete before the connection is actually closed.
+	// Close the old connection only after all in-flight operations that were
+	// using it have finished, avoiding premature cancellation of active RPCs.
 	if old != nil {
 		go func() {
-			time.Sleep(1 * time.Second)
+			e.inflight.Wait()
 			_ = old.Close()
 		}()
 	}
@@ -268,7 +272,9 @@ func (e *MCPEngine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rp
 	conn := e.conn
 	pd := e.descs.protoset
 	env := e.activeEnv
+	e.inflight.Add(1)
 	e.mu.Unlock()
+	defer e.inflight.Done()
 
 	if conn == nil {
 		return nil, fmt.Errorf("not connected")
@@ -378,11 +384,11 @@ func (e *MCPEngine) storeDescriptorState(
 	e.mu.Unlock()
 
 	if old != nil {
-		// Delay closing the old descriptor to allow in-flight InvokeUnary calls
-		// to complete. InvokeUnary snapshots the descriptor under lock, then uses
-		// it without the lock, so we need to give those operations time to finish.
+		// Close the old descriptor only after all in-flight InvokeUnary calls
+		// that snapshotted it have finished; they hold a reference across the
+		// lock boundary and would fail if the descriptor were closed sooner.
 		go func() {
-			time.Sleep(5 * time.Second)
+			e.inflight.Wait()
 			old.Close()
 		}()
 	}

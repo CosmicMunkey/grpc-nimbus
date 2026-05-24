@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  fireRainbowConfetti, fireProgressConfetti, fireLesibianConfetti,
+  fireRainbowConfetti, fireProgressConfetti, fireLesbianConfetti,
   fireTransConfetti, fireBisexualConfetti, firePansexualConfetti,
   fireNonbinaryConfetti, fireAsexualConfetti, fireGenderfluidConfetti,
   fireGenderqueerConfetti, fireAromanticConfetti, fireIntersexConfetti,
@@ -45,7 +45,7 @@ export const BADGE_CONFIG: Record<string, { title: string; fire: () => void; ico
   },
   lesbian: {
     title: 'Lesbian Pride',
-    fire: fireLesibianConfetti,
+    fire: fireLesbianConfetti,
     icon: (
       <svg width="22" height="15" viewBox="0 0 22 15" style={{ display: 'block', borderRadius: 2 }}>
         <rect y="0"  width="22" height="3" fill="#d52d00"/>
