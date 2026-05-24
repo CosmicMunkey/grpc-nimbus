@@ -60,7 +60,7 @@ func startPingServer(t *testing.T, serverCfg *tls.Config) string {
 	}
 	srv := grpc.NewServer(
 		grpc.Creds(credentials.NewTLS(serverCfg)),
-		grpc.UnknownServiceHandler(func(_ interface{}, stream grpc.ServerStream) error {
+		grpc.UnknownServiceHandler(func(_ any, stream grpc.ServerStream) error {
 			var req []byte
 			if err := stream.RecvMsg(&req); err != nil {
 				return err

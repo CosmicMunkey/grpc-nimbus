@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func TestHandleInvokeUnaryRejectsInvalidTimeout(t *testing.T) {
@@ -115,7 +115,6 @@ func TestValidateTimeoutSeconds(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := validateTimeoutSeconds(tt.timeout)

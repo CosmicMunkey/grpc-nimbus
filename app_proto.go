@@ -11,6 +11,7 @@ import (
 
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
 )
 
 // LoadedState bundles the currently loaded descriptor info for frontend restoration.
@@ -24,36 +25,6 @@ type LoadedState struct {
 	LastTarget          string            `json:"lastTarget"`       // last-used connection target
 	LastTLS             string            `json:"lastTLS"`
 	ActiveEnvironmentID string            `json:"activeEnvironmentId"` // active environment ID (empty = none)
-}
-
-func dedupeStrings(values []string) []string {
-	seen := map[string]bool{}
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		if value != "" && !seen[value] {
-			seen[value] = true
-			out = append(out, value)
-		}
-	}
-	return out
-}
-
-func commonDir(paths []string) string {
-	if len(paths) == 0 {
-		return ""
-	}
-	common := filepath.Dir(paths[0])
-	for _, path := range paths[1:] {
-		dir := filepath.Dir(path)
-		for !strings.HasPrefix(dir, common+string(filepath.Separator)) && dir != common {
-			parent := filepath.Dir(common)
-			if parent == common {
-				return common
-			}
-			common = parent
-		}
-	}
-	return common
 }
 
 func importFromErrorLine(err error, protoFiles []string) (string, string, bool) {
@@ -103,29 +74,6 @@ func importFromErrorLine(err error, protoFiles []string) (string, string, bool) 
 	return sourcePath, before, true
 }
 
-func importRefsForFile(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	lines := strings.Split(string(data), "\n")
-	var refs []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		const prefixImport = `import "`
-		if !strings.HasPrefix(line, prefixImport) {
-			continue
-		}
-		rest := strings.TrimPrefix(line, prefixImport)
-		before, _, ok := strings.Cut(rest, `"`)
-		if !ok {
-			continue
-		}
-		refs = append(refs, before)
-	}
-	return refs
-}
-
 // searchImportRootInDir searches for a matching import root within a single directory.
 // Returns the best match (shortest path to root) or empty string if none found.
 func searchImportRootInDir(searchDir, suffix string, known map[string]bool) string {
@@ -157,7 +105,7 @@ func searchImportRootInDir(searchDir, suffix string, known map[string]bool) stri
 func matchingImportRoot(searchRoot, importRef string, known map[string]bool) (string, bool) {
 	suffix := filepath.Clean(filepath.FromSlash(importRef))
 	best := searchImportRootInDir(searchRoot, suffix, known)
-	
+
 	// If no match in primary root, the function returns empty and we're done.
 	// If we found a match, we'll compare with vendor matches below.
 	if best != "" {
@@ -186,7 +134,7 @@ func matchingImportRootWithVendor(searchRoot, vendorRoot, importRef string, know
 }
 
 func discoverImportPaths(protoFiles, importPaths []string) []string {
-	searchRoot := commonDir(protoFiles)
+	searchRoot := util.CommonDir(protoFiles)
 	if searchRoot == "" {
 		return nil
 	}
@@ -194,7 +142,7 @@ func discoverImportPaths(protoFiles, importPaths []string) []string {
 	for _, path := range importPaths {
 		known[path] = true
 	}
-	
+
 	// Prefer searchRoot/vendor (closest to the loaded files) over parentDir/vendor.
 	vendorRoot := ""
 	if info, err := os.Stat(filepath.Join(searchRoot, "vendor")); err == nil && info.IsDir() {
@@ -204,10 +152,10 @@ func discoverImportPaths(protoFiles, importPaths []string) []string {
 			vendorRoot = filepath.Join(parentDir, "vendor")
 		}
 	}
-	
+
 	var discovered []string
 	for _, file := range protoFiles {
-		for _, importRef := range importRefsForFile(file) {
+		for _, importRef := range util.ImportRefs(file) {
 			root, ok := matchingImportRootWithVendor(searchRoot, vendorRoot, importRef, known)
 			if ok {
 				known[root] = true
@@ -215,7 +163,7 @@ func discoverImportPaths(protoFiles, importPaths []string) []string {
 			}
 		}
 	}
-	return dedupeStrings(discovered)
+	return util.DedupeStrings(discovered)
 }
 
 func inferImportPath(err error, protoFiles, importPaths []string) (string, bool) {
@@ -224,7 +172,7 @@ func inferImportPath(err error, protoFiles, importPaths []string) (string, bool)
 		return "", false
 	}
 	suffix := filepath.Clean(filepath.FromSlash(importRef))
-	searchRoot := commonDir(protoFiles)
+	searchRoot := util.CommonDir(protoFiles)
 	if searchRoot == "" {
 		return "", false
 	}
@@ -438,7 +386,7 @@ func resolveProtoFiles(importPaths, protoFiles []string) (*rpc.ProtosetDescripto
 		}
 		inferred, ok := inferImportPath(err, protoFiles, effectivePaths)
 		if ok {
-			allImportPaths = dedupeStrings(append(allImportPaths, inferred))
+			allImportPaths = util.DedupeStrings(append(allImportPaths, inferred))
 			continue
 		}
 		sourcePath, importRef, errOk := importFromErrorLine(err, protoFiles)
@@ -485,7 +433,7 @@ func (a *App) currentLoadModeLocked() string {
 func (a *App) combinedLoadedPathsLocked() []string {
 	paths := append([]string(nil), a.loadedProtosetPaths...)
 	paths = append(paths, a.loadedProtoFiles...)
-	return dedupeStrings(paths)
+	return util.DedupeStrings(paths)
 }
 
 func (a *App) rebuildDescriptor(ctx context.Context, protosets, importPaths, protoFiles []string, withReflection bool, connTarget *rpc.Connection) (*rpc.ProtosetDescriptor, error) {
@@ -569,7 +517,7 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 	conn := a.conn
 	a.mu.Unlock()
 
-	allProtosets := dedupeStrings(append(currentProtosets, paths...))
+	allProtosets := util.DedupeStrings(append(currentProtosets, paths...))
 	effectivePaths := append(importPaths, virtualDirs...)
 	pd, err := a.rebuildDescriptor(a.ctx, allProtosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
@@ -621,7 +569,7 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 	discovered := discoverImportPaths(protoFiles, userPaths)
 
 	// Final order: user-provided → discovered (vendor-first) → proto parent dirs.
-	importPaths = dedupeStrings(append(append(userPaths, discovered...), protoParentDirs...))
+	importPaths = util.DedupeStrings(append(append(userPaths, discovered...), protoParentDirs...))
 	a.mu.Lock()
 	protosets := append([]string(nil), a.loadedProtosetPaths...)
 	currentProtoFiles := append([]string(nil), a.loadedProtoFiles...)
@@ -630,8 +578,8 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 	conn := a.conn
 	a.mu.Unlock()
 
-	allProtoFiles := dedupeStrings(append(currentProtoFiles, protoFiles...))
-	allImportPaths := dedupeStrings(append(currentImportPaths, importPaths...))
+	allProtoFiles := util.DedupeStrings(append(currentProtoFiles, protoFiles...))
+	allImportPaths := util.DedupeStrings(append(currentImportPaths, importPaths...))
 	var virtualDirs []string
 	var (
 		pd  *rpc.ProtosetDescriptor
@@ -645,7 +593,7 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 		}
 		inferred, ok := inferImportPath(err, allProtoFiles, effectivePaths)
 		if ok {
-			allImportPaths = dedupeStrings(append(allImportPaths, inferred))
+			allImportPaths = util.DedupeStrings(append(allImportPaths, inferred))
 			continue
 		}
 		sourcePath, importRef, errOk := importFromErrorLine(err, allProtoFiles)

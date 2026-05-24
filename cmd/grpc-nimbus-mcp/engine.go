@@ -12,6 +12,7 @@ import (
 
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
 )
 
 // descriptorBundle groups the current descriptor source and its provenance.
@@ -29,13 +30,12 @@ type descriptorBundle struct {
 // Wails or UI dependencies, and reads from the same OS config directory so
 // environments and collections saved in the desktop app are immediately visible.
 type MCPEngine struct {
-	mu         sync.Mutex
-	settingsMu sync.Mutex
-	ctx        context.Context
-	conn       *rpc.Connection
-	descs      descriptorBundle
-	activeEnv  *storage.Environment
-	nextID     atomic.Int64
+	mu        sync.Mutex
+	ctx       context.Context
+	conn      *rpc.Connection
+	descs     descriptorBundle
+	activeEnv *storage.Environment
+	nextID    atomic.Int64
 	// inflight tracks in-flight InvokeUnary calls. Connect and storeDescriptorState
 	// wait on this before closing stale connections/descriptors, so they are never
 	// closed while an active RPC is still using them.
@@ -219,7 +219,7 @@ func (e *MCPEngine) loadDescriptorSnapshot() (descriptorBundle, *rpc.Connection)
 func (e *MCPEngine) LoadProtosets(ctx context.Context, paths []string) ([]rpc.ServiceInfo, error) {
 	snap, conn := e.loadDescriptorSnapshot()
 
-	allProtosets := dedupeNonEmptyStrings(append(snap.protosetPaths, paths...))
+	allProtosets := util.DedupeStrings(append(snap.protosetPaths, paths...))
 	pd, err := e.rebuildDescriptor(ctx, allProtosets, snap.importPaths, snap.protoFiles, snap.reflection, conn)
 	if err != nil {
 		return nil, err
@@ -351,9 +351,9 @@ func (e *MCPEngine) EnsureCollectionDescriptors(ctx context.Context, col *storag
 
 	snap, conn := e.loadDescriptorSnapshot()
 
-	allProtosets := dedupeNonEmptyStrings(append(snap.protosetPaths, col.ProtosetPaths...))
-	allProtoFiles := dedupeNonEmptyStrings(append(snap.protoFiles, col.ProtoFilePaths...))
-	allImportPaths := dedupeNonEmptyStrings(append(snap.importPaths, col.ProtoImportPaths...))
+	allProtosets := util.DedupeStrings(append(snap.protosetPaths, col.ProtosetPaths...))
+	allProtoFiles := util.DedupeStrings(append(snap.protoFiles, col.ProtoFilePaths...))
+	allImportPaths := util.DedupeStrings(append(snap.importPaths, col.ProtoImportPaths...))
 
 	pd, err := e.rebuildDescriptor(ctx, allProtosets, allImportPaths, allProtoFiles, snap.reflection, conn)
 	if err != nil {
@@ -398,27 +398,9 @@ func (e *MCPEngine) saveSettings(fn func(*storage.AppSettings)) {
 	if e.settings == nil {
 		return
 	}
-	e.settingsMu.Lock()
-	defer e.settingsMu.Unlock()
-
-	saved, err := e.settings.Load()
-	if err != nil || saved == nil {
-		saved = &storage.AppSettings{}
+	if err := e.settings.Update(fn); err != nil {
+		log.Printf("warning: could not save settings: %v", err)
 	}
-	fn(saved)
-	_ = e.settings.Save(saved)
-}
-
-func dedupeNonEmptyStrings(values []string) []string {
-	seen := map[string]bool{}
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if v != "" && !seen[v] {
-			seen[v] = true
-			out = append(out, v)
-		}
-	}
-	return out
 }
 
 func validateTimeoutSeconds(timeoutSeconds float64) error {

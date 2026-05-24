@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
@@ -58,6 +59,7 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 
 	existing, err := s.getHistoryLocked(entry.MethodPath)
 	if err != nil {
+		logger.Default.Warnf("could not read existing history for %q: %v", entry.MethodPath, err)
 		existing = nil
 	}
 	entries := append([]HistoryEntry{entry}, existing...)
@@ -72,16 +74,10 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 }
 
 // GetHistory returns the history entries for a given method path (newest first).
-// A corrupt or unreadable file is treated as empty history; it will be overwritten
-// on the next Add, so callers never need to handle the error as fatal.
 func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	entries, err := s.getHistoryLocked(methodPath)
-	if err != nil {
-		return nil, nil
-	}
-	return entries, nil
+	return s.getHistoryLocked(methodPath)
 }
 
 func (s *HistoryStore) getHistoryLocked(methodPath string) ([]HistoryEntry, error) {
@@ -147,15 +143,15 @@ func (s *HistoryStore) filePath(methodPath string) string {
 	// First try the new base64 RawURLEncoding format (avoids padding)
 	newSafe := sanitizeNew(methodPath)
 	newPath := filepath.Join(s.dir, newSafe+".json")
-	
+
 	if _, err := os.Stat(newPath); err == nil {
 		return newPath
 	}
-	
+
 	// Fall back to old underscore-based format for backward compatibility
 	oldSafe := sanitizeOld(methodPath)
 	oldPath := filepath.Join(s.dir, oldSafe+".json")
-	
+
 	if _, err := os.Stat(oldPath); err == nil {
 		// Attempt to migrate old file to new format
 		if err := os.Rename(oldPath, newPath); err == nil {
@@ -164,7 +160,7 @@ func (s *HistoryStore) filePath(methodPath string) string {
 		// If migration fails, use the old path
 		return oldPath
 	}
-	
+
 	// Neither exists, use new format as the default
 	return newPath
 }

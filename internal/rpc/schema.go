@@ -13,7 +13,7 @@ type FieldSchema struct {
 	// Type is one of: "string","bytes","bool","int32","int64","uint32","uint64",
 	// "float","double","enum","message","map"
 	Type           string        `json:"type"`
-	IsRepeated     bool          `json:"isRepeated"`             // true only for non-map repeated fields
+	IsRepeated     bool          `json:"isRepeated"` // true only for non-map repeated fields
 	IsMap          bool          `json:"isMap"`
 	OneofName      string        `json:"oneofName,omitempty"`
 	EnumValues     []EnumValue   `json:"enumValues,omitempty"`

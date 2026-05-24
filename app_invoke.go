@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // InvokeUnary executes a unary or server-streaming RPC synchronously.

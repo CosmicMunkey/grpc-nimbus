@@ -3,6 +3,7 @@
 import {rpc} from '../models';
 import {storage} from '../models';
 import {main} from '../models';
+import {logger} from '../models';
 import {context} from '../models';
 
 export function CancelReflection():Promise<void>;
@@ -14,6 +15,8 @@ export function CancelUnary():Promise<void>;
 export function ClearHistory(arg1:string):Promise<void>;
 
 export function ClearLoadedProtos():Promise<void>;
+
+export function ClearLogs():Promise<void>;
 
 export function Connect(arg1:rpc.ConnectionConfig):Promise<void>;
 
@@ -32,6 +35,8 @@ export function GetConnectionState():Promise<string>;
 export function GetHistory(arg1:string):Promise<Array<storage.HistoryEntry>>;
 
 export function GetLoadedState():Promise<main.LoadedState>;
+
+export function GetLogs(arg1:string):Promise<Array<logger.Entry>>;
 
 export function GetRequestSchema(arg1:string):Promise<Array<rpc.FieldSchema>>;
 

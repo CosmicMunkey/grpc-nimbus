@@ -1,3 +1,24 @@
+export namespace logger {
+	
+	export class Entry {
+	    level: number;
+	    timestamp: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.level = source["level"];
+	        this.timestamp = source["timestamp"];
+	        this.message = source["message"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class CustomThemeEntry {
@@ -84,6 +105,7 @@ export namespace main {
 	    inheritShellEnv: boolean;
 	    maxStreamMessages: number;
 	    defaultMetadata: rpc.MetadataEntry[];
+	    showDebugIndicator: boolean;
 	    windowWidth: number;
 	    windowHeight: number;
 	    windowX: number;
@@ -116,6 +138,7 @@ export namespace main {
 	        this.inheritShellEnv = source["inheritShellEnv"];
 	        this.maxStreamMessages = source["maxStreamMessages"];
 	        this.defaultMetadata = this.convertValues(source["defaultMetadata"], rpc.MetadataEntry);
+	        this.showDebugIndicator = source["showDebugIndicator"];
 	        this.windowWidth = source["windowWidth"];
 	        this.windowHeight = source["windowHeight"];
 	        this.windowX = source["windowX"];

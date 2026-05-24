@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
+
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 )
 
 // MethodInfo is the frontend-facing descriptor for a single RPC method.
@@ -282,7 +283,7 @@ func newDescriptor(src grpcurl.DescriptorSource, reflClient *grpcreflect.Client)
 	}
 
 	for _, svcName := range pending {
-		log.Printf("grpc-nimbus: warning: could not resolve service %q via reflection (skipped)", svcName)
+		logger.Default.Warnf("could not resolve service %q via reflection (skipped)", svcName)
 	}
 
 	pd := &ProtosetDescriptor{source: src, methods: methods, unresolvable: pending}

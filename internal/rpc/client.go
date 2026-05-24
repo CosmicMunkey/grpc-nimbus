@@ -22,7 +22,7 @@ const (
 
 // ConnectionConfig holds the parameters to connect to a gRPC server.
 type ConnectionConfig struct {
-	Target     string  `json:"target"`     // host:port
+	Target     string  `json:"target"` // host:port
 	TLS        TLSMode `json:"tls"`
 	ClientCert string  `json:"clientCert"` // path to client cert (mTLS)
 	ClientKey  string  `json:"clientKey"`  // path to client key (mTLS)

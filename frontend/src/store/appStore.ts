@@ -14,8 +14,10 @@ import {
   ServiceInfo,
   StreamEvent,
   Tab,
+  LogEntry,
 } from '../types';
 import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -77,9 +79,10 @@ declare global {
              autoConnectOnStartup?: boolean;
              allowShellCommands?: boolean;
              inheritShellEnv?: boolean;
-             maxStreamMessages?: number;
-             defaultMetadata?: MetadataEntry[];
-           }>;
+              maxStreamMessages?: number;
+              defaultMetadata?: MetadataEntry[];
+              showDebugIndicator?: boolean;
+            }>;
             SaveUserSettings(s: {
               confirmDeletes: boolean;
               timestampInputLocal: boolean;
@@ -102,7 +105,10 @@ declare global {
               inheritShellEnv: boolean;
               maxStreamMessages: number;
               defaultMetadata: MetadataEntry[];
+              showDebugIndicator: boolean;
             }): Promise<void>;
+          GetLogs(severity: string): Promise<LogEntry[]>;
+          ClearLogs(): Promise<void>;
           GetVersion(): Promise<string>;
         };
       };
@@ -142,6 +148,8 @@ export const api = {
   clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
   getRequestSchema: (methodPath: string) => window.go.main.App.GetRequestSchema(methodPath),
   clearLoadedProtos: () => window.go.main.App.ClearLoadedProtos(),
+  getLogs: (severity: string) => window.go.main.App.GetLogs(severity),
+  clearLogs: () => window.go.main.App.ClearLogs(),
   reloadProtos: () => window.go.main.App.ReloadProtos(),
   removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
@@ -154,7 +162,7 @@ export const api = {
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
     allowShellCommands: boolean; inheritShellEnv: boolean;
-    maxStreamMessages: number; defaultMetadata: MetadataEntry[];
+    maxStreamMessages: number; defaultMetadata: MetadataEntry[]; showDebugIndicator: boolean;
   }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
@@ -166,7 +174,7 @@ function saveAllSettings(s: Pick<AppState,
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
   'allowShellCommands' | 'inheritShellEnv' |
-  'maxStreamMessages' | 'defaultMetadata'
+  'maxStreamMessages' | 'defaultMetadata' | 'showDebugIndicator'
 >) {
   api.saveUserSettings({
     confirmDeletes: s.confirmDeletes,
@@ -190,6 +198,7 @@ function saveAllSettings(s: Pick<AppState,
     inheritShellEnv: s.inheritShellEnv,
     maxStreamMessages: s.maxStreamMessages,
     defaultMetadata: s.defaultMetadata,
+    showDebugIndicator: s.showDebugIndicator,
   }).catch(() => {});
 }
 
@@ -528,6 +537,12 @@ interface AppState {
   setDefaultMetadata: (v: MetadataEntry[]) => void;
   loadUserSettings: () => Promise<void>;
 
+  // Debug
+  logs: LogEntry[];
+  showDebugIndicator: boolean;
+  setShowDebugIndicator: (v: boolean) => void;
+  clearLogs: () => void;
+
   // Layout
   sidebarWidth: number;
   panelSplit: number;
@@ -619,6 +634,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* non-fatal */ }
     // Load user preferences in parallel (non-fatal)
     get().loadUserSettings().catch(() => {});
+    // Subscribe to live log events
+    api.getLogs('').then((entries) => {
+      if (entries?.length) set({ logs: entries });
+    }).catch(() => {});
+    EventsOn('log:entry', (entry) => {
+      set((s) => {
+        const logs = [...s.logs, entry as LogEntry];
+        if (logs.length > 1000) logs.splice(0, logs.length - 1000);
+        return { logs };
+      });
+    });
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────
@@ -1301,6 +1327,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   inheritShellEnv: false,
   maxStreamMessages: 200,
   defaultMetadata: [],
+  logs: [],
+  showDebugIndicator: false,
   confirmDialog: null,
   settingsOpen: false,
   settingsTarget: null,
@@ -1347,6 +1375,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         inheritShellEnv: s.inheritShellEnv ?? false,
         maxStreamMessages: s.maxStreamMessages ?? 200,
         defaultMetadata: s.defaultMetadata ?? [],
+        showDebugIndicator: s.showDebugIndicator ?? false,
       });
       applyTheme(resolved);
       applyFontSize(fontSize);
@@ -1503,6 +1532,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDefaultMetadata: (v) => {
     set({ defaultMetadata: v });
     saveAllSettings(get());
+  },
+
+  setShowDebugIndicator: (v) => {
+    set({ showDebugIndicator: v });
+    saveAllSettings(get());
+  },
+
+  clearLogs: () => {
+    set({ logs: [] });
+    api.clearLogs().catch(() => {});
   },
 
   setSidebarWidth: (w) => {

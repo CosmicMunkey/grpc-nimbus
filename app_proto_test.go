@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"google.golang.org/protobuf/proto"
-	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
 func writeProtosetFixture(t *testing.T, importPaths []string, entryProto string) string {
@@ -506,7 +506,6 @@ message ServiceMessage {
 	}
 }
 
-
 // TestFindGoModuleRootStripsInlineComment verifies that the go.mod parser
 // strips trailing // comments from the module directive. Without this fix,
 // "module example.com/foo // comment" would return the full string including
@@ -596,7 +595,6 @@ func TestMakeVirtualRootFallsBackToCopyWhenSymlinkTargetExists(t *testing.T) {
 		}
 	}
 }
-
 
 func serviceNames(services []rpc.ServiceInfo, err error) ([]string, error) {
 	if err != nil {

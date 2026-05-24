@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
 )
 
 const appDirName = "grpc-nimbus"
@@ -71,7 +73,8 @@ func (s *Store) ListCollections() ([]Collection, error) {
 		}
 		col, err := s.loadFile(filepath.Join(s.dir, e.Name()))
 		if err != nil {
-			continue // skip corrupt files
+			logger.Default.Warnf("skipping corrupt collection %q: %v", e.Name(), err)
+			continue
 		}
 		cols = append(cols, *col)
 	}
@@ -142,47 +145,6 @@ type EmbeddedProtoFile struct {
 	IsEntry bool   `json:"isEntry,omitempty"`
 }
 
-func importRefs(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	lines := strings.Split(string(data), "\n")
-	var refs []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		const prefix = `import "`
-		if !strings.HasPrefix(line, prefix) {
-			continue
-		}
-		rest := strings.TrimPrefix(line, prefix)
-		before, _, ok := strings.Cut(rest, `"`)
-		if !ok {
-			continue
-		}
-		refs = append(refs, before)
-	}
-	return refs
-}
-
-func commonDir(paths []string) string {
-	if len(paths) == 0 {
-		return ""
-	}
-	common := filepath.Dir(paths[0])
-	for _, p := range paths[1:] {
-		dir := filepath.Dir(p)
-		for dir != common && !strings.HasPrefix(dir, common+string(filepath.Separator)) {
-			parent := filepath.Dir(common)
-			if parent == common {
-				return common
-			}
-			common = parent
-		}
-	}
-	return common
-}
-
 func resolveImport(importPaths []string, ref string) (string, bool) {
 	rel := filepath.FromSlash(ref)
 	for _, root := range importPaths {
@@ -198,7 +160,7 @@ func bundleProtoSources(protoFiles, importPaths []string) ([]EmbeddedProtoFile, 
 	if len(protoFiles) == 0 {
 		return nil, nil, nil, nil
 	}
-	entryBase := commonDir(protoFiles)
+	entryBase := util.CommonDir(protoFiles)
 	if entryBase == "" {
 		entryBase = filepath.Dir(protoFiles[0])
 	}
@@ -228,7 +190,7 @@ func bundleProtoSources(protoFiles, importPaths []string) ([]EmbeddedProtoFile, 
 	for len(queue) > 0 {
 		file := queue[0]
 		queue = queue[1:]
-		for _, ref := range importRefs(file) {
+		for _, ref := range util.ImportRefs(file) {
 			if seenImports[ref] {
 				continue
 			}

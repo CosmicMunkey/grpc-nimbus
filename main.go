@@ -5,6 +5,7 @@ import (
 	"embed"
 	goruntime "runtime"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -12,7 +13,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 //go:embed all:frontend/dist

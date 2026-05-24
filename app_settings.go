@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
@@ -37,6 +36,7 @@ type UserSettings struct {
 	InheritShellEnv       bool                `json:"inheritShellEnv"`
 	MaxStreamMessages     int                 `json:"maxStreamMessages"`
 	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata"`
+	ShowDebugIndicator    bool                `json:"showDebugIndicator"`
 	WindowWidth           int                 `json:"windowWidth"`
 	WindowHeight          int                 `json:"windowHeight"`
 	WindowX               int                 `json:"windowX"`
@@ -62,6 +62,7 @@ func (a *App) GetUserSettings() UserSettings {
 		InheritShellEnv:      false,
 		MaxStreamMessages:    200,
 		DefaultMetadata:      []rpc.MetadataEntry{},
+		ShowDebugIndicator:   false,
 		WindowWidth:          1280,
 		WindowHeight:         800,
 	}
@@ -127,6 +128,9 @@ func (a *App) GetUserSettings() UserSettings {
 	}
 	if saved.DefaultMetadata != nil {
 		result.DefaultMetadata = saved.DefaultMetadata
+	}
+	if saved.ShowDebugIndicator != nil {
+		result.ShowDebugIndicator = *saved.ShowDebugIndicator
 	}
 	if saved.WindowWidth != nil {
 		result.WindowWidth = *saved.WindowWidth
@@ -215,6 +219,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.InheritShellEnv = &s.InheritShellEnv
 		settings.MaxStreamMessages = &s.MaxStreamMessages
 		settings.DefaultMetadata = s.DefaultMetadata
+		settings.ShowDebugIndicator = &s.ShowDebugIndicator
 		settings.WindowWidth = &s.WindowWidth
 		settings.WindowHeight = &s.WindowHeight
 		settings.WindowX = &s.WindowX
@@ -222,20 +227,11 @@ func (a *App) SaveUserSettings(s UserSettings) {
 	})
 }
 
-// saveSettings merges a settings mutation into the persisted settings file.
-// Serialized via settingsMu to prevent concurrent read-modify-write races.
 func (a *App) saveSettings(mutate func(*storage.AppSettings)) {
-	a.settingsMu.Lock()
-	defer a.settingsMu.Unlock()
 	if a.settings == nil {
 		return
 	}
-	current, err := a.settings.Load()
-	if err != nil || current == nil {
-		current = &storage.AppSettings{}
-	}
-	mutate(current)
-	if err := a.settings.Save(current); err != nil {
-		fmt.Printf("warning: could not save settings: %v\n", err)
+	if err := a.settings.Update(mutate); err != nil {
+		logger.Default.Warnf("could not save settings: %v", err)
 	}
 }

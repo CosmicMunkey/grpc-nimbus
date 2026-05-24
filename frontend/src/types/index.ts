@@ -133,6 +133,12 @@ export interface LoadedState {
   activeEnvironmentId?: string;
 }
 
+export interface LogEntry {
+  level: 'info' | 'warn' | 'error';
+  timestamp: string;
+  message: string;
+}
+
 // Represents one open request tab — all per-request state is scoped here.
 export interface Tab {
   id: string;
