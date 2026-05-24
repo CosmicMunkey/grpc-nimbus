@@ -119,11 +119,6 @@ func (s *Store) DeleteCollection(id string) error {
 	return nil
 }
 
-// FilePath returns the on-disk path for the given collection ID.
-func (s *Store) FilePath(id string) string {
-	return s.filePath(id)
-}
-
 // PortableExport is a self-contained collection bundle for sharing across machines.
 // Referenced protoset files and proto sources are embedded as raw bytes (base64 in
 // JSON) so the recipient doesn't need the same files on disk.

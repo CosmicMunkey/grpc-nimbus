@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -106,7 +107,7 @@ func (s *SettingsStore) Load() (*AppSettings, error) {
 	}
 	var settings AppSettings
 	if err := json.Unmarshal(data, &settings); err != nil {
-		// Corrupt file — return empty settings rather than failing
+		log.Printf("warning: corrupt settings file %q — returning defaults: %v", s.path, err)
 		return &AppSettings{}, nil
 	}
 	return &settings, nil

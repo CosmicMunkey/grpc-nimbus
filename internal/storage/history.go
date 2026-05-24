@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -149,14 +150,5 @@ func (s *HistoryStore) filePath(methodPath string) string {
 }
 
 func sanitize(s string) string {
-	out := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == '/' || c == '.' || c == ' ' {
-			out[i] = '_'
-		} else {
-			out[i] = c
-		}
-	}
-	return string(out)
+	return base64.URLEncoding.EncodeToString([]byte(s))
 }

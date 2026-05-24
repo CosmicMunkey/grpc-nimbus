@@ -14,6 +14,9 @@ import (
 func TestHandleInvokeUnaryRejectsInvalidTimeout(t *testing.T) {
 	t.Parallel()
 
+	// Note: MCPEngine has no connection or descriptor loaded, so the handler
+	// should reject the request at the timeout validation stage before it
+	// reaches gRPC.
 	engine := &MCPEngine{}
 	handler := handleInvokeUnary(engine)
 	req := mcp.CallToolRequest{

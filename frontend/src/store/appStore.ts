@@ -755,10 +755,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().streamingTabId) {
       await get().cancelStream();
     }
-    const tabIds = get().tabs.map((t) => t.id);
-    for (const id of tabIds) {
-      await get().closeTab(id);
-    }
+    set((s) => {
+      const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
+      return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: null };
+    });
   },
 
   duplicateTab: (id) => {
@@ -1334,24 +1334,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeCustomThemeId,
         themeBadge: s.themeBadge ?? '',
         fontSize,
-         responseWordWrap: s.responseWordWrap ?? true,
-         responseIndent: s.responseIndent ?? 2,
-         emitDefaults: s.emitDefaults ?? false,
-         envSortByCreated: s.envSortByCreated ?? false,
-         sidebarWidth,
-         panelSplit,
-         defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
-         historyLimit: s.historyLimit ?? 50,
-         autoConnectOnStartup: s.autoConnectOnStartup ?? false,
-         allowShellCommands: s.allowShellCommands ?? false,
-         inheritShellEnv: s.inheritShellEnv ?? false,
-         maxStreamMessages: s.maxStreamMessages ?? 200,
-         defaultMetadata: s.defaultMetadata ?? [],
-       });
-       applyTheme(resolved);
-       applyFontSize(fontSize);
-     } catch { /* use defaults */ }
-   },
+        responseWordWrap: s.responseWordWrap ?? true,
+        responseIndent: s.responseIndent ?? 2,
+        emitDefaults: s.emitDefaults ?? false,
+        envSortByCreated: s.envSortByCreated ?? false,
+        sidebarWidth,
+        panelSplit,
+        defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
+        historyLimit: s.historyLimit ?? 50,
+        autoConnectOnStartup: s.autoConnectOnStartup ?? false,
+        allowShellCommands: s.allowShellCommands ?? false,
+        inheritShellEnv: s.inheritShellEnv ?? false,
+        maxStreamMessages: s.maxStreamMessages ?? 200,
+        defaultMetadata: s.defaultMetadata ?? [],
+      });
+      applyTheme(resolved);
+      applyFontSize(fontSize);
+    } catch { /* use defaults */ }
+  },
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
