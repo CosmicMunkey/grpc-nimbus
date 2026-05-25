@@ -108,9 +108,9 @@ func NewSettingsStoreAt(path string) (*SettingsStore, error) {
 func (s *SettingsStore) Load() (*AppSettings, error) {
 	s.mu.RLock()
 	if s.cache != nil {
-		cp := *s.cache
+		cp := deepCopySettings(s.cache)
 		s.mu.RUnlock()
-		return &cp, nil
+		return cp, nil
 	}
 	s.mu.RUnlock()
 
@@ -118,8 +118,8 @@ func (s *SettingsStore) Load() (*AppSettings, error) {
 	defer s.mu.Unlock()
 
 	if s.cache != nil {
-		cp := *s.cache
-		return &cp, nil
+		cp := deepCopySettings(s.cache)
+		return cp, nil
 	}
 
 	data, err := os.ReadFile(s.path)
@@ -137,8 +137,8 @@ func (s *SettingsStore) Load() (*AppSettings, error) {
 		return &AppSettings{}, nil
 	}
 	s.cache = &settings
-	cp := *s.cache
-	return &cp, nil
+	cp := deepCopySettings(s.cache)
+	return cp, nil
 }
 
 // atomicWrite writes data to a temp file then renames it to s.path.
@@ -151,6 +151,37 @@ func (s *SettingsStore) atomicWrite(data []byte) error {
 	return os.Rename(tmp, s.path)
 }
 
+// deepCopySettings returns a deep copy of s, duplicating all slice and map
+// fields so callers cannot mutate the cache through shared backing storage.
+func deepCopySettings(s *AppSettings) *AppSettings {
+	cp := *s
+	cp.ProtosetPaths = append([]string(nil), s.ProtosetPaths...)
+	cp.ProtoImportPaths = append([]string(nil), s.ProtoImportPaths...)
+	cp.ProtoFilePaths = append([]string(nil), s.ProtoFilePaths...)
+	cp.DefaultMetadata = append([]rpc.MetadataEntry(nil), s.DefaultMetadata...)
+	if s.CustomTheme != nil {
+		m := make(map[string]string, len(s.CustomTheme))
+		for k, v := range s.CustomTheme {
+			m[k] = v
+		}
+		cp.CustomTheme = m
+	}
+	if len(s.CustomThemes) > 0 {
+		cp.CustomThemes = make([]CustomThemeEntry, len(s.CustomThemes))
+		for i, t := range s.CustomThemes {
+			entry := t
+			if t.Tokens != nil {
+				entry.Tokens = make(map[string]string, len(t.Tokens))
+				for k, v := range t.Tokens {
+					entry.Tokens[k] = v
+				}
+			}
+			cp.CustomThemes[i] = entry
+		}
+	}
+	return &cp
+}
+
 // saveLocked marshals settings, writes them atomically, and updates the cache.
 // Must be called with s.mu held. Stores a copy in cache to avoid aliasing.
 func (s *SettingsStore) saveLocked(settings *AppSettings) error {
@@ -161,8 +192,7 @@ func (s *SettingsStore) saveLocked(settings *AppSettings) error {
 	if err := s.atomicWrite(data); err != nil {
 		return err
 	}
-	cp := *settings
-	s.cache = &cp
+	s.cache = deepCopySettings(settings)
 	return nil
 }
 

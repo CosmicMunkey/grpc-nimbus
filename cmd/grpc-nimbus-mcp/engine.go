@@ -36,9 +36,10 @@ type MCPEngine struct {
 	descs     descriptorBundle
 	activeEnv *storage.Environment
 	nextID    atomic.Int64
-	// inflight tracks in-flight InvokeUnary calls. Connect and storeDescriptorState
-	// wait on this before closing stale connections/descriptors, so they are never
-	// closed while an active RPC is still using them.
+	// inflight tracks all operations that hold a snapshot of conn or a descriptor
+	// (InvokeUnary, LoadViaReflection, rebuildDescriptor, etc.). Connect and
+	// storeDescriptorState wait on this before closing stale resources so they
+	// are never closed while an active operation is still using them.
 	inflight sync.WaitGroup
 
 	store     *storage.Store
@@ -146,10 +147,15 @@ func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error
 // Disconnect closes the current gRPC connection.
 func (e *MCPEngine) Disconnect() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.conn != nil {
-		_ = e.conn.Close()
-		e.conn = nil
+	old := e.conn
+	e.conn = nil
+	e.mu.Unlock()
+
+	if old != nil {
+		go func() {
+			e.inflight.Wait()
+			_ = old.Close()
+		}()
 	}
 }
 
@@ -312,6 +318,10 @@ func (e *MCPEngine) rebuildDescriptor(
 	withReflection bool,
 	conn *rpc.Connection,
 ) (*rpc.ProtosetDescriptor, error) {
+	// Register as an in-flight operation so Connect/storeDescriptorState won't
+	// close conn or the old descriptor while we're using them.
+	e.inflight.Add(1)
+	defer e.inflight.Done()
 	var parts []*rpc.ProtosetDescriptor
 	if len(protosets) > 0 {
 		pd, err := rpc.LoadProtosets(protosets)

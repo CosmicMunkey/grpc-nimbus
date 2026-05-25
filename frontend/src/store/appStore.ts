@@ -19,6 +19,18 @@ import {
 import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 
+// The Go backend emits logger.Level as a numeric enum (0=info, 1=warn, 2=error).
+// Normalize it to the string union expected by LogEntry so all comparisons and
+// string operations in the UI work correctly regardless of what the backend sends.
+const LOG_LEVEL_MAP: Record<number, LogEntry['level']> = { 0: 'info', 1: 'warn', 2: 'error' };
+function normalizeLogEntry(raw: unknown): LogEntry {
+  const e = raw as Record<string, unknown>;
+  const level = typeof e.level === 'number'
+    ? (LOG_LEVEL_MAP[e.level] ?? 'info')
+    : (e.level as LogEntry['level']) ?? 'info';
+  return { level, timestamp: e.timestamp as string, message: e.message as string };
+}
+
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
   interface Window {
@@ -636,11 +648,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().loadUserSettings().catch(() => {});
     // Subscribe to live log events
     api.getLogs('').then((entries) => {
-      if (entries?.length) set({ logs: entries });
+      if (entries?.length) set({ logs: entries.map(normalizeLogEntry) });
     }).catch(() => {});
     EventsOn('log:entry', (entry) => {
       set((s) => {
-        const logs = [...s.logs, entry as LogEntry];
+        const logs = [...s.logs, normalizeLogEntry(entry)];
         if (logs.length > 1000) logs.splice(0, logs.length - 1000);
         return { logs };
       });

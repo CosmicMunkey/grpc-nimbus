@@ -140,12 +140,23 @@ func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) er
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {
-	// First try the new base64 RawURLEncoding format (avoids padding)
+	// Canonical new format: "b64_" prefix + base64 RawURLEncoding.
+	// The prefix ensures new-format names are never confused with legacy names.
 	newSafe := sanitizeNew(methodPath)
 	newPath := filepath.Join(s.dir, newSafe+".json")
 
 	if _, err := os.Stat(newPath); err == nil {
 		return newPath
+	}
+
+	// Transitional: base64 without prefix (used briefly during development).
+	unprefixedSafe := base64.RawURLEncoding.EncodeToString([]byte(methodPath))
+	unprefixedPath := filepath.Join(s.dir, unprefixedSafe+".json")
+	if _, err := os.Stat(unprefixedPath); err == nil {
+		if err := os.Rename(unprefixedPath, newPath); err == nil {
+			return newPath
+		}
+		return unprefixedPath
 	}
 
 	// Fall back to old underscore-based format for backward compatibility
@@ -165,10 +176,11 @@ func (s *HistoryStore) filePath(methodPath string) string {
 	return newPath
 }
 
-// sanitizeNew uses base64 RawURLEncoding to encode the method path
-// RawURLEncoding avoids '=' padding that URLEncoding would add
+// sanitizeNew uses a "b64_" prefix and base64 RawURLEncoding to produce a
+// unique, unambiguous filename for a method path. The prefix ensures new-format
+// names are never confused with legacy underscore-sanitized names.
 func sanitizeNew(s string) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(s))
+	return "b64_" + base64.RawURLEncoding.EncodeToString([]byte(s))
 }
 
 // sanitizeOld was the previous sanitization method: replacing /, ., and spaces with _
