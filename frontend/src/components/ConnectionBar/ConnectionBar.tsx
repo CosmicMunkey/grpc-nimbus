@@ -42,7 +42,7 @@ export default function ConnectionBar() {
     themeBadge,
     logs,
     showDebugIndicator,
-    openSettings,
+    toggleDebugPane,
   } = useAppStore();
   const effectiveConnected = connectionStatus !== 'disconnected';
 
@@ -219,7 +219,7 @@ export default function ConnectionBar() {
       {/* Debug indicator — shows when there are errors/warnings and the toggle is on */}
       {showDebugIndicator && logs.some((l) => l.level === 'error' || l.level === 'warn') && (
         <button
-          onClick={() => openSettings('debug')}
+          onClick={() => toggleDebugPane()}
           title="View logs"
           className="relative flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-400 border border-red-900/50 hover:bg-red-900/50 transition-colors"
         >

@@ -148,6 +148,10 @@ func buildAppMenu(app *App) *menu.Menu {
 	viewMenu.AddText("Previous Tab", keys.Combo("Tab", keys.ControlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		app.TriggerMenuPrevTab()
 	})
+	viewMenu.AddSeparator()
+	viewMenu.AddText("Debug Console", nil, func(_ *menu.CallbackData) {
+		app.TriggerMenuToggleDebugPane()
+	})
 
 	helpMenu := m.AddSubmenu("Help")
 	helpMenu.AddText("Documentation", keys.Combo("/", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {

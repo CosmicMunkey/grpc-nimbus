@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, X, Palette, SlidersHorizontal, Send, Plus, Pencil, Trash2, Copy, Paintbrush, Globe, ArrowLeft, Sparkles, Bug } from 'lucide-react';
+import { Settings, X, Palette, SlidersHorizontal, Send, Plus, Pencil, Trash2, Copy, Paintbrush, Globe, ArrowLeft, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { ThemeId, ThemeTokens, CustomThemeEntry, THEMES, DEFAULT_CUSTOM_THEME, FONT_SIZE_PRESETS } from '../../themes';
 import { MetadataEntry, Environment } from '../../types';
 import { TLS_OPTIONS } from '../Environments/EnvSelector';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
-import DebugSection from './DebugSection';
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 
@@ -526,7 +525,7 @@ function FlairSection() {
 // ── Appearance section ────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated } = useAppStore();
+  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated, showDebugIndicator, setShowDebugIndicator } = useAppStore();
 
   return (
     <div className="space-y-5">
@@ -592,6 +591,15 @@ function AppearanceSection() {
           <p className="text-[0.6875rem] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
         </div>
         <Toggle checked={envSortByCreated} onChange={setEnvSortByCreated} />
+      </div>
+
+      {/* Debug indicator */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Show error indicator in connection bar</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When on, a badge appears in the connection bar when there are errors or warnings.</p>
+        </div>
+        <Toggle checked={showDebugIndicator} onChange={setShowDebugIndicator} />
       </div>
     </div>
   );
@@ -1110,7 +1118,7 @@ function EnvironmentsSection() {
 
 // ── Category nav ──────────────────────────────────────────────────────────────
 
-type Category = 'appearance' | 'themes' | 'flair' | 'behavior' | 'requests' | 'environments' | 'debug';
+type Category = 'appearance' | 'themes' | 'flair' | 'behavior' | 'requests' | 'environments';
 
 const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance',   label: 'Appearance',   icon: <Palette size={14} /> },
@@ -1119,7 +1127,6 @@ const CATEGORIES: { id: Category; label: string; icon: React.ReactNode }[] = [
   { id: 'behavior',     label: 'Behavior',     icon: <SlidersHorizontal size={14} /> },
   { id: 'requests',     label: 'Requests',     icon: <Send size={14} /> },
   { id: 'environments', label: 'Environments', icon: <Globe size={14} /> },
-  { id: 'debug',        label: 'Debug',        icon: <Bug size={14} /> },
 ];
 
 // ── Main panel ────────────────────────────────────────────────────────────────
@@ -1181,7 +1188,7 @@ export default function SettingsPanel() {
 
               {/* Content */}
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                {category !== 'environments' && category !== 'themes' && category !== 'flair' && category !== 'debug' && (
+                {category !== 'environments' && category !== 'themes' && category !== 'flair' && (
                   <div className="flex-1 overflow-y-auto px-5 py-4">
                     {category === 'appearance'   && <AppearanceSection />}
                     {category === 'behavior'     && <BehaviorSection />}
@@ -1191,7 +1198,6 @@ export default function SettingsPanel() {
                 {category === 'themes'       && <ThemesSection />}
                 {category === 'flair'        && <FlairSection />}
                 {category === 'environments' && <EnvironmentsSection />}
-                {category === 'debug'        && <DebugSection />}
               </div>
             </div>
           </div>

@@ -70,7 +70,11 @@ func (a *App) GetUserSettings() UserSettings {
 		return defaults
 	}
 	saved, err := a.settings.Load()
-	if err != nil || saved == nil {
+	if err != nil {
+		logger.Default.Warnf("loading user settings failed, using defaults: %v", err)
+		return defaults
+	}
+	if saved == nil {
 		return defaults
 	}
 	result := defaults

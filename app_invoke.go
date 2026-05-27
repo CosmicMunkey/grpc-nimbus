@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -39,11 +40,15 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	}()
 
 	if conn == nil {
+		logger.Default.Errorf("invoke unary %s failed: not connected", req.MethodPath)
 		return nil, fmt.Errorf("not connected — call Connect first")
 	}
 	if pd == nil {
+		logger.Default.Errorf("invoke unary %s failed: no descriptor loaded", req.MethodPath)
 		return nil, fmt.Errorf("no descriptor loaded — load a protoset or use reflection")
 	}
+
+	logger.Default.Infof("invoke unary: %s", req.MethodPath)
 
 	// Apply environment variable interpolation.
 	req = interpolateRequest(req, defaultMeta, env, allowShell, inheritEnv)
@@ -51,19 +56,24 @@ func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 
 	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
 	if err != nil {
+		logger.Default.Errorf("invoke unary %s failed: %v", req.MethodPath, err)
 		return nil, err
 	}
 
+	logger.Default.Infof("invoke unary %s complete: %s (%dms)", req.MethodPath, resp.Status, resp.DurationMs)
+
 	// Record to history.
 	if a.histStore != nil {
-		_ = a.histStore.Add(storage.HistoryEntry{
+		if err := a.histStore.Add(storage.HistoryEntry{
 			ID:          fmt.Sprintf("%d", time.Now().UnixNano()),
 			MethodPath:  req.MethodPath,
 			RequestJSON: req.RequestJSON,
 			Metadata:    req.Metadata,
 			Response:    resp,
 			InvokedAt:   time.Now().Format(time.RFC3339Nano),
-		})
+		}); err != nil {
+			logger.Default.Warnf("recording history for %s failed: %v", req.MethodPath, err)
+		}
 	}
 	return resp, nil
 }
@@ -102,13 +112,16 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 
 	if conn == nil {
 		cancel()
+		logger.Default.Errorf("invoke stream %s failed: not connected", req.MethodPath)
 		return fmt.Errorf("not connected")
 	}
 	if pd == nil {
 		cancel()
+		logger.Default.Errorf("invoke stream %s failed: no descriptor loaded", req.MethodPath)
 		return fmt.Errorf("no descriptor loaded")
 	}
 
+	logger.Default.Infof("invoke stream: %s", req.MethodPath)
 	req = interpolateRequest(req, defaultMeta, env, allowShell, inheritEnv)
 	req.EmitDefaults = emitDefaults
 
@@ -125,10 +138,13 @@ func (a *App) InvokeStream(req rpc.InvokeRequest) error {
 			runtime.EventsEmit(a.ctx, "stream:event", evt)
 		})
 		if err != nil {
+			logger.Default.Errorf("stream %s error: %v", req.MethodPath, err)
 			runtime.EventsEmit(a.ctx, "stream:event", rpc.StreamEvent{
 				Type:  "error",
 				Error: err.Error(),
 			})
+		} else {
+			logger.Default.Infof("stream %s done", req.MethodPath)
 		}
 		runtime.EventsEmit(a.ctx, "stream:done", nil)
 	}()

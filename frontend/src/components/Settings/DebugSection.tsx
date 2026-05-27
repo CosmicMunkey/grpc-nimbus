@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { LogEntry } from '../../types';
-import { Bug, Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2, X } from 'lucide-react';
 
 const LEVEL_COLORS: Record<string, string> = {
   info: 'text-blue-400',
@@ -15,9 +14,8 @@ const LEVEL_BG: Record<string, string> = {
   error: 'bg-red-900/20',
 };
 
-
-function LogViewer() {
-  const { logs, clearLogs } = useAppStore();
+export function LogViewer() {
+  const { logs, clearLogs, toggleDebugPane } = useAppStore();
   const [filter, setFilter] = useState<string>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -76,6 +74,13 @@ function LogViewer() {
           >
             <Trash2 size={13} />
           </button>
+          <button
+            onClick={toggleDebugPane}
+            title="Close debug console"
+            className="p-1.5 text-c-text3 hover:text-c-text rounded hover:bg-c-hover transition-colors"
+          >
+            <X size={13} />
+          </button>
         </div>
       </div>
 
@@ -111,43 +116,6 @@ function LogViewer() {
         <span>·</span>
         <span>{autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}</span>
       </div>
-    </div>
-  );
-}
-
-export default function DebugSection() {
-  const { showDebugIndicator, setShowDebugIndicator } = useAppStore();
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Settings */}
-      <div className="px-5 py-3 border-b border-c-border shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="pr-4">
-            <p className="text-xs font-medium text-c-text">Show error indicator in connection bar</p>
-            <p className="text-[0.6875rem] text-c-text3 mt-0.5">
-              When on, a badge appears in the connection bar when there are errors or warnings.
-            </p>
-          </div>
-          <button
-            role="switch"
-            aria-checked={showDebugIndicator}
-            onClick={() => setShowDebugIndicator(!showDebugIndicator)}
-            className={`relative inline-flex h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors ${
-              showDebugIndicator ? 'bg-c-accent' : 'bg-c-border'
-            }`}
-          >
-            <span
-              className={`h-4 w-4 shrink-0 rounded-full bg-white shadow transition-transform ${
-                showDebugIndicator ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Log viewer */}
-      <LogViewer />
     </div>
   );
 }

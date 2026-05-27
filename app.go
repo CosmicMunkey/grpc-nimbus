@@ -49,6 +49,9 @@ type App struct {
 	// These are not persisted to settings; they are re-created on each load.
 	virtualImportDirs []string
 
+	// connWatchCancel cancels the goroutine watching for connection state changes.
+	connWatchCancel context.CancelFunc
+
 	// streamCancel cancels the active streaming invocation, if any.
 	streamCancel    context.CancelFunc
 	streamCancelSeq uint64
@@ -180,11 +183,22 @@ func (a *App) Connect(cfg rpc.ConnectionConfig) error {
 	if a.conn != nil {
 		_ = a.conn.Close()
 	}
+	if a.connWatchCancel != nil {
+		a.connWatchCancel()
+		a.connWatchCancel = nil
+	}
+	logger.Default.Infof("connecting to %s (TLS: %s)", cfg.Target, cfg.TLS)
 	conn, err := rpc.NewConnection(a.ctx, cfg)
 	if err != nil {
+		logger.Default.Errorf("connection to %s failed: %v", cfg.Target, err)
 		return err
 	}
 	a.conn = conn
+
+	// Watch for async connection failures (e.g. unreachable host) and log them.
+	watchCtx, watchCancel := context.WithCancel(a.ctx)
+	a.connWatchCancel = watchCancel
+	go a.watchConnectionState(watchCtx, conn, cfg.Target)
 
 	// Persist the connection target for next launch.
 	go a.saveSettings(func(s *storage.AppSettings) {
@@ -198,9 +212,40 @@ func (a *App) Connect(cfg rpc.ConnectionConfig) error {
 func (a *App) Disconnect() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.connWatchCancel != nil {
+		a.connWatchCancel()
+		a.connWatchCancel = nil
+	}
 	if a.conn != nil {
+		logger.Default.Infof("disconnecting")
 		_ = a.conn.Close()
 		a.conn = nil
+	}
+}
+
+// watchConnectionState logs a warning if the connection transitions to transient_failure.
+// It runs in a goroutine and exits when ctx is cancelled or the connection is shut down.
+func (a *App) watchConnectionState(ctx context.Context, conn *rpc.Connection, target string) {
+	warnLogged := false
+	for {
+		state := conn.GetState()
+		switch state {
+		case "ready":
+			logger.Default.Infof("connected to %s", target)
+			warnLogged = false
+		case "transient_failure":
+			if !warnLogged {
+				logger.Default.Warnf("connection to %s failed (transient_failure)", target)
+				warnLogged = true
+			}
+		case "shutdown":
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-conn.WaitForStateChange(ctx):
+		}
 	}
 }
 

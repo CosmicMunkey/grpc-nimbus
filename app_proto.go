@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
@@ -517,13 +518,17 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 	conn := a.conn
 	a.mu.Unlock()
 
+	logger.Default.Infof("loading protosets: %v", paths)
 	allProtosets := util.DedupeStrings(append(currentProtosets, paths...))
 	effectivePaths := append(importPaths, virtualDirs...)
 	pd, err := a.rebuildDescriptor(a.ctx, allProtosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
+		logger.Default.Errorf("loading protosets failed: %v", err)
 		return nil, err
 	}
 	a.storeDescriptorState(pd, allProtosets, importPaths, protoFiles, withReflection)
+	svcs := pd.Services()
+	logger.Default.Infof("protosets loaded: %d service(s)", len(svcs))
 
 	go a.saveSettings(func(s *storage.AppSettings) {
 		s.ProtoLoadMode = a.currentLoadMode()
@@ -531,13 +536,14 @@ func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
 		s.ProtoFilePaths = protoFiles
 		s.ProtoImportPaths = importPaths
 	})
-	return pd.Services(), nil
+	return svcs, nil
 }
 
 // LoadProtoFiles parses .proto source files with optional import paths.
 // If importPaths is empty and the file paths are absolute, the parent directories
 // of the proto files are used as import paths automatically.
 func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInfo, error) {
+	logger.Default.Infof("loading proto files: %v", protoFiles)
 	seen := map[string]bool{}
 	userPaths := make([]string, 0, len(importPaths))
 	for _, dir := range importPaths {
@@ -610,9 +616,11 @@ func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInf
 		for _, d := range virtualDirs {
 			os.RemoveAll(d)
 		}
+		logger.Default.Errorf("loading proto files failed: %v", err)
 		return nil, err
 	}
 	a.storeDescriptorState(pd, protosets, allImportPaths, allProtoFiles, withReflection)
+	logger.Default.Infof("proto files loaded: %d service(s)", len(pd.Services()))
 
 	// Track virtual dirs for cleanup; replace any from a previous load.
 	a.mu.Lock()
@@ -657,14 +665,18 @@ func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
 	}()
 
 	if conn == nil {
+		logger.Default.Errorf("load via reflection failed: not connected")
 		return nil, fmt.Errorf("not connected — call Connect first")
 	}
+	logger.Default.Infof("loading via reflection")
 	effectivePaths := append(importPaths, virtualDirs...)
 	pd, err := a.rebuildDescriptor(ctx, protosets, effectivePaths, protoFiles, true, conn)
 	if err != nil {
+		logger.Default.Errorf("reflection load failed: %v", err)
 		return nil, err
 	}
 	a.storeDescriptorState(pd, protosets, importPaths, protoFiles, true)
+	logger.Default.Infof("reflection load complete: %d service(s)", len(pd.Services()))
 
 	go a.saveSettings(func(s *storage.AppSettings) {
 		s.ProtoLoadMode = a.currentLoadMode()
@@ -722,6 +734,7 @@ func (a *App) GetLoadedState() (*LoadedState, error) {
 // ClearLoadedProtos discards all loaded descriptors and removes saved paths,
 // returning the app to a clean state as if it were freshly installed.
 func (a *App) ClearLoadedProtos() {
+	logger.Default.Infof("clearing all loaded protos")
 	a.mu.Lock()
 	old := a.protoset
 	a.protoset = nil
@@ -766,20 +779,25 @@ func (a *App) ReloadProtos() ([]rpc.ServiceInfo, error) {
 	a.mu.Unlock()
 
 	if len(protosets) == 0 && len(protoFiles) == 0 && !withReflection {
+		logger.Default.Errorf("reload protos failed: nothing to reload")
 		return nil, fmt.Errorf("nothing to reload")
 	}
+	logger.Default.Infof("reloading protos")
 	effectivePaths := append(importPaths, virtualDirs...)
 	pd, err := a.rebuildDescriptor(a.ctx, protosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
+		logger.Default.Errorf("reload protos failed: %v", err)
 		return nil, err
 	}
 	a.storeDescriptorState(pd, protosets, importPaths, protoFiles, withReflection)
+	logger.Default.Infof("protos reloaded: %d service(s)", len(pd.Services()))
 	return pd.Services(), nil
 }
 
 // RemoveProtoPath removes one path from the loaded set and reloads the rest.
 // If the removed path was the only one, this is equivalent to ClearLoadedProtos.
 func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
+	logger.Default.Infof("removing proto path: %s", path)
 	a.mu.Lock()
 	protosets := append([]string(nil), a.loadedProtosetPaths...)
 	protoFiles := append([]string(nil), a.loadedProtoFiles...)
@@ -809,6 +827,7 @@ func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
 	effectivePaths := append(importPaths, virtualDirs...)
 	pd, err := a.rebuildDescriptor(a.ctx, remainingProtosets, effectivePaths, remainingProtoFiles, withReflection, conn)
 	if err != nil {
+		logger.Default.Errorf("remove proto path %q rebuild failed: %v", path, err)
 		return nil, err
 	}
 	a.storeDescriptorState(pd, remainingProtosets, importPaths, remainingProtoFiles, withReflection)
@@ -834,6 +853,7 @@ func (a *App) GetServices() ([]rpc.ServiceInfo, error) {
 	pd := a.protoset
 	a.mu.Unlock()
 	if pd == nil {
+		logger.Default.Errorf("get services failed: no descriptor loaded")
 		return nil, fmt.Errorf("no descriptor loaded")
 	}
 	return pd.Services(), nil
@@ -845,6 +865,7 @@ func (a *App) GetRequestSchema(methodPath string) ([]rpc.FieldSchema, error) {
 	pd := a.protoset
 	a.mu.Unlock()
 	if pd == nil {
+		logger.Default.Errorf("get request schema %s failed: no descriptor loaded", methodPath)
 		return nil, fmt.Errorf("no descriptor loaded")
 	}
 	return pd.GetRequestSchema(methodPath)

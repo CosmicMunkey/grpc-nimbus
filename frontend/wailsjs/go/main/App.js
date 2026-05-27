@@ -198,6 +198,10 @@ export function TriggerMenuPrevTab() {
   return window['go']['main']['App']['TriggerMenuPrevTab']();
 }
 
+export function TriggerMenuToggleDebugPane() {
+  return window['go']['main']['App']['TriggerMenuToggleDebugPane']();
+}
+
 export function TriggerMenuToggleFullscreen() {
   return window['go']['main']['App']['TriggerMenuToggleFullscreen']();
 }

@@ -209,6 +209,8 @@ function HistoryEntryRow({ entry, initialExpanded }: { entry: HistoryEntry; init
   const [expanded, setExpanded] = useState(initialExpanded ?? false);
   const successCls = isDark ? 'text-green-400' : 'text-green-600';
 
+  useEffect(() => { setExpanded(initialExpanded ?? false); }, [initialExpanded]);
+
   return (
     <div className="border-b border-c-border">
       <div

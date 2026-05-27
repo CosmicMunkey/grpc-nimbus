@@ -9,6 +9,7 @@ import ConfirmDialog from './components/ConfirmDialog/ConfirmDialog';
 import SettingsPanel from './components/Settings/SettingsPanel';
 import AboutDialog from './components/AboutDialog/AboutDialog';
 import HelpDialog from './components/HelpDialog/HelpDialog';
+import { LogViewer } from './components/Settings/DebugSection';
 import { useAppStore } from './store/appStore';
 
 function ExportCollectionModal({ onClose }: { onClose: () => void }) {
@@ -139,14 +140,54 @@ function ColumnResizer({ onDrag }: { onDrag: (startX: number, currentX: number, 
   );
 }
 
+function RowResizer({ onDrag }: { onDrag: (startY: number, currentY: number, phase: 'start' | 'move' | 'end') => void }) {
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => { cleanupRef.current?.(); };
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    onDrag(startY, startY, 'start');
+    const onMove = (ev: PointerEvent) => onDrag(startY, ev.clientY, 'move');
+    const cleanup = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      cleanupRef.current = null;
+    };
+    const onUp = (ev: PointerEvent) => {
+      cleanup();
+      onDrag(startY, ev.clientY, 'end');
+    };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    cleanupRef.current = cleanup;
+  };
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      className="h-1 shrink-0 cursor-row-resize bg-c-border hover:bg-c-accent/30 transition-colors"
+    />
+  );
+}
+
 export default function App() {
-  const { restoreLoadedState, importCollection, sidebarWidth, panelSplit, setSidebarWidth, setPanelSplit } = useAppStore();
+  const { restoreLoadedState, importCollection, sidebarWidth, panelSplit, setSidebarWidth, setPanelSplit, debugPaneOpen, toggleDebugPane } = useAppStore();
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [debugPaneHeight, setDebugPaneHeight] = useState(240);
   const sidebarStartRef = useRef(0);
   const splitStartRef = useRef(0);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const debugHeightStartRef = useRef(0);
 
   const handleSidebarDrag = useCallback((startX: number, currentX: number, phase: 'start' | 'move' | 'end') => {
     if (phase === 'start') sidebarStartRef.current = useAppStore.getState().sidebarWidth;
@@ -162,6 +203,12 @@ export default function App() {
     useAppStore.setState({ panelSplit: newSplit });
     if (phase === 'end') setPanelSplit(newSplit);
   }, [setPanelSplit]);
+
+  const handleDebugPaneDrag = useCallback((startY: number, currentY: number, phase: 'start' | 'move' | 'end') => {
+    if (phase === 'start') debugHeightStartRef.current = debugPaneHeight;
+    const newHeight = Math.max(100, Math.min(Math.floor(window.innerHeight * 0.6), debugHeightStartRef.current - (currentY - startY)));
+    setDebugPaneHeight(newHeight);
+  }, [debugPaneHeight]);
 
   useEffect(() => {
     restoreLoadedState();
@@ -216,12 +263,13 @@ export default function App() {
     const offAbout = rt.EventsOn('menu:about', () => setShowAboutDialog(true));
     const offHelp  = rt.EventsOn('menu:help',  () => setShowHelpDialog(true));
     const offCloseAllTabs = rt.EventsOn('menu:closeAllTabs', () => getState().closeAllTabs());
+    const offToggleDebugPane = rt.EventsOn('menu:toggleDebugPane', () => getState().toggleDebugPane());
 
     return () => {
       offImport(); offExport();
       offZoomIn(); offZoomOut(); offZoomReset();
       offNewTab(); offCloseTab(); offNextTab(); offPrevTab();
-      offAbout(); offHelp(); offCloseAllTabs();
+      offAbout(); offHelp(); offCloseAllTabs(); offToggleDebugPane();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -260,6 +308,15 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {debugPaneOpen && (
+        <>
+          <RowResizer onDrag={handleDebugPaneDrag} />
+          <div style={{ height: debugPaneHeight }} className="shrink-0 border-t border-c-border bg-c-panel flex flex-col min-h-0">
+            <LogViewer />
+          </div>
+        </>
+      )}
 
       {showExportModal && <ExportCollectionModal onClose={() => setShowExportModal(false)} />}
       {showAboutDialog && <AboutDialog onClose={() => setShowAboutDialog(false)} />}

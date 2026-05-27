@@ -19,6 +19,10 @@ import {
 import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 
+// Guard against registering the log:entry listener more than once (React StrictMode
+// mounts effects twice in development, which would cause duplicate log entries).
+let logListenerRegistered = false;
+
 // The Go backend emits logger.Level as a numeric enum (0=info, 1=warn, 2=error).
 // Normalize it to the string union expected by LogEntry so all comparisons and
 // string operations in the UI work correctly regardless of what the backend sends.
@@ -554,6 +558,8 @@ interface AppState {
   showDebugIndicator: boolean;
   setShowDebugIndicator: (v: boolean) => void;
   clearLogs: () => void;
+  debugPaneOpen: boolean;
+  toggleDebugPane: () => void;
 
   // Layout
   sidebarWidth: number;
@@ -650,13 +656,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     api.getLogs('').then((entries) => {
       if (entries?.length) set({ logs: entries.map(normalizeLogEntry) });
     }).catch(() => {});
-    EventsOn('log:entry', (entry) => {
-      set((s) => {
-        const logs = [...s.logs, normalizeLogEntry(entry)];
-        if (logs.length > 1000) logs.splice(0, logs.length - 1000);
-        return { logs };
+    if (!logListenerRegistered) {
+      logListenerRegistered = true;
+      EventsOn('log:entry', (entry) => {
+        useAppStore.setState((s) => {
+          const logs = [...s.logs, normalizeLogEntry(entry)];
+          if (logs.length > 1000) logs.splice(0, logs.length - 1000);
+          return { logs };
+        });
       });
-    });
+    }
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────
@@ -1341,6 +1350,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   defaultMetadata: [],
   logs: [],
   showDebugIndicator: false,
+  debugPaneOpen: false,
   confirmDialog: null,
   settingsOpen: false,
   settingsTarget: null,
@@ -1550,6 +1560,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ showDebugIndicator: v });
     saveAllSettings(get());
   },
+
+  toggleDebugPane: () => set((s) => ({ debugPaneOpen: !s.debugPaneOpen })),
 
   clearLogs: () => {
     set({ logs: [] });
