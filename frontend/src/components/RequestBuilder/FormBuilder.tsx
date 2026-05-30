@@ -2,11 +2,66 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { FieldSchema } from '../../types';
 import { useAppStore, useActiveTab } from '../../store/appStore';
+import { fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
 
-// ─── Form value types ────────────────────────────────────────────────────────
+// Returns true only if every non-FieldMask field in the value is transitively populated.
+function isFullyPopulated(
+  val: Record<string, unknown>,
+  fields: FieldSchema[],
+  visited: Set<string>,
+  path: string,
+): boolean {
+  return fields.filter(f => !f.isFieldMask).every(f => {
+    const sv = val[f.jsonName];
+    if (sv === null || sv === undefined) return false;
+    if (typeof sv === 'string') return sv !== '';
+    if (Array.isArray(sv)) return sv.length > 0;
+    if (f.type === 'message' && f.fields && typeof sv === 'object') {
+      const subPath = path ? `${path}.${f.name}` : f.name;
+      if (visited.has(subPath)) return true; // cycle — treat as populated
+      visited.add(subPath);
+      return isFullyPopulated(sv as Record<string, unknown>, f.fields, visited, subPath);
+    }
+    return true;
+  });
+}
 
-export type FormVal = Record<string, unknown>;
-
+// Walk the form value tree and collect all populated field paths for field masks.
+// For message fields: if all sub-fields are transitively populated, emit the parent
+// path only. If only some are populated, emit only the populated leaf paths.
+function collectPopulatedPaths(
+  formValue: Record<string, unknown>,
+  fields: FieldSchema[],
+  prefix = '',
+  visited = new Set<string>(),
+): string[] {
+  const paths: string[] = [];
+  for (const f of fields) {
+    if (f.isFieldMask) continue;
+    const val = formValue[f.jsonName];
+    if (val === null || val === undefined) continue;
+    const isFilled = typeof val === 'string' ? val !== ''
+      : Array.isArray(val) ? val.length > 0
+      : typeof val === 'object' && !Array.isArray(val) ? Object.keys(val).length > 0
+      : true;
+    if (!isFilled) continue;
+    const path = prefix ? `${prefix}.${f.name}` : f.name;
+    if (f.type === 'message' && f.fields && val && typeof val === 'object' && !Array.isArray(val) && !visited.has(path)) {
+      visited.add(path);
+      const subFields = f.fields.filter(sf => !sf.isFieldMask);
+      const fullyPopulated = subFields.length > 0 &&
+        isFullyPopulated(val as Record<string, unknown>, f.fields, new Set(visited), path);
+      if (fullyPopulated) {
+        paths.push(path);
+      } else {
+        paths.push(...collectPopulatedPaths(val as Record<string, unknown>, f.fields, path, visited));
+      }
+    } else {
+      paths.push(path);
+    }
+  }
+  return [...new Set(paths)];
+}
 function isNumericType(t: string) {
   return ['int32', 'int64', 'uint32', 'uint64', 'float', 'double'].includes(t);
 }
@@ -33,43 +88,12 @@ function initForm(fields: FieldSchema[], parsed: FormVal = {}): FormVal {
   for (const f of fields) {
     const pv = parsed[f.jsonName];
     if (pv !== undefined) {
-      v[f.jsonName] = pv;
+      v[f.jsonName] = f.isFieldMask ? { paths: fieldMaskPathsFromValue(pv) } : pv;
     } else {
       v[f.jsonName] = defaultFor(f);
     }
   }
   return v;
-}
-
-// Serialize form value to JSON, omitting null values (absent fields)
-function serialize(v: unknown): unknown {
-  if (v === null || v === undefined) return undefined;
-  if (Array.isArray(v)) {
-    return v.map(serialize).filter(x => x !== undefined);
-  }
-  if (typeof v === 'object') {
-    const out: FormVal = {};
-    for (const [k, val] of Object.entries(v as FormVal)) {
-      const s = serialize(val);
-      if (s !== undefined) out[k] = s;
-    }
-    return out;
-  }
-  return v;
-}
-
-export function toJson(form: FormVal): string {
-  const cleaned = serialize(form) as FormVal | undefined;
-  if (!cleaned || Object.keys(cleaned).length === 0) return '{}';
-  return JSON.stringify(cleaned, null, 2);
-}
-
-export function fromJson(json: string): FormVal {
-  try {
-    const v = JSON.parse(json);
-    if (v && typeof v === 'object' && !Array.isArray(v)) return v as FormVal;
-  } catch { /* ignore */ }
-  return {};
 }
 
 // ─── Type badge ──────────────────────────────────────────────────────────────
@@ -775,6 +799,89 @@ function InlineMessageEditor({
   );
 }
 
+// ─── FieldMask editor ──────────────────────────────────────────────────────────
+
+function FieldMaskEditor({
+  value, onChange, onAutoFill,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+  onAutoFill: () => string[];
+}) {
+  const currentPaths = fieldMaskPathsFromValue(value);
+  const isIncluded = value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
+
+  const pathText = currentPaths.join(', ');
+  const [draft, setDraft] = useState(pathText);
+
+  useEffect(() => {
+    setDraft(pathText);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const commit = (t: string) => {
+    const parts = t.split(',').map(s => s.trim()).filter(Boolean);
+    const unique = [...new Set(parts)];
+    onChange({ paths: unique });
+  };
+
+  const handleAutoFill = () => {
+    const result = onAutoFill();
+    setDraft(result.join(', '));
+    onChange({ paths: result });
+  };
+
+  if (!isIncluded) {
+    return (
+      <button
+        onClick={() => {
+          const auto = onAutoFill();
+          if (auto.length > 0) {
+            setDraft(auto.join(', '));
+            onChange({ paths: auto });
+          } else {
+            onChange({ paths: [] });
+          }
+        }}
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-2 py-0.5 rounded border border-dashed border-c-border hover:border-c-text3"
+      >
+        <Plus size={10} /> Set
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 w-full">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => commit(draft)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(draft); } }}
+          className="flex-1 min-w-0 bg-c-input border border-c-border rounded px-2 py-0.5 text-xs text-c-text placeholder-c-text3 outline-none focus:border-c-accent font-mono"
+          placeholder="field1, field2.sub_field"
+        />
+        <button
+          onClick={handleAutoFill}
+          className="shrink-0 flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-c-accent/10 text-c-accent hover:bg-c-accent/20 border border-c-accent/30"
+          title="Auto-fill from populated fields"
+        >
+          <ChevronRight size={10} /> Auto-fill
+        </button>
+        <button
+          onClick={() => onChange(null)}
+          className="shrink-0 text-c-text3 hover:text-c-accent p-0.5 rounded"
+          title="Remove field"
+        >
+          <X size={11} />
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
 // ─── Field editor ─────────────────────────────────────────────────────────────
 
 interface FieldEditorProps {
@@ -782,9 +889,13 @@ interface FieldEditorProps {
   value: unknown;
   onChange: (v: unknown) => void;
   depth: number;
+  onAutoFill?: () => string[];
 }
 
-function FieldEditor({ schema, value, onChange, depth }: FieldEditorProps) {
+function FieldEditor({ schema, value, onChange, depth, onAutoFill }: FieldEditorProps) {
+  if (schema.isFieldMask && onAutoFill) {
+    return <FieldMaskEditor value={value} onChange={onChange} onAutoFill={onAutoFill} />;
+  }
   if (schema.isMap) {
     const mapVal = (typeof value === 'object' && !Array.isArray(value) && value !== null)
       ? value as FormVal : {};
@@ -816,13 +927,14 @@ function FieldEditor({ schema, value, onChange, depth }: FieldEditorProps) {
 // ─── Field row ────────────────────────────────────────────────────────────────
 
 function FieldRow({
-  schema, value, onChange, depth, hideLabel,
+  schema, value, onChange, depth, hideLabel, onAutoFill,
 }: {
   schema: FieldSchema;
   value: unknown;
   onChange: (v: unknown) => void;
   depth: number;
   hideLabel?: boolean;
+  onAutoFill?: () => string[];
 }) {
   const isComplex = schema.type === 'message' || schema.isRepeated || schema.isMap;
 
@@ -839,7 +951,7 @@ function FieldRow({
           </div>
         )}
         <div className={hideLabel ? '' : 'pl-2'}>
-          <FieldEditor schema={schema} value={value} onChange={onChange} depth={depth} />
+          <FieldEditor schema={schema} value={value} onChange={onChange} depth={depth} onAutoFill={onAutoFill} />
         </div>
       </div>
     );
@@ -853,7 +965,7 @@ function FieldRow({
           <TypeBadge schema={schema} />
         </div>
       )}
-      <FieldEditor schema={schema} value={value} onChange={onChange} depth={depth} />
+      <FieldEditor schema={schema} value={value} onChange={onChange} depth={depth} onAutoFill={onAutoFill} />
     </div>
   );
 }
@@ -901,7 +1013,7 @@ export default function FormBuilder() {
     const merged = initForm(requestSchema, parsed);
     lastFormJson.current = currentRequestJson;
     setFormValue(merged);
-    const normalized = toJson(merged);
+    const normalized = toJson(merged, requestSchema);
     if (normalized !== currentRequestJson) setRequestJson(normalized);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestJson, requestSchema]);
@@ -911,7 +1023,7 @@ export default function FormBuilder() {
   // (and thus the correct initial form values) have loaded.
   useEffect(() => {
     if (requestSchema.length === 0) return;
-    const json = toJson(formValue);
+    const json = toJson(formValue, requestSchema);
     if (json === lastFormJson.current) return;
     lastFormJson.current = json;
     setRequestJson(json);
@@ -921,6 +1033,12 @@ export default function FormBuilder() {
   const handleFieldChange = useCallback((jsonName: string, newVal: unknown) => {
     setFormValue(prev => ({ ...prev, [jsonName]: newVal }));
   }, []);
+
+  const handleAutoFill = useCallback((jsonName: string) => {
+    const paths = collectPopulatedPaths(formValue, requestSchema);
+    setFormValue(prev => ({ ...prev, [jsonName]: { paths } }));
+    return paths;
+  }, [formValue, requestSchema]);
 
   if (requestSchema.length === 0) {
     return (
@@ -950,6 +1068,7 @@ export default function FormBuilder() {
           value={formValue[f.jsonName]}
           onChange={v => handleFieldChange(f.jsonName, v)}
           depth={0}
+          onAutoFill={f.isFieldMask ? () => handleAutoFill(f.jsonName) : undefined}
         />
       ))}
       {Object.entries(oneofGroups).map(([groupName, groupFields]) => (

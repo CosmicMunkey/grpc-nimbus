@@ -119,6 +119,7 @@ export interface FieldSchema {
   mapKeyType?: string;
   mapValueType?: string;
   mapValueFields?: FieldSchema[];
+  isFieldMask?: boolean;
 }
 
 export interface LoadedState {

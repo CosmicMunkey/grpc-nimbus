@@ -63,6 +63,7 @@ type App struct {
 	// reflectionCancel cancels the currently in-flight reflection load, if any.
 	reflectionCancel    context.CancelFunc
 	reflectionCancelSeq uint64
+
 }
 
 // NewApp creates the App instance. Called once at startup.

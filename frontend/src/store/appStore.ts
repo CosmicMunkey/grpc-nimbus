@@ -19,10 +19,6 @@ import {
 import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 
-// Guard against registering the log:entry listener more than once (React StrictMode
-// mounts effects twice in development, which would cause duplicate log entries).
-let logListenerRegistered = false;
-
 // The Go backend emits logger.Level as a numeric enum (0=info, 1=warn, 2=error).
 // Normalize it to the string union expected by LogEntry so all comparisons and
 // string operations in the UI work correctly regardless of what the backend sends.
@@ -584,7 +580,9 @@ interface AppState {
 export const useActiveTab = (): Tab =>
   useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? s.tabs[0]);
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => {
+  let logListenerRegistered = false;
+  return ({
   // ── Connection ──────────────────────────────────────────────────────────────
   connectionConfig: { target: 'localhost:50051', tls: 'none' },
   isConnected: false,
@@ -1589,4 +1587,5 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ confirmDialog: null });
     dialog?.resolve(yes);
   },
-}));
+});
+});

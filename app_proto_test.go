@@ -54,8 +54,8 @@ func TestLoadProtoFilesMergesProtoParentDirWithExtraImportPaths(t *testing.T) {
 	if services[0].Name != "library.v1.Library" {
 		t.Fatalf("expected service library.v1.Library, got %q", services[0].Name)
 	}
-	if len(services[0].Methods) != 2 {
-		t.Fatalf("expected 2 methods, got %d", len(services[0].Methods))
+	if len(services[0].Methods) != 3 {
+		t.Fatalf("expected 3 methods, got %d", len(services[0].Methods))
 	}
 }
 
@@ -104,8 +104,8 @@ func TestLoadProtoFilesAutoDetectsNestedImportRoot(t *testing.T) {
 	if services[0].Name != "library.v1.Library" {
 		t.Fatalf("expected service library.v1.Library, got %q", services[0].Name)
 	}
-	if len(services[0].Methods) != 2 {
-		t.Fatalf("expected 2 methods, got %d", len(services[0].Methods))
+	if len(services[0].Methods) != 3 {
+		t.Fatalf("expected 3 methods, got %d", len(services[0].Methods))
 	}
 }
 

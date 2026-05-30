@@ -202,10 +202,6 @@ export function TriggerMenuToggleDebugPane() {
   return window['go']['main']['App']['TriggerMenuToggleDebugPane']();
 }
 
-export function TriggerMenuToggleFullscreen() {
-  return window['go']['main']['App']['TriggerMenuToggleFullscreen']();
-}
-
 export function TriggerMenuZoomIn() {
   return window['go']['main']['App']['TriggerMenuZoomIn']();
 }

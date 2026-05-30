@@ -194,6 +194,12 @@ func bundleProtoSources(protoFiles, importPaths []string) ([]EmbeddedProtoFile, 
 			if seenImports[ref] {
 				continue
 			}
+			// Skip well-known protobuf types — they are bundled with the
+			// runtime and resolved automatically by protoparse/grpcurl.
+			if strings.HasPrefix(ref, "google/protobuf/") {
+				seenImports[ref] = true
+				continue
+			}
 			resolved, ok := resolveImport(importPaths, ref)
 			if !ok {
 				return nil, nil, nil, fmt.Errorf("resolving imported proto %q", ref)

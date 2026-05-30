@@ -213,6 +213,7 @@ export namespace rpc {
 	    mapKeyType?: string;
 	    mapValueType?: string;
 	    mapValueFields?: FieldSchema[];
+	    isFieldMask?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FieldSchema(source);
@@ -232,6 +233,7 @@ export namespace rpc {
 	        this.mapKeyType = source["mapKeyType"];
 	        this.mapValueType = source["mapValueType"];
 	        this.mapValueFields = this.convertValues(source["mapValueFields"], FieldSchema);
+	        this.isFieldMask = source["isFieldMask"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

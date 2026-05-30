@@ -106,8 +106,6 @@ export function TriggerMenuPrevTab():Promise<void>;
 
 export function TriggerMenuToggleDebugPane():Promise<void>;
 
-export function TriggerMenuToggleFullscreen():Promise<void>;
-
 export function TriggerMenuZoomIn():Promise<void>;
 
 export function TriggerMenuZoomOut():Promise<void>;

@@ -56,8 +56,8 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	if service.Name != "library.v1.Library" {
 		t.Fatalf("expected service library.v1.Library, got %q", service.Name)
 	}
-	if len(service.Methods) != 2 {
-		t.Fatalf("expected 2 methods, got %d", len(service.Methods))
+	if len(service.Methods) != 3 {
+		t.Fatalf("expected 3 methods, got %d", len(service.Methods))
 	}
 
 	methods := map[string]MethodInfo{}
@@ -84,6 +84,17 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 		t.Fatal("expected WatchShelves to be server streaming")
 	}
 
+	updateBook, ok := methods["UpdateBook"]
+	if !ok {
+		t.Fatal("expected UpdateBook method to be present")
+	}
+	if updateBook.InputType != "library.v1.UpdateBookRequest" {
+		t.Fatalf("expected UpdateBook input type library.v1.UpdateBookRequest, got %q", updateBook.InputType)
+	}
+	if updateBook.OutputType != "library.v1.Book" {
+		t.Fatalf("expected UpdateBook output type library.v1.Book, got %q", updateBook.OutputType)
+	}
+
 	schema, err := pd.GetRequestSchema("library.v1.Library/ListBooks")
 	if err != nil {
 		t.Fatalf("GetRequestSchema: %v", err)
@@ -107,6 +118,23 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	}
 	if fieldNamed(t, requestedBy.Fields, "actor").Type != "string" {
 		t.Fatalf("expected transitive imported actor field type string")
+	}
+
+	// Verify that google.protobuf.FieldMask is detected in the schema
+	updateSchema, err := pd.GetRequestSchema("library.v1.Library/UpdateBook")
+	if err != nil {
+		t.Fatalf("GetRequestSchema(UpdateBook): %v", err)
+	}
+
+	updateMask := fieldNamed(t, updateSchema, "update_mask")
+	if updateMask.Type != "message" {
+		t.Fatalf("expected update_mask type message, got %q", updateMask.Type)
+	}
+	if !updateMask.IsFieldMask {
+		t.Fatal("expected update_mask.IsFieldMask to be true")
+	}
+	if len(updateMask.Fields) != 1 || updateMask.Fields[0].Name != "paths" {
+		t.Fatal("expected update_mask to have a single 'paths' sub-field")
 	}
 }
 
