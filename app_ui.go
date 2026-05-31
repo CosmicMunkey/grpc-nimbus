@@ -81,15 +81,6 @@ func (a *App) TriggerMenuExport() {
 	runtime.EventsEmit(a.ctx, "menu:exportCollection")
 }
 
-// TriggerMenuToggleFullscreen toggles the window between fullscreen and normal.
-func (a *App) TriggerMenuToggleFullscreen() {
-	if runtime.WindowIsFullscreen(a.ctx) {
-		runtime.WindowUnfullscreen(a.ctx)
-	} else {
-		runtime.WindowFullscreen(a.ctx)
-	}
-}
-
 // TriggerMenuZoomIn tells the frontend to increase the UI text size.
 func (a *App) TriggerMenuZoomIn() { runtime.EventsEmit(a.ctx, "menu:zoomIn") }
 
@@ -119,3 +110,6 @@ func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu:help") }
 
 // TriggerMenuCloseAllTabs tells the frontend to close all tabs and open a fresh one.
 func (a *App) TriggerMenuCloseAllTabs() { runtime.EventsEmit(a.ctx, "menu:closeAllTabs") }
+
+// TriggerMenuToggleDebugPane toggles the debug console pane in the frontend.
+func (a *App) TriggerMenuToggleDebugPane() { runtime.EventsEmit(a.ctx, "menu:toggleDebugPane") }

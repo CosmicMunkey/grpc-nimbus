@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
@@ -17,7 +18,12 @@ func (a *App) GetHistory(methodPath string) ([]storage.HistoryEntry, error) {
 // ClearHistory removes all history for the given method path.
 func (a *App) ClearHistory(methodPath string) error {
 	if a.histStore == nil {
+		logger.Default.Errorf("clear history %s failed: history store unavailable", methodPath)
 		return fmt.Errorf("history store unavailable")
 	}
-	return a.histStore.ClearHistory(methodPath)
+	if err := a.histStore.ClearHistory(methodPath); err != nil {
+		logger.Default.Errorf("clear history %s failed: %v", methodPath, err)
+		return err
+	}
+	return nil
 }

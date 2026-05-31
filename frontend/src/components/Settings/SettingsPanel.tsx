@@ -525,7 +525,7 @@ function FlairSection() {
 // ── Appearance section ────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated } = useAppStore();
+  const { fontSize, setFontSize, responseWordWrap, setResponseWordWrap, responseIndent, setResponseIndent, envSortByCreated, setEnvSortByCreated, showDebugIndicator, setShowDebugIndicator } = useAppStore();
 
   return (
     <div className="space-y-5">
@@ -591,6 +591,15 @@ function AppearanceSection() {
           <p className="text-[0.6875rem] text-c-text3 mt-0.5">When off, environments are sorted alphabetically.</p>
         </div>
         <Toggle checked={envSortByCreated} onChange={setEnvSortByCreated} />
+      </div>
+
+      {/* Debug indicator */}
+      <div className="flex items-center justify-between py-3 border-t border-c-border/40">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Show error indicator in connection bar</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When on, a badge appears in the connection bar when there are errors or warnings.</p>
+        </div>
+        <Toggle checked={showDebugIndicator} onChange={setShowDebugIndicator} />
       </div>
     </div>
   );

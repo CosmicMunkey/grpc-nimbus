@@ -7,11 +7,47 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
 )
+
+// descriptorBundle groups the current descriptor source and its provenance.
+// All fields must be updated atomically (under e.mu).
+type descriptorBundle struct {
+	protoset      *rpc.ProtosetDescriptor
+	protosetPaths []string
+	protoFiles    []string
+	importPaths   []string
+	reflection    bool
+}
+
+type trackedConnection struct {
+	conn     *rpc.Connection
+	inFlight sync.WaitGroup
+}
+
+type trackedDescriptor struct {
+	bundle   descriptorBundle
+	inFlight sync.WaitGroup
+}
+
+type engineSnapshot struct {
+	tc *trackedConnection
+	td *trackedDescriptor
+}
+
+func (s *engineSnapshot) Release() {
+	if s.tc != nil {
+		s.tc.inFlight.Done()
+	}
+	if s.td != nil {
+		s.td.inFlight.Done()
+	}
+}
 
 // MCPEngine owns all gRPC and descriptor state for an MCP server session.
 // It mirrors the App struct from the main Wails application but without any
@@ -21,19 +57,15 @@ type MCPEngine struct {
 	mu         sync.Mutex
 	settingsMu sync.Mutex
 	ctx        context.Context
-	conn       *rpc.Connection
-	protoset   *rpc.ProtosetDescriptor
+	conn       *trackedConnection
+	descs      *trackedDescriptor
 	activeEnv  *storage.Environment
+	nextID     atomic.Int64
 
 	store     *storage.Store
 	envStore  *storage.EnvStore
 	histStore *storage.HistoryStore
 	settings  *storage.SettingsStore
-
-	loadedProtosetPaths []string
-	loadedProtoFiles    []string
-	loadImportPaths     []string
-	loadReflection      bool
 }
 
 const (
@@ -44,7 +76,10 @@ const (
 // NewMCPEngine creates and initialises an MCPEngine. It auto-restores the last
 // saved descriptor sources and active environment from the shared config dir.
 func NewMCPEngine(ctx context.Context) *MCPEngine {
-	e := &MCPEngine{ctx: ctx}
+	e := &MCPEngine{
+		ctx:   ctx,
+		descs: &trackedDescriptor{},
+	}
 
 	var err error
 	e.store, err = storage.NewStore()
@@ -70,24 +105,29 @@ func NewMCPEngine(ctx context.Context) *MCPEngine {
 		return e
 	}
 
+	e.descs = &trackedDescriptor{
+		bundle: descriptorBundle{
+			protosetPaths: append([]string(nil), saved.ProtosetPaths...),
+			protoFiles:    append([]string(nil), saved.ProtoFilePaths...),
+			importPaths:   append([]string(nil), saved.ProtoImportPaths...),
+		},
+	}
+
 	var parts []*rpc.ProtosetDescriptor
 	if len(saved.ProtosetPaths) > 0 {
 		pd, err := rpc.LoadProtosets(saved.ProtosetPaths)
 		if err == nil {
 			parts = append(parts, pd)
-			e.loadedProtosetPaths = append([]string(nil), saved.ProtosetPaths...)
 		}
 	}
 	if len(saved.ProtoFilePaths) > 0 {
 		pd, err := rpc.LoadProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
 		if err == nil {
 			parts = append(parts, pd)
-			e.loadedProtoFiles = append([]string(nil), saved.ProtoFilePaths...)
-			e.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
 		}
 	}
 	if merged := rpc.MergeDescriptors(parts...); merged != nil {
-		e.protoset = merged
+		e.descs.bundle.protoset = merged
 	}
 
 	// Restore active environment.
@@ -101,20 +141,28 @@ func NewMCPEngine(ctx context.Context) *MCPEngine {
 }
 
 // Connect dials the specified gRPC server.
+// The lock is released during the network dial so other operations are not blocked.
 func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if e.conn != nil {
-		_ = e.conn.Close()
-	}
 	conn, err := rpc.NewConnection(e.mergeContext(ctx), cfg)
 	if err != nil {
 		return err
 	}
-	e.conn = conn
 
-	go e.saveSettings(func(s *storage.AppSettings) {
+	e.mu.Lock()
+	old := e.conn
+	e.conn = &trackedConnection{conn: conn}
+	e.mu.Unlock()
+
+	// Close the old connection only after all in-flight operations that were
+	// using it have finished, avoiding premature cancellation of active RPCs.
+	if old != nil {
+		go func() {
+			old.inFlight.Wait()
+			_ = old.conn.Close()
+		}()
+	}
+
+	e.saveSettings(func(s *storage.AppSettings) {
 		s.LastTarget = cfg.Target
 		s.LastTLS = string(cfg.TLS)
 	})
@@ -124,10 +172,15 @@ func (e *MCPEngine) Connect(ctx context.Context, cfg rpc.ConnectionConfig) error
 // Disconnect closes the current gRPC connection.
 func (e *MCPEngine) Disconnect() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.conn != nil {
-		_ = e.conn.Close()
-		e.conn = nil
+	old := e.conn
+	e.conn = nil
+	e.mu.Unlock()
+
+	if old != nil {
+		go func() {
+			old.inFlight.Wait()
+			_ = old.conn.Close()
+		}()
 	}
 }
 
@@ -138,7 +191,7 @@ func (e *MCPEngine) GetConnectionState() string {
 	if e.conn == nil {
 		return "disconnected"
 	}
-	return e.conn.GetState()
+	return e.conn.conn.GetState()
 }
 
 // SetActiveEnvironment activates an environment by ID and returns it.
@@ -181,99 +234,120 @@ func (e *MCPEngine) SetActiveEnvironmentByName(name string) error {
 	return fmt.Errorf("no environment named %q", name)
 }
 
+func (e *MCPEngine) acquireSnapshot() *engineSnapshot {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	snap := &engineSnapshot{}
+	if e.conn != nil {
+		e.conn.inFlight.Add(1)
+		snap.tc = e.conn
+	}
+	if e.descs != nil {
+		e.descs.inFlight.Add(1)
+		snap.td = e.descs
+	}
+	return snap
+}
+
 // LoadProtosets loads one or more .protoset files, merging with any existing descriptors.
 func (e *MCPEngine) LoadProtosets(ctx context.Context, paths []string) ([]rpc.ServiceInfo, error) {
-	e.mu.Lock()
-	currentProtosets := append([]string(nil), e.loadedProtosetPaths...)
-	importPaths := append([]string(nil), e.loadImportPaths...)
-	protoFiles := append([]string(nil), e.loadedProtoFiles...)
-	withReflection := e.loadReflection
-	conn := e.conn
-	e.mu.Unlock()
+	snap := e.acquireSnapshot()
+	var conn *rpc.Connection
+	if snap.tc != nil {
+		conn = snap.tc.conn
+	}
+	var bundle descriptorBundle
+	if snap.td != nil {
+		bundle = snap.td.bundle
+	}
 
-	allProtosets := dedupeStrings(append(currentProtosets, paths...))
-	pd, err := e.rebuildDescriptor(ctx, allProtosets, importPaths, protoFiles, withReflection, conn)
+	allProtosets := util.DedupeStrings(append(bundle.protosetPaths, paths...))
+	pd, err := e.rebuildDescriptor(ctx, allProtosets, bundle.importPaths, bundle.protoFiles, bundle.reflection, conn)
+	snap.Release()
 	if err != nil {
 		return nil, err
 	}
-	e.storeDescriptorState(pd, allProtosets, importPaths, protoFiles, withReflection)
+	e.storeDescriptorState(pd, allProtosets, bundle.importPaths, bundle.protoFiles, bundle.reflection)
 	return pd.Services(), nil
 }
 
 // LoadViaReflection queries the connected server's reflection API.
 func (e *MCPEngine) LoadViaReflection(ctx context.Context) ([]rpc.ServiceInfo, error) {
-	e.mu.Lock()
-	conn := e.conn
-	protosets := append([]string(nil), e.loadedProtosetPaths...)
-	importPaths := append([]string(nil), e.loadImportPaths...)
-	protoFiles := append([]string(nil), e.loadedProtoFiles...)
-	e.mu.Unlock()
-
-	if conn == nil {
+	snap := e.acquireSnapshot()
+	if snap.tc == nil {
+		snap.Release()
 		return nil, fmt.Errorf("not connected — call connect first")
 	}
-	pd, err := e.rebuildDescriptor(ctx, protosets, importPaths, protoFiles, true, conn)
+	conn := snap.tc.conn
+	var bundle descriptorBundle
+	if snap.td != nil {
+		bundle = snap.td.bundle
+	}
+
+	pd, err := e.rebuildDescriptor(ctx, bundle.protosetPaths, bundle.importPaths, bundle.protoFiles, true, conn)
+	snap.Release()
 	if err != nil {
 		return nil, err
 	}
-	e.storeDescriptorState(pd, protosets, importPaths, protoFiles, true)
+	e.storeDescriptorState(pd, bundle.protosetPaths, bundle.importPaths, bundle.protoFiles, true)
 	return pd.Services(), nil
 }
 
 // GetServices returns the service/method tree from the loaded descriptor.
 func (e *MCPEngine) GetServices() ([]rpc.ServiceInfo, error) {
-	e.mu.Lock()
-	pd := e.protoset
-	e.mu.Unlock()
-	if pd == nil {
+	snap := e.acquireSnapshot()
+	if snap.td == nil || snap.td.bundle.protoset == nil {
+		snap.Release()
 		return nil, fmt.Errorf("no descriptor loaded — call load_protoset or load_via_reflection first")
 	}
-	return pd.Services(), nil
+	defer snap.Release()
+	return snap.td.bundle.protoset.Services(), nil
 }
 
 // GetRequestSchema returns the JSON field schemas for a method's input message.
 func (e *MCPEngine) GetRequestSchema(methodPath string) ([]rpc.FieldSchema, error) {
-	e.mu.Lock()
-	pd := e.protoset
-	e.mu.Unlock()
-	if pd == nil {
+	snap := e.acquireSnapshot()
+	if snap.td == nil || snap.td.bundle.protoset == nil {
+		snap.Release()
 		return nil, fmt.Errorf("no descriptor loaded")
 	}
-	return pd.GetRequestSchema(methodPath)
+	defer snap.Release()
+	return snap.td.bundle.protoset.GetRequestSchema(methodPath)
 }
 
 // InvokeUnary executes a unary RPC and records it to history.
+// The request timeout is applied by rpc.InvokeUnary based on req.TimeoutSeconds.
 func (e *MCPEngine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	if err := validateTimeoutSeconds(req.TimeoutSeconds); err != nil {
 		return nil, err
 	}
 
+	snap := e.acquireSnapshot()
+	if snap.tc == nil {
+		snap.Release()
+		return nil, fmt.Errorf("not connected")
+	}
+	if snap.td == nil || snap.td.bundle.protoset == nil {
+		snap.Release()
+		return nil, fmt.Errorf("no descriptor loaded")
+	}
+	defer snap.Release()
+
 	e.mu.Lock()
-	conn := e.conn
-	pd := e.protoset
 	env := e.activeEnv
 	e.mu.Unlock()
 
-	if conn == nil {
-		return nil, fmt.Errorf("not connected")
-	}
-	if pd == nil {
-		return nil, fmt.Errorf("no descriptor loaded")
-	}
-
 	req = interpolateRequest(req, env)
 
-	callCtx, cancel := context.WithTimeout(e.mergeContext(ctx), time.Duration(req.TimeoutSeconds*float64(time.Second)))
-	defer cancel()
-
-	resp, err := rpc.InvokeUnary(callCtx, conn, pd, req)
+	resp, err := rpc.InvokeUnary(e.mergeContext(ctx), snap.tc.conn, snap.td.bundle.protoset, req)
 	if err != nil {
 		return nil, err
 	}
 
 	if e.histStore != nil {
+		id := fmt.Sprintf("%d-%d", time.Now().UnixNano(), e.nextID.Add(1))
 		_ = e.histStore.Add(storage.HistoryEntry{
-			ID:          fmt.Sprintf("%d", time.Now().UnixNano()),
+			ID:          id,
 			MethodPath:  req.MethodPath,
 			RequestJSON: req.RequestJSON,
 			Metadata:    req.Metadata,
@@ -329,19 +403,22 @@ func (e *MCPEngine) EnsureCollectionDescriptors(ctx context.Context, col *storag
 		return nil
 	}
 
-	e.mu.Lock()
-	currentProtosets := append([]string(nil), e.loadedProtosetPaths...)
-	currentProtoFiles := append([]string(nil), e.loadedProtoFiles...)
-	currentImportPaths := append([]string(nil), e.loadImportPaths...)
-	withReflection := e.loadReflection
-	conn := e.conn
-	e.mu.Unlock()
+	snap := e.acquireSnapshot()
+	var conn *rpc.Connection
+	if snap.tc != nil {
+		conn = snap.tc.conn
+	}
+	var bundle descriptorBundle
+	if snap.td != nil {
+		bundle = snap.td.bundle
+	}
 
-	allProtosets := dedupeStrings(append(currentProtosets, col.ProtosetPaths...))
-	allProtoFiles := dedupeStrings(append(currentProtoFiles, col.ProtoFilePaths...))
-	allImportPaths := dedupeStrings(append(currentImportPaths, col.ProtoImportPaths...))
+	allProtosets := util.DedupeStrings(append(bundle.protosetPaths, col.ProtosetPaths...))
+	allProtoFiles := util.DedupeStrings(append(bundle.protoFiles, col.ProtoFilePaths...))
+	allImportPaths := util.DedupeStrings(append(bundle.importPaths, col.ProtoImportPaths...))
 
-	pd, err := e.rebuildDescriptor(ctx, allProtosets, allImportPaths, allProtoFiles, withReflection, conn)
+	pd, err := e.rebuildDescriptor(ctx, allProtosets, allImportPaths, allProtoFiles, bundle.reflection, conn)
+	snap.Release()
 	if err != nil {
 		return fmt.Errorf("loading descriptors for collection %q: %w", col.Name, err)
 	}
@@ -349,7 +426,7 @@ func (e *MCPEngine) EnsureCollectionDescriptors(ctx context.Context, col *storag
 		return fmt.Errorf("no descriptors available for collection %q", col.Name)
 	}
 
-	e.storeDescriptorState(pd, allProtosets, allImportPaths, allProtoFiles, withReflection)
+	e.storeDescriptorState(pd, allProtosets, allImportPaths, allProtoFiles, bundle.reflection)
 	return nil
 }
 
@@ -359,18 +436,27 @@ func (e *MCPEngine) storeDescriptorState(
 	withReflection bool,
 ) {
 	e.mu.Lock()
-	old := e.protoset
-	e.protoset = pd
-	e.loadedProtosetPaths = append([]string(nil), protosets...)
-	e.loadedProtoFiles = append([]string(nil), protoFiles...)
-	e.loadImportPaths = append([]string(nil), importPaths...)
-	e.loadReflection = withReflection
+	old := e.descs
+	e.descs = &trackedDescriptor{
+		bundle: descriptorBundle{
+			protoset:      pd,
+			protosetPaths: append([]string(nil), protosets...),
+			protoFiles:    append([]string(nil), protoFiles...),
+			importPaths:   append([]string(nil), importPaths...),
+			reflection:    withReflection,
+		},
+	}
 	e.mu.Unlock()
 
 	if old != nil {
+		// Close the old descriptor only after all in-flight InvokeUnary calls
+		// that snapshotted it have finished; they hold a reference across the
+		// lock boundary and would fail if the descriptor were closed sooner.
 		go func() {
-			time.Sleep(5 * time.Second)
-			old.Close()
+			old.inFlight.Wait()
+			if old.bundle.protoset != nil {
+				old.bundle.protoset.Close()
+			}
 		}()
 	}
 }
@@ -379,27 +465,9 @@ func (e *MCPEngine) saveSettings(fn func(*storage.AppSettings)) {
 	if e.settings == nil {
 		return
 	}
-	e.settingsMu.Lock()
-	defer e.settingsMu.Unlock()
-
-	saved, err := e.settings.Load()
-	if err != nil || saved == nil {
-		saved = &storage.AppSettings{}
+	if err := e.settings.Update(fn); err != nil {
+		log.Printf("warning: could not save settings: %v", err)
 	}
-	fn(saved)
-	_ = e.settings.Save(saved)
-}
-
-func dedupeStrings(values []string) []string {
-	seen := map[string]bool{}
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if v != "" && !seen[v] {
-			seen[v] = true
-			out = append(out, v)
-		}
-	}
-	return out
 }
 
 func validateTimeoutSeconds(timeoutSeconds float64) error {

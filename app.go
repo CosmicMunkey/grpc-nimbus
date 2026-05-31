@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App is the main Wails application struct. All exported methods are callable
@@ -16,15 +16,14 @@ import (
 type App struct {
 	ctx context.Context
 
-	mu         sync.Mutex
-	settingsMu sync.Mutex
-	conn       *rpc.Connection
-	protoset   *rpc.ProtosetDescriptor
-	store      *storage.Store
-	envStore   *storage.EnvStore
-	histStore  *storage.HistoryStore
-	settings   *storage.SettingsStore
-	activeEnv  *storage.Environment
+	mu        sync.Mutex
+	conn      *rpc.Connection
+	protoset  *rpc.ProtosetDescriptor
+	store     *storage.Store
+	envStore  *storage.EnvStore
+	histStore *storage.HistoryStore
+	settings  *storage.SettingsStore
+	activeEnv *storage.Environment
 
 	// defaultMetadata holds the global default request headers from settings.
 	// Protected by mu; updated synchronously when SaveUserSettings is called.
@@ -50,6 +49,9 @@ type App struct {
 	// These are not persisted to settings; they are re-created on each load.
 	virtualImportDirs []string
 
+	// connWatchCancel cancels the goroutine watching for connection state changes.
+	connWatchCancel context.CancelFunc
+
 	// streamCancel cancels the active streaming invocation, if any.
 	streamCancel    context.CancelFunc
 	streamCancelSeq uint64
@@ -61,6 +63,7 @@ type App struct {
 	// reflectionCancel cancels the currently in-flight reflection load, if any.
 	reflectionCancel    context.CancelFunc
 	reflectionCancelSeq uint64
+
 }
 
 // NewApp creates the App instance. Called once at startup.
@@ -71,23 +74,28 @@ func NewApp() *App {
 // startup is called by Wails when the application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	logger.Default.OnEntry = func(entry logger.Entry) {
+		runtime.EventsEmit(a.ctx, "log:entry", entry)
+	}
+
 	var err error
 
 	a.store, err = storage.NewStore()
 	if err != nil {
-		fmt.Printf("warning: collection store unavailable: %v\n", err)
+		logger.Default.Warnf("collection store unavailable: %v", err)
 	}
 	a.envStore, err = storage.NewEnvStore()
 	if err != nil {
-		fmt.Printf("warning: environment store unavailable: %v\n", err)
+		logger.Default.Warnf("environment store unavailable: %v", err)
 	}
 	a.histStore, err = storage.NewHistoryStore()
 	if err != nil {
-		fmt.Printf("warning: history store unavailable: %v\n", err)
+		logger.Default.Warnf("history store unavailable: %v", err)
 	}
 	a.settings, err = storage.NewSettingsStore()
 	if err != nil {
-		fmt.Printf("warning: settings store unavailable: %v\n", err)
+		logger.Default.Warnf("settings store unavailable: %v", err)
 		return
 	}
 
@@ -100,7 +108,7 @@ func (a *App) startup(ctx context.Context) {
 	for _, path := range saved.ProtosetPaths {
 		pd, err := rpc.LoadProtosets([]string{path})
 		if err != nil {
-			fmt.Printf("warning: auto-restore protoset %q skipped: %v\n", path, err)
+			logger.Default.Warnf("auto-restore protoset %q skipped: %v", path, err)
 			continue
 		}
 		parts = append(parts, pd)
@@ -113,7 +121,7 @@ func (a *App) startup(ctx context.Context) {
 			for _, file := range saved.ProtoFilePaths {
 				pd, _, vd, err := resolveProtoFiles(saved.ProtoImportPaths, []string{file})
 				if err != nil {
-					fmt.Printf("warning: auto-restore proto file %q skipped: %v\n", file, err)
+					logger.Default.Warnf("auto-restore proto file %q skipped: %v", file, err)
 					continue
 				}
 				parts = append(parts, pd)
@@ -162,7 +170,7 @@ func (a *App) startup(ctx context.Context) {
 		}
 		go func() {
 			if err := a.Connect(rpc.ConnectionConfig{Target: saved.LastTarget, TLS: tls}); err != nil {
-				fmt.Printf("warning: auto-connect failed: %v\n", err)
+				logger.Default.Warnf("auto-connect failed: %v", err)
 			}
 		}()
 	}
@@ -176,11 +184,22 @@ func (a *App) Connect(cfg rpc.ConnectionConfig) error {
 	if a.conn != nil {
 		_ = a.conn.Close()
 	}
+	if a.connWatchCancel != nil {
+		a.connWatchCancel()
+		a.connWatchCancel = nil
+	}
+	logger.Default.Infof("connecting to %s (TLS: %s)", cfg.Target, cfg.TLS)
 	conn, err := rpc.NewConnection(a.ctx, cfg)
 	if err != nil {
+		logger.Default.Errorf("connection to %s failed: %v", cfg.Target, err)
 		return err
 	}
 	a.conn = conn
+
+	// Watch for async connection failures (e.g. unreachable host) and log them.
+	watchCtx, watchCancel := context.WithCancel(a.ctx)
+	a.connWatchCancel = watchCancel
+	go a.watchConnectionState(watchCtx, conn, cfg.Target)
 
 	// Persist the connection target for next launch.
 	go a.saveSettings(func(s *storage.AppSettings) {
@@ -194,9 +213,40 @@ func (a *App) Connect(cfg rpc.ConnectionConfig) error {
 func (a *App) Disconnect() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.connWatchCancel != nil {
+		a.connWatchCancel()
+		a.connWatchCancel = nil
+	}
 	if a.conn != nil {
+		logger.Default.Infof("disconnecting")
 		_ = a.conn.Close()
 		a.conn = nil
+	}
+}
+
+// watchConnectionState logs a warning if the connection transitions to transient_failure.
+// It runs in a goroutine and exits when ctx is cancelled or the connection is shut down.
+func (a *App) watchConnectionState(ctx context.Context, conn *rpc.Connection, target string) {
+	warnLogged := false
+	for {
+		state := conn.GetState()
+		switch state {
+		case "ready":
+			logger.Default.Infof("connected to %s", target)
+			warnLogged = false
+		case "transient_failure":
+			if !warnLogged {
+				logger.Default.Warnf("connection to %s failed (transient_failure)", target)
+				warnLogged = true
+			}
+		case "shutdown":
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-conn.WaitForStateChange(ctx):
+		}
 	}
 }
 

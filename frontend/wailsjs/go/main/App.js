@@ -22,6 +22,10 @@ export function ClearLoadedProtos() {
   return window['go']['main']['App']['ClearLoadedProtos']();
 }
 
+export function ClearLogs() {
+  return window['go']['main']['App']['ClearLogs']();
+}
+
 export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
@@ -56,6 +60,10 @@ export function GetHistory(arg1) {
 
 export function GetLoadedState() {
   return window['go']['main']['App']['GetLoadedState']();
+}
+
+export function GetLogs(arg1) {
+  return window['go']['main']['App']['GetLogs'](arg1);
 }
 
 export function GetRequestSchema(arg1) {
@@ -190,8 +198,8 @@ export function TriggerMenuPrevTab() {
   return window['go']['main']['App']['TriggerMenuPrevTab']();
 }
 
-export function TriggerMenuToggleFullscreen() {
-  return window['go']['main']['App']['TriggerMenuToggleFullscreen']();
+export function TriggerMenuToggleDebugPane() {
+  return window['go']['main']['App']['TriggerMenuToggleDebugPane']();
 }
 
 export function TriggerMenuZoomIn() {

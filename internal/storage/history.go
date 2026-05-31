@@ -1,12 +1,14 @@
 package storage
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
@@ -57,6 +59,7 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 
 	existing, err := s.getHistoryLocked(entry.MethodPath)
 	if err != nil {
+		logger.Default.Warnf("could not read existing history for %q: %v", entry.MethodPath, err)
 		existing = nil
 	}
 	entries := append([]HistoryEntry{entry}, existing...)
@@ -71,16 +74,10 @@ func (s *HistoryStore) Add(entry HistoryEntry) error {
 }
 
 // GetHistory returns the history entries for a given method path (newest first).
-// A corrupt or unreadable file is treated as empty history; it will be overwritten
-// on the next Add, so callers never need to handle the error as fatal.
 func (s *HistoryStore) GetHistory(methodPath string) ([]HistoryEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	entries, err := s.getHistoryLocked(methodPath)
-	if err != nil {
-		return nil, nil
-	}
-	return entries, nil
+	return s.getHistoryLocked(methodPath)
 }
 
 func (s *HistoryStore) getHistoryLocked(methodPath string) ([]HistoryEntry, error) {
@@ -143,12 +140,53 @@ func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) er
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {
-	// Sanitize method path for use as a filename: replace / and . with _
-	safe := sanitize(methodPath)
-	return filepath.Join(s.dir, safe+".json")
+	// Canonical new format: "b64_" prefix + base64 RawURLEncoding.
+	// The prefix ensures new-format names are never confused with legacy names.
+	newSafe := sanitizeNew(methodPath)
+	newPath := filepath.Join(s.dir, newSafe+".json")
+
+	
+	if _, err := os.Stat(newPath); err == nil {
+		return newPath
+	}
+	
+	// Next try the intermediate prefixless base64 RawURLEncoding format
+	midSafe := base64.RawURLEncoding.EncodeToString([]byte(methodPath))
+	midPath := filepath.Join(s.dir, midSafe+".json")
+	if _, err := os.Stat(midPath); err == nil {
+		// Attempt to migrate intermediate file to new format
+		if err := os.Rename(midPath, newPath); err == nil {
+			return newPath
+		}
+		return midPath
+	}
+	
+	// Fall back to old underscore-based format for backward compatibility
+	oldSafe := sanitizeOld(methodPath)
+	oldPath := filepath.Join(s.dir, oldSafe+".json")
+	
+	if _, err := os.Stat(oldPath); err == nil {
+		// Attempt to migrate old file to new format
+		if err := os.Rename(oldPath, newPath); err == nil {
+			return newPath
+		}
+		// If migration fails, use the old path
+		return oldPath
+	}
+	
+	// Neither exists, use new format as the default
+	return newPath
 }
 
-func sanitize(s string) string {
+// sanitizeNew uses base64 RawURLEncoding prefixed with b64_ to encode the method path.
+// The b64_ prefix ensures the filename is unambiguously recognized as new-format.
+func sanitizeNew(s string) string {
+	return "b64_" + base64.RawURLEncoding.EncodeToString([]byte(s))
+}
+
+// sanitizeOld was the previous sanitization method: replacing /, ., and spaces with _
+// It's kept for backward compatibility when looking up existing history files
+func sanitizeOld(s string) string {
 	out := make([]byte, len(s))
 	for i := 0; i < len(s); i++ {
 		c := s[i]

@@ -102,6 +102,101 @@ func TestPortableExportImportPreservesProtoSources(t *testing.T) {
 	}
 }
 
+func TestCollectionRoundTrip(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	col := Collection{
+		ID:   "col-1",
+		Name: "My Collection",
+	}
+	if err := store.SaveCollection(col); err != nil {
+		t.Fatalf("SaveCollection: %v", err)
+	}
+
+	loaded, err := store.GetCollection("col-1")
+	if err != nil {
+		t.Fatalf("GetCollection: %v", err)
+	}
+	if loaded.Name != "My Collection" {
+		t.Fatalf("expected Name=My Collection, got %q", loaded.Name)
+	}
+	if loaded.CreatedAt == "" {
+		t.Fatal("expected CreatedAt to be set")
+	}
+	if loaded.UpdatedAt == "" {
+		t.Fatal("expected UpdatedAt to be set")
+	}
+}
+
+func TestListCollections(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+
+	cols, err := store.ListCollections()
+	if err != nil {
+		t.Fatalf("ListCollections (empty): %v", err)
+	}
+	if len(cols) != 0 {
+		t.Fatalf("expected no collections, got %d", len(cols))
+	}
+
+	if err := store.SaveCollection(Collection{ID: "a", Name: "A"}); err != nil {
+		t.Fatalf("SaveCollection: %v", err)
+	}
+	if err := store.SaveCollection(Collection{ID: "b", Name: "B"}); err != nil {
+		t.Fatalf("SaveCollection: %v", err)
+	}
+
+	cols, err = store.ListCollections()
+	if err != nil {
+		t.Fatalf("ListCollections: %v", err)
+	}
+	if len(cols) != 2 {
+		t.Fatalf("expected 2 collections, got %d", len(cols))
+	}
+}
+
+func TestDeleteCollection(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+
+	if err := store.SaveCollection(Collection{ID: "del-me", Name: "Delete Me"}); err != nil {
+		t.Fatalf("SaveCollection: %v", err)
+	}
+	if err := store.DeleteCollection("del-me"); err != nil {
+		t.Fatalf("DeleteCollection: %v", err)
+	}
+
+	_, err := store.GetCollection("del-me")
+	if err == nil {
+		t.Fatal("expected error for deleted collection")
+	}
+}
+
+func TestDeleteNonexistentCollectionReturnsNil(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+	if err := store.DeleteCollection("does-not-exist"); err != nil {
+		t.Fatalf("expected no error: %v", err)
+	}
+}
+
+func TestCollectionSkipsCorruptFile(t *testing.T) {
+	store := &Store{dir: t.TempDir()}
+
+	if err := store.SaveCollection(Collection{ID: "good", Name: "Good"}); err != nil {
+		t.Fatalf("SaveCollection: %v", err)
+	}
+	badPath := store.filePath("bad")
+	if err := os.WriteFile(badPath, []byte("{corrupt}"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cols, err := store.ListCollections()
+	if err != nil {
+		t.Fatalf("ListCollections: %v", err)
+	}
+	if len(cols) != 1 || cols[0].ID != "good" {
+		t.Fatalf("expected 1 collection (good), got %d", len(cols))
+	}
+}
+
 func TestSaveCollectionRejectsEmptyID(t *testing.T) {
 	store := &Store{dir: t.TempDir()}
 	err := store.SaveCollection(Collection{ID: "   ", Name: "bad"})

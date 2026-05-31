@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 )
 
@@ -62,6 +64,9 @@ type AppSettings struct {
 	MaxStreamMessages     *int                `json:"maxStreamMessages,omitempty"`     // nil → 200; 0 = unlimited
 	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata,omitempty"`       // global headers for all requests
 
+	// Debug
+	ShowDebugIndicator *bool `json:"showDebugIndicator,omitempty"` // nil → default false
+
 	// Window state
 	WindowWidth  *int `json:"windowWidth,omitempty"`  // window width in px
 	WindowHeight *int `json:"windowHeight,omitempty"` // window height in px
@@ -70,8 +75,11 @@ type AppSettings struct {
 }
 
 // SettingsStore persists AppSettings as a single JSON file.
+// Load is safe for concurrent use; Save and Update are serialized.
 type SettingsStore struct {
-	path string
+	mu    sync.RWMutex
+	path  string
+	cache *AppSettings
 }
 
 // NewSettingsStore creates a SettingsStore using the OS config directory.
@@ -95,32 +103,123 @@ func NewSettingsStoreAt(path string) (*SettingsStore, error) {
 	return &SettingsStore{path: path}, nil
 }
 
-// Load reads settings from disk. Returns empty settings if the file doesn't exist.
+// Load reads settings from the in-memory cache or disk.
+// Returns empty settings if the file doesn't exist.
 func (s *SettingsStore) Load() (*AppSettings, error) {
+	s.mu.RLock()
+	if s.cache != nil {
+		cp := deepCopySettings(s.cache)
+		s.mu.RUnlock()
+		return cp, nil
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.cache != nil {
+		cp := deepCopySettings(s.cache)
+		return cp, nil
+	}
+
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			s.cache = &AppSettings{}
 			return &AppSettings{}, nil
 		}
 		return nil, err
 	}
 	var settings AppSettings
 	if err := json.Unmarshal(data, &settings); err != nil {
-		// Corrupt file — return empty settings rather than failing
+		logger.Default.Warnf("corrupt settings file %q — returning defaults: %v", s.path, err)
+		s.cache = &AppSettings{}
 		return &AppSettings{}, nil
 	}
-	return &settings, nil
+	s.cache = &settings
+	cp := deepCopySettings(s.cache)
+	return cp, nil
 }
 
-// Save writes settings to disk atomically (write to temp file then rename).
-func (s *SettingsStore) Save(settings *AppSettings) error {
-	data, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return err
-	}
+// atomicWrite writes data to a temp file then renames it to s.path.
+// Must be called with s.mu held.
+func (s *SettingsStore) atomicWrite(data []byte) error {
 	tmp := s.path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0644); err != nil {
 		return err
 	}
 	return os.Rename(tmp, s.path)
+}
+
+// deepCopySettings returns a deep copy of s, duplicating all slice and map
+// fields so callers cannot mutate the cache through shared backing storage.
+func deepCopySettings(s *AppSettings) *AppSettings {
+	cp := *s
+	cp.ProtosetPaths = append([]string(nil), s.ProtosetPaths...)
+	cp.ProtoImportPaths = append([]string(nil), s.ProtoImportPaths...)
+	cp.ProtoFilePaths = append([]string(nil), s.ProtoFilePaths...)
+	cp.DefaultMetadata = append([]rpc.MetadataEntry(nil), s.DefaultMetadata...)
+	if s.CustomTheme != nil {
+		m := make(map[string]string, len(s.CustomTheme))
+		for k, v := range s.CustomTheme {
+			m[k] = v
+		}
+		cp.CustomTheme = m
+	}
+	if len(s.CustomThemes) > 0 {
+		cp.CustomThemes = make([]CustomThemeEntry, len(s.CustomThemes))
+		for i, t := range s.CustomThemes {
+			entry := t
+			if t.Tokens != nil {
+				entry.Tokens = make(map[string]string, len(t.Tokens))
+				for k, v := range t.Tokens {
+					entry.Tokens[k] = v
+				}
+			}
+			cp.CustomThemes[i] = entry
+		}
+	}
+	return &cp
+}
+
+// saveLocked marshals settings, writes them atomically, and updates the cache.
+// Must be called with s.mu held. Stores a copy in cache to avoid aliasing.
+func (s *SettingsStore) saveLocked(settings *AppSettings) error {
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := s.atomicWrite(data); err != nil {
+		return err
+	}
+	s.cache = deepCopySettings(settings)
+	return nil
+}
+
+// Save writes settings to disk atomically (write to temp file then rename).
+func (s *SettingsStore) Save(settings *AppSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.saveLocked(settings)
+}
+
+// Update loads the current settings, applies the mutation, and saves the result.
+// The entire read-mutate-write sequence is serialized, so concurrent calls are safe.
+func (s *SettingsStore) Update(mutate func(*AppSettings)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var current *AppSettings
+	if s.cache != nil {
+		current = deepCopySettings(s.cache)
+	} else {
+		current = &AppSettings{}
+		data, err := os.ReadFile(s.path)
+		if err == nil {
+			_ = json.Unmarshal(data, current)
+		}
+	}
+
+	mutate(current)
+	return s.saveLocked(current)
 }

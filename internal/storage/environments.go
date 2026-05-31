@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 )
 
 // EnvHeader is a gRPC metadata entry that is sent on every request when an
@@ -63,6 +65,7 @@ func (s *EnvStore) ListEnvironments() ([]Environment, error) {
 		}
 		env, err := s.loadEnvFile(filepath.Join(s.dir, e.Name()))
 		if err != nil {
+			logger.Default.Warnf("skipping corrupt environment %q: %v", e.Name(), err)
 			continue
 		}
 		envs = append(envs, *env)

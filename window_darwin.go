@@ -16,5 +16,5 @@ void disableAutomaticWindowTabbing() {
 import "C"
 
 func init() {
-C.disableAutomaticWindowTabbing()
+	C.disableAutomaticWindowTabbing()
 }

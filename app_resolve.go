@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 )
 
 var (
@@ -40,7 +42,7 @@ func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
 			cmd := reShellCmd.FindStringSubmatch(match)[1]
 			out, err := runShellCommand(cmd, inheritEnv)
 			if err != nil {
-				fmt.Printf("warning: header command %q failed: %v\n", cmd, err)
+				logger.Default.Warnf("header command %q failed: %v", cmd, err)
 				return ""
 			}
 			return out

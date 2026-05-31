@@ -39,7 +39,6 @@ export default function ProtosetLoader() {
   // Electron-specific and is never populated in Wails' WebKit/WebView2 context.
   useEffect(() => {
     OnFileDrop((_x, _y, paths) => {
-      if (!draggingRef.current) return;
       draggingRef.current = false;
       setDragging(false);
       if (!paths.length) return;

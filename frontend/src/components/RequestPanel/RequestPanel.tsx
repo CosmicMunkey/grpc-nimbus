@@ -1,11 +1,10 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { Suspense, lazy, useCallback, useState } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
-import CodeMirror from '@uiw/react-codemirror';
-import { json } from '@codemirror/lang-json';
 import { MetadataEntry } from '../../types';
 import FormBuilder from '../RequestBuilder/FormBuilder';
-import { buildCodeMirrorTheme } from '../../codeMirrorTheme';
+
+const JsonEditor = lazy(() => import('../CodeMirror/JsonEditor'));
 
 function MetadataTable() {
   const { requestMetadata } = useActiveTab();
@@ -326,8 +325,6 @@ export default function RequestPanel() {
     savedRequestName,
   } = useActiveTab();
   const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest, streamingTabId } = useAppStore();
-  const activeThemeTokens = useAppStore(s => s.activeThemeTokens);
-  const cmTheme = useMemo(() => buildCodeMirrorTheme(activeThemeTokens), [activeThemeTokens]);
   const hasOtherActiveStream = streamingTabId !== null && streamingTabId !== tabId;
   const showCancel = isInvoking || isStreaming;
 
@@ -467,18 +464,18 @@ export default function RequestPanel() {
           <FormBuilder key={tabId} />
         ) : tab === 'body' ? (
           <div className="h-full">
-            <CodeMirror
-              value={requestJson}
-              onChange={setRequestJson}
-              theme={cmTheme}
-              extensions={[json()]}
-              className="h-full"
-              basicSetup={{
-                lineNumbers: true,
-                foldGutter: true,
-                autocompletion: true,
-              }}
-            />
+            <Suspense fallback={<div className="h-full animate-pulse bg-c-bg" />}>
+              <JsonEditor
+                value={requestJson}
+                onChange={setRequestJson}
+                className="h-full"
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  autocompletion: true,
+                }}
+              />
+            </Suspense>
           </div>
         ) : tab === 'grpcurl' ? (
           <GrpcurlTab />

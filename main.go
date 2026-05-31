@@ -5,6 +5,7 @@ import (
 	"embed"
 	goruntime "runtime"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -12,7 +13,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
 //go:embed all:frontend/dist
@@ -147,6 +147,10 @@ func buildAppMenu(app *App) *menu.Menu {
 	})
 	viewMenu.AddText("Previous Tab", keys.Combo("Tab", keys.ControlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		app.TriggerMenuPrevTab()
+	})
+	viewMenu.AddSeparator()
+	viewMenu.AddText("Debug Console", nil, func(_ *menu.CallbackData) {
+		app.TriggerMenuToggleDebugPane()
 	})
 
 	helpMenu := m.AddSubmenu("Help")

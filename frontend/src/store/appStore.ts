@@ -14,8 +14,22 @@ import {
   ServiceInfo,
   StreamEvent,
   Tab,
+  LogEntry,
 } from '../types';
 import { ThemeId, ThemeTokens, CustomThemeEntry, applyTheme, applyFontSize, resolveTheme, isColorDark, isBuiltinTheme, THEMES, DEFAULT_CUSTOM_THEME } from '../themes';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
+
+// The Go backend emits logger.Level as a numeric enum (0=info, 1=warn, 2=error).
+// Normalize it to the string union expected by LogEntry so all comparisons and
+// string operations in the UI work correctly regardless of what the backend sends.
+const LOG_LEVEL_MAP: Record<number, LogEntry['level']> = { 0: 'info', 1: 'warn', 2: 'error' };
+function normalizeLogEntry(raw: unknown): LogEntry {
+  const e = raw as Record<string, unknown>;
+  const level = typeof e.level === 'number'
+    ? (LOG_LEVEL_MAP[e.level] ?? 'info')
+    : (e.level as LogEntry['level']) ?? 'info';
+  return { level, timestamp: e.timestamp as string, message: e.message as string };
+}
 
 // Wails injects window.go at runtime. Stubs keep TypeScript happy in development.
 declare global {
@@ -77,9 +91,10 @@ declare global {
              autoConnectOnStartup?: boolean;
              allowShellCommands?: boolean;
              inheritShellEnv?: boolean;
-             maxStreamMessages?: number;
-             defaultMetadata?: MetadataEntry[];
-           }>;
+              maxStreamMessages?: number;
+              defaultMetadata?: MetadataEntry[];
+              showDebugIndicator?: boolean;
+            }>;
             SaveUserSettings(s: {
               confirmDeletes: boolean;
               timestampInputLocal: boolean;
@@ -102,7 +117,10 @@ declare global {
               inheritShellEnv: boolean;
               maxStreamMessages: number;
               defaultMetadata: MetadataEntry[];
+              showDebugIndicator: boolean;
             }): Promise<void>;
+          GetLogs(severity: string): Promise<LogEntry[]>;
+          ClearLogs(): Promise<void>;
           GetVersion(): Promise<string>;
         };
       };
@@ -142,6 +160,8 @@ export const api = {
   clearHistory: (methodPath: string) => window.go.main.App.ClearHistory(methodPath),
   getRequestSchema: (methodPath: string) => window.go.main.App.GetRequestSchema(methodPath),
   clearLoadedProtos: () => window.go.main.App.ClearLoadedProtos(),
+  getLogs: (severity: string) => window.go.main.App.GetLogs(severity),
+  clearLogs: () => window.go.main.App.ClearLogs(),
   reloadProtos: () => window.go.main.App.ReloadProtos(),
   removeProtoPath: (path: string) => window.go.main.App.RemoveProtoPath(path),
   getLoadedState: () => window.go.main.App.GetLoadedState(),
@@ -154,7 +174,7 @@ export const api = {
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
     allowShellCommands: boolean; inheritShellEnv: boolean;
-    maxStreamMessages: number; defaultMetadata: MetadataEntry[];
+    maxStreamMessages: number; defaultMetadata: MetadataEntry[]; showDebugIndicator: boolean;
   }): Promise<void> => window.go.main.App.SaveUserSettings(s),
 };
 
@@ -166,7 +186,7 @@ function saveAllSettings(s: Pick<AppState,
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
   'allowShellCommands' | 'inheritShellEnv' |
-  'maxStreamMessages' | 'defaultMetadata'
+  'maxStreamMessages' | 'defaultMetadata' | 'showDebugIndicator'
 >) {
   api.saveUserSettings({
     confirmDeletes: s.confirmDeletes,
@@ -190,6 +210,7 @@ function saveAllSettings(s: Pick<AppState,
     inheritShellEnv: s.inheritShellEnv,
     maxStreamMessages: s.maxStreamMessages,
     defaultMetadata: s.defaultMetadata,
+    showDebugIndicator: s.showDebugIndicator,
   }).catch(() => {});
 }
 
@@ -528,6 +549,14 @@ interface AppState {
   setDefaultMetadata: (v: MetadataEntry[]) => void;
   loadUserSettings: () => Promise<void>;
 
+  // Debug
+  logs: LogEntry[];
+  showDebugIndicator: boolean;
+  setShowDebugIndicator: (v: boolean) => void;
+  clearLogs: () => void;
+  debugPaneOpen: boolean;
+  toggleDebugPane: () => void;
+
   // Layout
   sidebarWidth: number;
   panelSplit: number;
@@ -551,7 +580,9 @@ interface AppState {
 export const useActiveTab = (): Tab =>
   useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? s.tabs[0]);
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => {
+  let logListenerRegistered = false;
+  return ({
   // ── Connection ──────────────────────────────────────────────────────────────
   connectionConfig: { target: 'localhost:50051', tls: 'none' },
   isConnected: false,
@@ -619,6 +650,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* non-fatal */ }
     // Load user preferences in parallel (non-fatal)
     get().loadUserSettings().catch(() => {});
+    // Subscribe to live log events
+    api.getLogs('').then((entries) => {
+      if (entries?.length) set({ logs: entries.map(normalizeLogEntry) });
+    }).catch(() => {});
+    if (!logListenerRegistered) {
+      logListenerRegistered = true;
+      EventsOn('log:entry', (entry) => {
+        useAppStore.setState((s) => {
+          const logs = [...s.logs, normalizeLogEntry(entry)];
+          if (logs.length > 1000) logs.splice(0, logs.length - 1000);
+          return { logs };
+        });
+      });
+    }
   },
 
   // ── Descriptor sources ──────────────────────────────────────────────────────
@@ -755,10 +800,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().streamingTabId) {
       await get().cancelStream();
     }
-    const tabIds = get().tabs.map((t) => t.id);
-    for (const id of tabIds) {
-      await get().closeTab(id);
-    }
+    set((s) => {
+      const fresh = makeTab({ timeoutSeconds: s.defaultTimeoutSeconds });
+      return { tabs: [fresh], activeTabId: fresh.id, streamingTabId: null };
+    });
   },
 
   duplicateTab: (id) => {
@@ -1301,6 +1346,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   inheritShellEnv: false,
   maxStreamMessages: 200,
   defaultMetadata: [],
+  logs: [],
+  showDebugIndicator: false,
+  debugPaneOpen: false,
   confirmDialog: null,
   settingsOpen: false,
   settingsTarget: null,
@@ -1334,24 +1382,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeCustomThemeId,
         themeBadge: s.themeBadge ?? '',
         fontSize,
-         responseWordWrap: s.responseWordWrap ?? true,
-         responseIndent: s.responseIndent ?? 2,
-         emitDefaults: s.emitDefaults ?? false,
-         envSortByCreated: s.envSortByCreated ?? false,
-         sidebarWidth,
-         panelSplit,
-         defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
-         historyLimit: s.historyLimit ?? 50,
-         autoConnectOnStartup: s.autoConnectOnStartup ?? false,
-         allowShellCommands: s.allowShellCommands ?? false,
-         inheritShellEnv: s.inheritShellEnv ?? false,
-         maxStreamMessages: s.maxStreamMessages ?? 200,
-         defaultMetadata: s.defaultMetadata ?? [],
-       });
-       applyTheme(resolved);
-       applyFontSize(fontSize);
-     } catch { /* use defaults */ }
-   },
+        responseWordWrap: s.responseWordWrap ?? true,
+        responseIndent: s.responseIndent ?? 2,
+        emitDefaults: s.emitDefaults ?? false,
+        envSortByCreated: s.envSortByCreated ?? false,
+        sidebarWidth,
+        panelSplit,
+        defaultTimeoutSeconds: s.defaultTimeoutSeconds ?? 0,
+        historyLimit: s.historyLimit ?? 50,
+        autoConnectOnStartup: s.autoConnectOnStartup ?? false,
+        allowShellCommands: s.allowShellCommands ?? false,
+        inheritShellEnv: s.inheritShellEnv ?? false,
+        maxStreamMessages: s.maxStreamMessages ?? 200,
+        defaultMetadata: s.defaultMetadata ?? [],
+        showDebugIndicator: s.showDebugIndicator ?? false,
+      });
+      applyTheme(resolved);
+      applyFontSize(fontSize);
+    } catch { /* use defaults */ }
+  },
 
   setConfirmDeletes: (v) => {
     set({ confirmDeletes: v });
@@ -1505,6 +1554,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveAllSettings(get());
   },
 
+  setShowDebugIndicator: (v) => {
+    set({ showDebugIndicator: v });
+    saveAllSettings(get());
+  },
+
+  toggleDebugPane: () => set((s) => ({ debugPaneOpen: !s.debugPaneOpen })),
+
+  clearLogs: () => {
+    set({ logs: [] });
+    api.clearLogs().catch(() => {});
+  },
+
   setSidebarWidth: (w) => {
     set({ sidebarWidth: w });
     saveAllSettings(get());
@@ -1526,4 +1587,5 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ confirmDialog: null });
     dialog?.resolve(yes);
   },
-}));
+});
+});

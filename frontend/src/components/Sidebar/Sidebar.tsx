@@ -170,7 +170,7 @@ function CollectionsList() {
   const [renamingRequest, setRenamingRequest] = useState<{ colId: string; reqId: string } | null>(null);
   const [requestName, setRequestName] = useState('');
 
-  React.useEffect(() => { loadCollections(); }, []);
+  React.useEffect(() => { loadCollections(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startCollectionRename = (colId: string, currentName: string, e: React.MouseEvent) => {
     e.stopPropagation();

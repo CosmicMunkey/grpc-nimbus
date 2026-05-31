@@ -119,6 +119,7 @@ export interface FieldSchema {
   mapKeyType?: string;
   mapValueType?: string;
   mapValueFields?: FieldSchema[];
+  isFieldMask?: boolean;
 }
 
 export interface LoadedState {
@@ -131,6 +132,12 @@ export interface LoadedState {
   lastTarget: string;
   lastTLS: string;
   activeEnvironmentId?: string;
+}
+
+export interface LogEntry {
+  level: 'info' | 'warn' | 'error';
+  timestamp: string;
+  message: string;
 }
 
 // Represents one open request tab — all per-request state is scoped here.

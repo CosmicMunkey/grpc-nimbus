@@ -22,7 +22,7 @@ const (
 
 // ConnectionConfig holds the parameters to connect to a gRPC server.
 type ConnectionConfig struct {
-	Target     string  `json:"target"`     // host:port
+	Target     string  `json:"target"` // host:port
 	TLS        TLSMode `json:"tls"`
 	ClientCert string  `json:"clientCert"` // path to client cert (mTLS)
 	ClientKey  string  `json:"clientKey"`  // path to client key (mTLS)
@@ -89,6 +89,25 @@ func (c *Connection) Close() error {
 		return err
 	}
 	return nil
+}
+
+// WaitForStateChange blocks until the connection state changes from the current
+// state, then returns a closed channel. Returns immediately if ctx is cancelled.
+// The returned channel is always closed (never blocks on receive).
+func (c *Connection) WaitForStateChange(ctx context.Context) <-chan struct{} {
+	c.mu.Lock()
+	conn := c.conn
+	c.mu.Unlock()
+	ch := make(chan struct{})
+	if conn == nil {
+		close(ch)
+		return ch
+	}
+	go func() {
+		conn.WaitForStateChange(ctx, conn.GetState())
+		close(ch)
+	}()
+	return ch
 }
 
 func buildDialOptions(cfg ConnectionConfig) ([]grpc.DialOption, error) {

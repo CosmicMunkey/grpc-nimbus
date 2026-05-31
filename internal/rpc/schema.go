@@ -13,7 +13,7 @@ type FieldSchema struct {
 	// Type is one of: "string","bytes","bool","int32","int64","uint32","uint64",
 	// "float","double","enum","message","map"
 	Type           string        `json:"type"`
-	IsRepeated     bool          `json:"isRepeated"`             // true only for non-map repeated fields
+	IsRepeated     bool          `json:"isRepeated"` // true only for non-map repeated fields
 	IsMap          bool          `json:"isMap"`
 	OneofName      string        `json:"oneofName,omitempty"`
 	EnumValues     []EnumValue   `json:"enumValues,omitempty"`
@@ -21,6 +21,7 @@ type FieldSchema struct {
 	MapKeyType     string        `json:"mapKeyType,omitempty"`     // for map type
 	MapValueType   string        `json:"mapValueType,omitempty"`   // for map type
 	MapValueFields []FieldSchema `json:"mapValueFields,omitempty"` // when map value is message
+	IsFieldMask    bool          `json:"isFieldMask,omitempty"`    // true for google.protobuf.FieldMask
 }
 
 // EnumValue is a single enum name/number pair.
@@ -125,6 +126,10 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 			}
 		} else if mt := fd.GetMessageType(); mt != nil && mt.GetFullyQualifiedName() == "google.protobuf.Timestamp" {
 			fs.Type = "timestamp"
+		} else if mt := fd.GetMessageType(); mt != nil && mt.GetFullyQualifiedName() == "google.protobuf.FieldMask" {
+			fs.Type = "message"
+			fs.IsFieldMask = true
+			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
 		} else {
 			fs.Type = "message"
 			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
