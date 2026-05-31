@@ -17,7 +17,7 @@ function isFullyPopulated(
     if (typeof sv === 'string') return sv !== '';
     if (Array.isArray(sv)) return sv.length > 0;
     if (f.type === 'message' && f.fields && typeof sv === 'object') {
-      const subPath = path ? `${path}.${f.name}` : f.name;
+      const subPath = path ? `${path}.${f.jsonName}` : f.jsonName;
       if (visited.has(subPath)) return true; // cycle — treat as populated
       visited.add(subPath);
       return isFullyPopulated(sv as Record<string, unknown>, f.fields, visited, subPath);
@@ -45,7 +45,7 @@ function collectPopulatedPaths(
       : typeof val === 'object' && !Array.isArray(val) ? Object.keys(val).length > 0
       : true;
     if (!isFilled) continue;
-    const path = prefix ? `${prefix}.${f.name}` : f.name;
+    const path = prefix ? `${prefix}.${f.jsonName}` : f.jsonName;
     if (f.type === 'message' && f.fields && val && typeof val === 'object' && !Array.isArray(val) && !visited.has(path)) {
       visited.add(path);
       const subFields = f.fields.filter(sf => !sf.isFieldMask);

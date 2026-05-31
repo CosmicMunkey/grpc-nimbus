@@ -36,8 +36,12 @@ export function LogViewer() {
   };
 
   const handleCopyAll = async () => {
-    const text = logs.map((e) => `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}`).join('\n');
-    await navigator.clipboard.writeText(text);
+    try {
+      const text = logs.map((e) => `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}`).join('\n');
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy logs to clipboard:', err);
+    }
   };
 
   return (

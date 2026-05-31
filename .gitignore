@@ -34,8 +34,6 @@ go.work.sum
 # Wails build artifacts
 build/bin/
 
-# Local dev binary (built by `wails build` or `make dev` into repo root)
-/grpc-nimbus
 
 # MCP server binary (built by `make mcp`)
 bin/
@@ -49,6 +47,7 @@ frontend/node_modules/
 
 .github/copilot-instructions.md
 .github/project-context.md
+.antigravitycli
 
 .DS_Store
 /mcp-server

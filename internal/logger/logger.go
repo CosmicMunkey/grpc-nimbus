@@ -47,6 +47,9 @@ type Logger struct {
 }
 
 func New(capacity int) *Logger {
+	if capacity <= 0 {
+		capacity = 1000
+	}
 	return &Logger{
 		ring:   make([]Entry, capacity),
 		cap:    capacity,

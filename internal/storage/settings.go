@@ -209,14 +209,15 @@ func (s *SettingsStore) Update(mutate func(*AppSettings)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	current := s.cache
-	if current == nil {
+	var current *AppSettings
+	if s.cache != nil {
+		current = deepCopySettings(s.cache)
+	} else {
 		current = &AppSettings{}
 		data, err := os.ReadFile(s.path)
 		if err == nil {
 			_ = json.Unmarshal(data, current)
 		}
-		s.cache = current
 	}
 
 	mutate(current)
