@@ -38,7 +38,9 @@ type AppSettings struct {
 	ConfirmClearHistory *bool `json:"confirmClearHistory,omitempty"` // nil → default false
 
 	// Response
-	EmitDefaults *bool `json:"emitDefaults,omitempty"` // nil → default false (omit zero-value fields)
+	EmitDefaults             *bool `json:"emitDefaults,omitempty"`             // nil → default false (omit zero-value fields)
+	FieldMaskIncludeDefaults *bool `json:"fieldMaskIncludeDefaults,omitempty"` // nil → default false
+
 
 	// Appearance
 	EnvSortByCreated    *bool              `json:"envSortByCreated,omitempty"`    // nil → false (alphabetical); true → by creation time

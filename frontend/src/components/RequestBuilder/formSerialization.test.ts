@@ -21,6 +21,70 @@ const requestSchema: FieldSchema[] = [
         isRepeated: false,
         isMap: false,
       },
+      {
+        name: 'genre',
+        jsonName: 'genre',
+        number: 2,
+        type: 'enum',
+        isRepeated: false,
+        isMap: false,
+        enumValues: [
+          { name: 'BOOK_GENRE_UNSPECIFIED', number: 0 },
+          { name: 'BOOK_GENRE_FICTION', number: 1 },
+          { name: 'BOOK_GENRE_NON_FICTION', number: 2 },
+          { name: 'BOOK_GENRE_BIOGRAPHY', number: 3 },
+        ],
+      },
+      {
+        name: 'in_print',
+        jsonName: 'inPrint',
+        number: 3,
+        type: 'bool',
+        isRepeated: false,
+        isMap: false,
+      },
+      {
+        name: 'page_count',
+        jsonName: 'pageCount',
+        number: 4,
+        type: 'int64',
+        isRepeated: false,
+        isMap: false,
+      },
+      {
+        name: 'publisher',
+        jsonName: 'publisher',
+        number: 5,
+        type: 'message',
+        isRepeated: false,
+        isMap: false,
+        fields: [
+          {
+            name: 'name',
+            jsonName: 'name',
+            number: 1,
+            type: 'string',
+            isRepeated: false,
+            isMap: false,
+          },
+          {
+            name: 'country',
+            jsonName: 'country',
+            number: 2,
+            type: 'string',
+            isRepeated: false,
+            isMap: false,
+          },
+        ],
+      },
+      {
+        name: 'tags',
+        jsonName: 'tags',
+        number: 6,
+        type: 'string',
+        isRepeated: false,
+        isMap: true,
+      },
     ],
   },
   {
@@ -56,6 +120,55 @@ test('toJson serializes FieldMask objects as protobuf JSON strings', () => {
   );
 });
 
+test('toJson serializes FieldMask with rich fields correctly', () => {
+  const form: FormVal = {
+    book: {
+      title: 'Dune',
+      genre: 'BOOK_GENRE_FICTION',
+      inPrint: true,
+      pageCount: 600,
+      publisher: {
+        name: 'Chilton Books',
+        country: 'US',
+      },
+      tags: { 'sci-fi': 'classic' },
+    },
+    updateMask: {
+      paths: [
+        'book.title',
+        'book.genre',
+        'book.inPrint',
+        'book.pageCount',
+        'book.publisher.name',
+        'book.publisher.country',
+        'book.tags',
+      ],
+    },
+  };
+
+  assert.equal(
+    toJson(form, requestSchema),
+    JSON.stringify(
+      {
+        book: {
+          title: 'Dune',
+          genre: 'BOOK_GENRE_FICTION',
+          inPrint: true,
+          pageCount: 600,
+          publisher: {
+            name: 'Chilton Books',
+            country: 'US',
+          },
+          tags: { 'sci-fi': 'classic' },
+        },
+        updateMask: 'book.title,book.genre,book.inPrint,book.pageCount,book.publisher.name,book.publisher.country,book.tags',
+      },
+      null,
+      2,
+    ),
+  );
+});
+
 test('toJson omits empty FieldMask values', () => {
   const form: FormVal = {
     book: { title: 'Dune' },
@@ -78,3 +191,4 @@ test('fromJson keeps protobuf JSON FieldMask strings intact', () => {
 test('fieldMaskPathsFromValue parses protobuf JSON FieldMask strings for the editor', () => {
   assert.deepEqual(fieldMaskPathsFromValue('book.title, author'), ['book.title', 'author']);
 });
+

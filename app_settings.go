@@ -37,6 +37,7 @@ type UserSettings struct {
 	MaxStreamMessages     int                 `json:"maxStreamMessages"`
 	DefaultMetadata       []rpc.MetadataEntry `json:"defaultMetadata"`
 	ShowDebugIndicator    bool                `json:"showDebugIndicator"`
+	FieldMaskIncludeDefaults bool             `json:"fieldMaskIncludeDefaults"`
 	WindowWidth           int                 `json:"windowWidth"`
 	WindowHeight          int                 `json:"windowHeight"`
 	WindowX               int                 `json:"windowX"`
@@ -61,10 +62,11 @@ func (a *App) GetUserSettings() UserSettings {
 		AllowShellCommands:   false,
 		InheritShellEnv:      false,
 		MaxStreamMessages:    200,
-		DefaultMetadata:      []rpc.MetadataEntry{},
-		ShowDebugIndicator:   false,
-		WindowWidth:          1280,
-		WindowHeight:         800,
+		DefaultMetadata:          []rpc.MetadataEntry{},
+		ShowDebugIndicator:       false,
+		FieldMaskIncludeDefaults: false,
+		WindowWidth:              1280,
+		WindowHeight:             800,
 	}
 	if a.settings == nil {
 		return defaults
@@ -135,6 +137,9 @@ func (a *App) GetUserSettings() UserSettings {
 	}
 	if saved.ShowDebugIndicator != nil {
 		result.ShowDebugIndicator = *saved.ShowDebugIndicator
+	}
+	if saved.FieldMaskIncludeDefaults != nil {
+		result.FieldMaskIncludeDefaults = *saved.FieldMaskIncludeDefaults
 	}
 	if saved.WindowWidth != nil {
 		result.WindowWidth = *saved.WindowWidth
@@ -224,6 +229,7 @@ func (a *App) SaveUserSettings(s UserSettings) {
 		settings.MaxStreamMessages = &s.MaxStreamMessages
 		settings.DefaultMetadata = s.DefaultMetadata
 		settings.ShowDebugIndicator = &s.ShowDebugIndicator
+		settings.FieldMaskIncludeDefaults = &s.FieldMaskIncludeDefaults
 		settings.WindowWidth = &s.WindowWidth
 		settings.WindowHeight = &s.WindowHeight
 		settings.WindowX = &s.WindowX

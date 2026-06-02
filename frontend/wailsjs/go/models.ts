@@ -106,6 +106,7 @@ export namespace main {
 	    maxStreamMessages: number;
 	    defaultMetadata: rpc.MetadataEntry[];
 	    showDebugIndicator: boolean;
+	    fieldMaskIncludeDefaults: boolean;
 	    windowWidth: number;
 	    windowHeight: number;
 	    windowX: number;
@@ -139,6 +140,7 @@ export namespace main {
 	        this.maxStreamMessages = source["maxStreamMessages"];
 	        this.defaultMetadata = this.convertValues(source["defaultMetadata"], rpc.MetadataEntry);
 	        this.showDebugIndicator = source["showDebugIndicator"];
+	        this.fieldMaskIncludeDefaults = source["fieldMaskIncludeDefaults"];
 	        this.windowWidth = source["windowWidth"];
 	        this.windowHeight = source["windowHeight"];
 	        this.windowX = source["windowX"];

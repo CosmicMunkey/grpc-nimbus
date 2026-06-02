@@ -83,6 +83,7 @@ declare global {
             responseWordWrap?: boolean;
             responseIndent?: number;
             emitDefaults?: boolean;
+            fieldMaskIncludeDefaults?: boolean;
             envSortByCreated?: boolean;
             sidebarWidth?: number;
             panelSplit?: number;
@@ -107,6 +108,7 @@ declare global {
               responseWordWrap: boolean;
               responseIndent: number;
               emitDefaults: boolean;
+              fieldMaskIncludeDefaults: boolean;
               envSortByCreated: boolean;
               sidebarWidth: number;
               panelSplit: number;
@@ -170,7 +172,7 @@ export const api = {
   saveUserSettings: (s: {
     confirmDeletes: boolean; timestampInputLocal: boolean; confirmClearHistory: boolean;
     theme: string; themeBadge: string; customThemes: CustomThemeEntry[]; activeCustomThemeId: string;
-    fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean; envSortByCreated: boolean;
+    fontSize: number; responseWordWrap: boolean; responseIndent: number; emitDefaults: boolean; fieldMaskIncludeDefaults: boolean; envSortByCreated: boolean;
     sidebarWidth: number; panelSplit: number;
     defaultTimeoutSeconds: number; historyLimit: number; autoConnectOnStartup: boolean;
     allowShellCommands: boolean; inheritShellEnv: boolean;
@@ -182,7 +184,7 @@ export const api = {
 function saveAllSettings(s: Pick<AppState,
   'confirmDeletes' | 'timestampInputLocal' | 'confirmClearHistory' |
   'theme' | 'themeBadge' | 'customThemes' | 'activeCustomThemeId' |
-  'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' | 'envSortByCreated' |
+  'fontSize' | 'responseWordWrap' | 'responseIndent' | 'emitDefaults' | 'fieldMaskIncludeDefaults' | 'envSortByCreated' |
   'sidebarWidth' | 'panelSplit' |
   'defaultTimeoutSeconds' | 'historyLimit' | 'autoConnectOnStartup' |
   'allowShellCommands' | 'inheritShellEnv' |
@@ -200,6 +202,7 @@ function saveAllSettings(s: Pick<AppState,
     responseWordWrap: s.responseWordWrap,
     responseIndent: s.responseIndent,
     emitDefaults: s.emitDefaults,
+    fieldMaskIncludeDefaults: s.fieldMaskIncludeDefaults,
     envSortByCreated: s.envSortByCreated,
     sidebarWidth: s.sidebarWidth,
     panelSplit: s.panelSplit,
@@ -511,6 +514,8 @@ interface AppState {
   setConfirmClearHistory: (v: boolean) => void;
   timestampInputLocal: boolean;
   setTimestampInputLocal: (v: boolean) => void;
+  fieldMaskIncludeDefaults: boolean;
+  setFieldMaskIncludeDefaults: (v: boolean) => void;
   theme: ThemeId;
   isDark: boolean;
   activeThemeTokens: ThemeTokens;
@@ -1328,6 +1333,7 @@ export const useAppStore = create<AppState>((set, get) => {
   confirmDeletes: true,
   confirmClearHistory: false,
   timestampInputLocal: false,
+  fieldMaskIncludeDefaults: false,
   theme: 'nimbus' as ThemeId,
   isDark: true,
   activeThemeTokens: THEMES.nimbus,
@@ -1385,6 +1391,7 @@ export const useAppStore = create<AppState>((set, get) => {
         responseWordWrap: s.responseWordWrap ?? true,
         responseIndent: s.responseIndent ?? 2,
         emitDefaults: s.emitDefaults ?? false,
+        fieldMaskIncludeDefaults: s.fieldMaskIncludeDefaults ?? false,
         envSortByCreated: s.envSortByCreated ?? false,
         sidebarWidth,
         panelSplit,
@@ -1414,6 +1421,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
   setTimestampInputLocal: (v) => {
     set({ timestampInputLocal: v });
+    saveAllSettings(get());
+  },
+  setFieldMaskIncludeDefaults: (v) => {
+    set({ fieldMaskIncludeDefaults: v });
     saveAllSettings(get());
   },
 

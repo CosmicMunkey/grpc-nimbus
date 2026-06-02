@@ -694,6 +694,7 @@ function RequestsSection() {
     allowShellCommands, setAllowShellCommands,
     inheritShellEnv, setInheritShellEnv,
     emitDefaults, setEmitDefaults,
+    fieldMaskIncludeDefaults, setFieldMaskIncludeDefaults,
     defaultMetadata, setDefaultMetadata,
   } = useAppStore();
 
@@ -779,6 +780,15 @@ function RequestsSection() {
           <p className="text-[0.6875rem] text-c-text3 mt-0.5">Include fields set to their default value (0, false, empty string, default enum) in the response JSON.</p>
         </div>
         <Toggle checked={emitDefaults} onChange={setEmitDefaults} />
+      </div>
+
+      {/* Field Mask include defaults */}
+      <div className="flex items-center justify-between py-3">
+        <div className="pr-4">
+          <p className="text-xs font-medium text-c-text">Field Mask: include defaults</p>
+          <p className="text-[0.6875rem] text-c-text3 mt-0.5">When auto-populating field masks, include fields that are set to their default proto3 values (0, false, default enum).</p>
+        </div>
+        <Toggle checked={fieldMaskIncludeDefaults} onChange={setFieldMaskIncludeDefaults} />
       </div>
 
       {/* Default metadata */}

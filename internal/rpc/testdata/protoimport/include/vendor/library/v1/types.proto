@@ -14,8 +14,25 @@ message Shelf {
   string theme = 2;
 }
 
+enum BookGenre {
+  BOOK_GENRE_UNSPECIFIED = 0;
+  BOOK_GENRE_FICTION = 1;
+  BOOK_GENRE_NON_FICTION = 2;
+  BOOK_GENRE_BIOGRAPHY = 3;
+}
+
+message Publisher {
+  string name = 1;
+  string country = 2;
+}
+
 message Book {
   string isbn = 1;
   string title = 2;
   Shelf shelf = 3;
+  BookGenre genre = 4;
+  bool in_print = 5;
+  int64 page_count = 6;
+  Publisher publisher = 7;
+  map<string, string> tags = 8;
 }
