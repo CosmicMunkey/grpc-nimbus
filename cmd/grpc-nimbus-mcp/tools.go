@@ -42,10 +42,8 @@ func handleConnect(e *MCPEngine) func(context.Context, mcp.CallToolRequest) (*mc
 		}
 		tlsMode := rpc.TLSMode(req.GetString("tls_mode", string(rpc.TLSModeNone)))
 		cfg := rpc.ConnectionConfig{
-			Target:     target,
-			TLS:        tlsMode,
-			ClientCert: req.GetString("client_cert", ""),
-			ClientKey:  req.GetString("client_key", ""),
+			Target: target,
+			TLS:    tlsMode,
 		}
 		if err := e.Connect(ctx, cfg); err != nil {
 			return toolError("connection failed: %v", err)

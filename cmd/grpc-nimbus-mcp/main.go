@@ -29,12 +29,6 @@ func main() {
 		mcp.WithString("tls_mode",
 			mcp.Description("TLS mode: \"none\" (default) or \"system\""),
 		),
-		mcp.WithString("client_cert",
-			mcp.Description("Path to client certificate file for mTLS (optional)"),
-		),
-		mcp.WithString("client_key",
-			mcp.Description("Path to client key file for mTLS (optional)"),
-		),
 	), handleConnect(engine))
 
 	s.AddTool(mcp.NewTool("connect_with_environment",

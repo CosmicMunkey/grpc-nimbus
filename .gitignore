@@ -34,10 +34,8 @@ go.work.sum
 # Wails build artifacts
 build/bin/
 
-
 # MCP server binary (built by `make mcp`)
 bin/
-grpc-nimbus-mcp
 
 # Frontend build output (embedded via go:embed at build time)
 frontend/dist/
@@ -51,5 +49,6 @@ frontend/node_modules/
 
 .DS_Store
 /mcp-server
+
 # Code Index
 .codegraph/

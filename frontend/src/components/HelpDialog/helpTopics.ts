@@ -146,17 +146,14 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'connection',
     title: 'Connection & TLS',
-    keywords: ['connect', 'disconnect', 'tls', 'ssl', 'plaintext', 'secure', 'certificate', 'host', 'port', 'reconnect', 'mtls', 'client cert', 'mTLS'],
+    keywords: ['connect', 'disconnect', 'tls', 'ssl', 'plaintext', 'secure', 'certificate', 'host', 'port', 'reconnect'],
     content: [
       { type: 'paragraph', text: 'Enter a host:port in the connection bar at the top of the window and choose a TLS mode before connecting.' },
       { type: 'heading', text: 'TLS Modes' },
       { type: 'bullets', items: [
-        'Plaintext — no encryption. For local development or internal networks.',
+        'Plaintext (h2c) — no encryption. For local development or internal networks.',
         'TLS (system CA) — encrypts and verifies the server certificate against your OS trust store.',
-        'mTLS (client certificate) — two-way authentication using a client certificate and private key. Select cert and key files in the connection bar.',
       ]},
-      { type: 'heading', text: 'Setting up mTLS' },
-      { type: 'paragraph', text: 'When using mTLS, you provide both a client certificate (usually a .crt or .pem file) and a private key (.key or .pem file). Click the file picker icons in the connection bar to select these files. The server will verify your certificate and you will verify the server\'s certificate using your system CA store.' },
       { type: 'heading', text: 'Connection Status' },
       { type: 'paragraph', text: 'The status dot next to the host reflects real gRPC connectivity: green = connected, yellow = idle, red = error with details in a tooltip.' },
       { type: 'note', text: 'Changing the host or TLS mode while connected shows a Reconnect button — click it to apply new settings in one step.' },
