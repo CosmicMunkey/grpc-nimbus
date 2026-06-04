@@ -146,14 +146,17 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'connection',
     title: 'Connection & TLS',
-    keywords: ['connect', 'disconnect', 'tls', 'ssl', 'plaintext', 'secure', 'certificate', 'host', 'port', 'reconnect'],
+    keywords: ['connect', 'disconnect', 'tls', 'ssl', 'plaintext', 'secure', 'certificate', 'host', 'port', 'reconnect', 'mtls', 'client cert', 'mTLS'],
     content: [
       { type: 'paragraph', text: 'Enter a host:port in the connection bar at the top of the window and choose a TLS mode before connecting.' },
       { type: 'heading', text: 'TLS Modes' },
       { type: 'bullets', items: [
         'Plaintext — no encryption. For local development or internal networks.',
         'TLS (system CA) — encrypts and verifies the server certificate against your OS trust store.',
+        'mTLS (client certificate) — two-way authentication using a client certificate and private key. Select cert and key files in the connection bar.',
       ]},
+      { type: 'heading', text: 'Setting up mTLS' },
+      { type: 'paragraph', text: 'When using mTLS, you provide both a client certificate (usually a .crt or .pem file) and a private key (.key or .pem file). Click the file picker icons in the connection bar to select these files. The server will verify your certificate and you will verify the server\'s certificate using your system CA store.' },
       { type: 'heading', text: 'Connection Status' },
       { type: 'paragraph', text: 'The status dot next to the host reflects real gRPC connectivity: green = connected, yellow = idle, red = error with details in a tooltip.' },
       { type: 'note', text: 'Changing the host or TLS mode while connected shows a Reconnect button — click it to apply new settings in one step.' },
@@ -162,7 +165,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: 'settings',
     title: 'Settings & Themes',
-    keywords: ['settings', 'theme', 'color', 'dark', 'light', 'nimbus', 'font', 'size', 'zoom', 'confirm', 'delete'],
+    keywords: ['settings', 'theme', 'color', 'dark', 'light', 'nimbus', 'font', 'size', 'zoom', 'confirm', 'delete', 'shell', 'environment', 'field mask'],
     content: [
       { type: 'paragraph', text: 'Open Settings with the gear icon in the bottom-left corner. All changes take effect immediately and persist across restarts.' },
       { type: 'heading', text: 'Appearance' },
@@ -175,12 +178,20 @@ export const helpTopics: HelpTopic[] = [
       { type: 'heading', text: 'Requests' },
       { type: 'bullets', items: [
         'Show default field values — when enabled, fields at their zero/default value are included in the response JSON.',
+        'Field Mask: include defaults — when auto-populating field masks, include fields that are set to their default proto3 values.',
+      ]},
+      { type: 'heading', text: 'Shell & Variables' },
+      { type: 'bullets', items: [
+        'Allow shell commands in metadata — enables $(command) syntax in metadata values to execute shell commands and capture output.',
+        'Inherit shell environment — when enabled, shell commands and variable substitution (${VAR}) have access to your parent shell\'s environment variables and PATH. Keep off unless you trust the environments/requests being used.',
       ]},
       { type: 'heading', text: 'Behavior' },
       { type: 'bullets', items: [
         'Confirm deletes — toggle whether removing saved requests shows a confirmation dialog.',
         'Timestamp format — show request timestamps in local time or UTC.',
       ]},
+      { type: 'heading', text: 'Global Headers' },
+      { type: 'paragraph', text: 'Set default metadata headers sent with every request. These are overridden by environment-level headers, which are overridden by per-request metadata.' },
     ],
   },
   {
@@ -227,6 +238,27 @@ export const helpTopics: HelpTopic[] = [
       { type: 'bullets', items: [
         'Cmd/Ctrl+Shift+/ — open this documentation',
       ]},
+    ],
+  },
+  {
+    id: 'shell-commands',
+    title: 'Shell Commands & Variable Interpolation',
+    keywords: ['shell', 'command', 'variable', 'env', 'environment', 'interpolation', 'execute', '$', 'VAR'],
+    content: [
+      { type: 'paragraph', text: 'GRPC Nimbus can dynamically populate metadata headers by executing shell commands and substituting environment variables. This is useful for injecting authentication tokens or retrieving configuration at request time.' },
+      { type: 'heading', text: 'Setup' },
+      { type: 'bullets', items: [
+        'Go to Settings > Behavior.',
+        'Enable "Allow shell commands in metadata" to use $(command) syntax.',
+        'Enable "Inherit shell environment" to access shell variables and your parent shell\'s PATH.',
+      ]},
+      { type: 'heading', text: 'Variable Substitution' },
+      { type: 'paragraph', text: 'Use ${VARIABLE_NAME} in any metadata value to substitute environment variables. Example: Bearer token in Authorization header could be ${AUTH_TOKEN}.' },
+      { type: 'heading', text: 'Shell Command Execution' },
+      { type: 'paragraph', text: 'Use $(command) syntax to execute a shell command and embed its output. Example: $(date +%s) to get the current Unix timestamp, or $(get-token.sh) to call a script.' },
+      { type: 'heading', text: 'Metadata Precedence' },
+      { type: 'paragraph', text: 'Interpolation is applied in order: 1) Default metadata (global headers), 2) Environment headers, 3) Per-request headers. Later headers can override earlier ones.' },
+      { type: 'note', text: 'Only enable "Inherit shell environment" if you trust the environment and request configurations being used, as shell access introduces security considerations.' },
     ],
   },
   {
