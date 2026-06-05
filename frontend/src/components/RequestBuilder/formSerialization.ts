@@ -52,9 +52,7 @@ function serializeFieldMask(v: unknown): string | undefined {
     return trimmed === '' ? undefined : trimmed;
   }
   const paths = fieldMaskPathsFromValue(v);
-
-  if (paths.length === 0) return undefined;
-  return paths.join(',');
+  return paths.length === 0 ? undefined : paths.join(',');
 }
 
 export function toJson(form: FormVal, fields?: FieldSchema[]): string {

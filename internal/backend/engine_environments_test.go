@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"path/filepath"
@@ -8,8 +8,8 @@ import (
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 )
 
-// newTestApp builds a minimal App with a temporary env store and settings store.
-func newTestApp(t *testing.T) *App {
+// newTestEngine builds a minimal Engine with a temporary env store and settings store.
+func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -23,17 +23,17 @@ func newTestApp(t *testing.T) *App {
 		t.Fatalf("NewSettingsStoreAt: %v", err)
 	}
 
-	return &App{
+	return &Engine{
 		envStore: envStore,
 		settings: settingsStore,
 	}
 }
 
 // TestSaveEnvironmentRefreshesActiveEnv verifies that editing an active
-// environment updates a.activeEnv in memory so that subsequent RPCs use the
+// environment updates e.activeEnv in memory so that subsequent RPCs use the
 // new headers rather than stale ones.
 func TestSaveEnvironmentRefreshesActiveEnv(t *testing.T) {
-	a := newTestApp(t)
+	e := newTestEngine(t)
 
 	env := storage.Environment{
 		ID:   "env1",
@@ -42,40 +42,40 @@ func TestSaveEnvironmentRefreshesActiveEnv(t *testing.T) {
 			{Key: "authorization", Value: "Bearer old-token"},
 		},
 	}
-	if err := a.SaveEnvironment(env); err != nil {
+	if err := e.SaveEnvironment(env); err != nil {
 		t.Fatalf("SaveEnvironment: %v", err)
 	}
-	if err := a.SetActiveEnvironment("env1"); err != nil {
+	if err := e.SetActiveEnvironment("env1"); err != nil {
 		t.Fatalf("SetActiveEnvironment: %v", err)
 	}
 
 	// Sanity-check the initial header value.
-	a.mu.Lock()
-	got := a.activeEnv.Headers[0].Value
-	a.mu.Unlock()
+	e.mu.Lock()
+	got := e.activeEnv.Headers[0].Value
+	e.mu.Unlock()
 	if got != "Bearer old-token" {
 		t.Fatalf("expected old token, got %q", got)
 	}
 
 	// Now update the environment (simulates the user editing the auth token).
 	env.Headers[0].Value = "Bearer new-token"
-	if err := a.SaveEnvironment(env); err != nil {
+	if err := e.SaveEnvironment(env); err != nil {
 		t.Fatalf("SaveEnvironment (update): %v", err)
 	}
 
-	// a.activeEnv must be refreshed immediately — no restart required.
-	a.mu.Lock()
-	got = a.activeEnv.Headers[0].Value
-	a.mu.Unlock()
+	// e.activeEnv must be refreshed immediately — no restart required.
+	e.mu.Lock()
+	got = e.activeEnv.Headers[0].Value
+	e.mu.Unlock()
 	if got != "Bearer new-token" {
-		t.Errorf("expected a.activeEnv to be refreshed to new token, got %q", got)
+		t.Errorf("expected e.activeEnv to be refreshed to new token, got %q", got)
 	}
 }
 
 // TestSaveEnvironmentDoesNotTouchOtherActiveEnv verifies that saving an env
-// that is NOT the active one leaves a.activeEnv unchanged.
+// that is NOT the active one leaves e.activeEnv unchanged.
 func TestSaveEnvironmentDoesNotTouchOtherActiveEnv(t *testing.T) {
-	a := newTestApp(t)
+	e := newTestEngine(t)
 
 	active := storage.Environment{
 		ID:      "active",
@@ -84,25 +84,25 @@ func TestSaveEnvironmentDoesNotTouchOtherActiveEnv(t *testing.T) {
 	}
 	other := storage.Environment{ID: "other", Name: "other"}
 
-	if err := a.SaveEnvironment(active); err != nil {
+	if err := e.SaveEnvironment(active); err != nil {
 		t.Fatalf("SaveEnvironment (active): %v", err)
 	}
-	if err := a.SaveEnvironment(other); err != nil {
+	if err := e.SaveEnvironment(other); err != nil {
 		t.Fatalf("SaveEnvironment (other): %v", err)
 	}
-	if err := a.SetActiveEnvironment("active"); err != nil {
+	if err := e.SetActiveEnvironment("active"); err != nil {
 		t.Fatalf("SetActiveEnvironment: %v", err)
 	}
 
 	// Save the OTHER env — should not affect the active env pointer.
 	other.Name = "other-updated"
-	if err := a.SaveEnvironment(other); err != nil {
+	if err := e.SaveEnvironment(other); err != nil {
 		t.Fatalf("SaveEnvironment (other update): %v", err)
 	}
 
-	a.mu.Lock()
-	gotID := a.activeEnv.ID
-	a.mu.Unlock()
+	e.mu.Lock()
+	gotID := e.activeEnv.ID
+	e.mu.Unlock()
 	if gotID != "active" {
 		t.Errorf("active env changed unexpectedly, got ID %q", gotID)
 	}
@@ -111,17 +111,17 @@ func TestSaveEnvironmentDoesNotTouchOtherActiveEnv(t *testing.T) {
 // TestSetActiveEnvironmentPersistsID verifies that SetActiveEnvironment writes
 // the environment ID to AppSettings so it survives an app restart.
 func TestSetActiveEnvironmentPersistsID(t *testing.T) {
-	a := newTestApp(t)
+	e := newTestEngine(t)
 
 	env := storage.Environment{ID: "env1", Name: "prod"}
-	if err := a.SaveEnvironment(env); err != nil {
+	if err := e.SaveEnvironment(env); err != nil {
 		t.Fatalf("SaveEnvironment: %v", err)
 	}
-	if err := a.SetActiveEnvironment("env1"); err != nil {
+	if err := e.SetActiveEnvironment("env1"); err != nil {
 		t.Fatalf("SetActiveEnvironment: %v", err)
 	}
 
-	saved, err := a.settings.Load()
+	saved, err := e.settings.Load()
 	if err != nil {
 		t.Fatalf("Load settings: %v", err)
 	}
@@ -133,52 +133,57 @@ func TestSetActiveEnvironmentPersistsID(t *testing.T) {
 // TestSetActiveEnvironmentClearsPersistenceOnEmpty verifies that clearing the
 // active environment (empty ID) also clears the persisted setting.
 func TestSetActiveEnvironmentClearsPersistenceOnEmpty(t *testing.T) {
-	a := newTestApp(t)
+	e := newTestEngine(t)
 
 	env := storage.Environment{ID: "env1", Name: "prod"}
-	if err := a.SaveEnvironment(env); err != nil {
+	if err := e.SaveEnvironment(env); err != nil {
 		t.Fatalf("SaveEnvironment: %v", err)
 	}
-	if err := a.SetActiveEnvironment("env1"); err != nil {
+	if err := e.SetActiveEnvironment("env1"); err != nil {
 		t.Fatalf("SetActiveEnvironment: %v", err)
 	}
 
 	// Now clear the active environment.
-	if err := a.SetActiveEnvironment(""); err != nil {
+	if err := e.SetActiveEnvironment(""); err != nil {
 		t.Fatalf("SetActiveEnvironment (clear): %v", err)
 	}
 
-	saved, err := a.settings.Load()
+	saved, err := e.settings.Load()
 	if err != nil {
 		t.Fatalf("Load settings: %v", err)
 	}
 	if saved.ActiveEnvironmentID != "" {
 		t.Errorf("expected empty ActiveEnvironmentID after clear, got %q", saved.ActiveEnvironmentID)
 	}
-	a.mu.Lock()
-	activeEnv := a.activeEnv
-	a.mu.Unlock()
+	e.mu.Lock()
+	activeEnv := e.activeEnv
+	e.mu.Unlock()
 	if activeEnv != nil {
-		t.Errorf("expected a.activeEnv to be nil after clear, got %+v", activeEnv)
+		t.Errorf("expected e.activeEnv to be nil after clear, got %+v", activeEnv)
 	}
 }
 
 // TestGetLoadedStateIncludesActiveEnvironmentID verifies that GetLoadedState
 // returns the persisted active environment ID for frontend restoration.
 func TestGetLoadedStateIncludesActiveEnvironmentID(t *testing.T) {
-	a := newTestApp(t)
+	e := newTestEngine(t)
 
 	// Pre-write settings with an active environment ID.
-	a.saveSettings(func(s *storage.AppSettings) {
+	e.saveSettings(func(s *storage.AppSettings) {
 		s.ActiveEnvironmentID = "env42"
 	})
 
-	state, err := a.GetLoadedState()
+	saved, mode, paths, protosets, protoFiles, svcs, err := e.GetLoadedState()
 	if err != nil {
 		t.Fatalf("GetLoadedState: %v", err)
 	}
-	if state.ActiveEnvironmentID != "env42" {
-		t.Errorf("expected ActiveEnvironmentID %q, got %q", "env42", state.ActiveEnvironmentID)
+	_ = mode
+	_ = paths
+	_ = protosets
+	_ = protoFiles
+	_ = svcs
+	if saved == nil || saved.ActiveEnvironmentID != "env42" {
+		t.Errorf("expected ActiveEnvironmentID %q, got %q", "env42", saved.ActiveEnvironmentID)
 	}
 }
 

@@ -108,7 +108,7 @@ const requestSchema: FieldSchema[] = [
   },
 ];
 
-test('toJson serializes FieldMask objects as protobuf JSON strings', () => {
+test('toJson serializes FieldMask objects as comma-separated string (protobuf JSON)', () => {
   const form: FormVal = {
     book: { title: 'Dune' },
     updateMask: { paths: ['book.title', 'author'] },
@@ -120,7 +120,7 @@ test('toJson serializes FieldMask objects as protobuf JSON strings', () => {
   );
 });
 
-test('toJson serializes FieldMask with rich fields correctly', () => {
+test('toJson serializes FieldMask with rich fields correctly as comma-separated string', () => {
   const form: FormVal = {
     book: {
       title: 'Dune',
@@ -190,5 +190,45 @@ test('fromJson keeps protobuf JSON FieldMask strings intact', () => {
 
 test('fieldMaskPathsFromValue parses protobuf JSON FieldMask strings for the editor', () => {
   assert.deepEqual(fieldMaskPathsFromValue('book.title, author'), ['book.title', 'author']);
+});
+
+test('toJson maps wrapper types to their primitive values', () => {
+  const wrapperSchema: FieldSchema[] = [
+    {
+      name: 'active',
+      jsonName: 'active',
+      number: 1,
+      type: 'bool_value',
+      isRepeated: false,
+      isMap: false,
+    },
+    {
+      name: 'title',
+      jsonName: 'title',
+      number: 2,
+      type: 'string_value',
+      isRepeated: false,
+      isMap: false,
+    },
+    {
+      name: 'count',
+      jsonName: 'count',
+      number: 3,
+      type: 'int32_value',
+      isRepeated: false,
+      isMap: false,
+    }
+  ];
+
+  const form: FormVal = {
+    active: true,
+    title: 'Hello',
+    count: 123,
+  };
+
+  assert.equal(
+    toJson(form, wrapperSchema),
+    JSON.stringify({ active: true, title: 'Hello', count: 123 }, null, 2),
+  );
 });
 

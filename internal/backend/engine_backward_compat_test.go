@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ func TestBackwardCompatibility_OldSettingsFileWithoutInheritShellEnv(t *testing.
 	}
 }
 
-// TestBackwardCompatibility_NewSettingsFileCanBeRead verifies that new
+// TestBackwardCompatibility_NewSettingsFileWithInheritShellEnv verifies that new
 // settings files with InheritShellEnv can be unmarshaled correctly.
 func TestBackwardCompatibility_NewSettingsFileWithInheritShellEnv(t *testing.T) {
 	trueVal := true

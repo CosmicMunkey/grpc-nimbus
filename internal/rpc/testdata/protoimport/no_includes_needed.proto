@@ -2,12 +2,23 @@ syntax = "proto3";
 
 package sample.v1;
 
+import "google/protobuf/wrappers.proto";
+
 service PingService {
   rpc Ping(PingRequest) returns (PingResponse);
 }
 
 message PingRequest {
   string message = 1;
+  google.protobuf.DoubleValue double_val = 2;
+  google.protobuf.FloatValue float_val = 3;
+  google.protobuf.Int64Value int64_val = 4;
+  google.protobuf.UInt64Value uint64_val = 5;
+  google.protobuf.Int32Value int32_val = 6;
+  google.protobuf.UInt32Value uint32_val = 7;
+  google.protobuf.BoolValue bool_val = 8;
+  google.protobuf.StringValue string_val = 9;
+  google.protobuf.BytesValue bytes_val = 10;
 }
 
 message PingResponse {

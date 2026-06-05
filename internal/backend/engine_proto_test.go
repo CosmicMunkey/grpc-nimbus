@@ -1,11 +1,13 @@
-package main
+package backend
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/protoresolver"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -34,7 +36,7 @@ func writeProtosetFixture(t *testing.T, importPaths []string, entryProto string)
 }
 
 func TestLoadProtoFilesMergesProtoParentDirWithExtraImportPaths(t *testing.T) {
-	base, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport"))
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
@@ -42,8 +44,8 @@ func TestLoadProtoFilesMergesProtoParentDirWithExtraImportPaths(t *testing.T) {
 	protoFile := filepath.Join(base, "needs_includes.proto")
 	includeRoot := filepath.Join(base, "include")
 
-	a := &App{}
-	services, err := a.LoadProtoFiles([]string{includeRoot}, []string{protoFile})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), []string{includeRoot}, []string{protoFile})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -60,15 +62,15 @@ func TestLoadProtoFilesMergesProtoParentDirWithExtraImportPaths(t *testing.T) {
 }
 
 func TestLoadProtoFilesWithoutManualImportPaths(t *testing.T) {
-	base, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport"))
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
 
 	protoFile := filepath.Join(base, "no_includes_needed.proto")
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{protoFile})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{protoFile})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -85,15 +87,15 @@ func TestLoadProtoFilesWithoutManualImportPaths(t *testing.T) {
 }
 
 func TestLoadProtoFilesAutoDetectsNestedImportRoot(t *testing.T) {
-	base, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport"))
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
 
 	protoFile := filepath.Join(base, "needs_includes.proto")
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{protoFile})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{protoFile})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -110,7 +112,7 @@ func TestLoadProtoFilesAutoDetectsNestedImportRoot(t *testing.T) {
 }
 
 func TestDescriptorSourcesAccumulateAcrossProtoAndProtosetLoads(t *testing.T) {
-	base, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport"))
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
@@ -122,36 +124,36 @@ func TestDescriptorSourcesAccumulateAcrossProtoAndProtosetLoads(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		first  func(*App) ([]string, error)
-		second func(*App) ([]string, error)
+		first  func(*Engine) ([]string, error)
+		second func(*Engine) ([]string, error)
 	}{
 		{
 			name: "protoset-then-proto",
-			first: func(a *App) ([]string, error) {
-				return serviceNames(a.LoadProtosets([]string{protosetPath}))
+			first: func(e *Engine) ([]string, error) {
+				return serviceNames(e.LoadProtosets(context.Background(), []string{protosetPath}))
 			},
-			second: func(a *App) ([]string, error) {
-				return serviceNames(a.LoadProtoFiles([]string{includeRoot}, []string{protoFile}))
+			second: func(e *Engine) ([]string, error) {
+				return serviceNames(e.LoadProtoFiles(context.Background(), []string{includeRoot}, []string{protoFile}))
 			},
 		},
 		{
 			name: "proto-then-protoset",
-			first: func(a *App) ([]string, error) {
-				return serviceNames(a.LoadProtoFiles([]string{includeRoot}, []string{protoFile}))
+			first: func(e *Engine) ([]string, error) {
+				return serviceNames(e.LoadProtoFiles(context.Background(), []string{includeRoot}, []string{protoFile}))
 			},
-			second: func(a *App) ([]string, error) {
-				return serviceNames(a.LoadProtosets([]string{protosetPath}))
+			second: func(e *Engine) ([]string, error) {
+				return serviceNames(e.LoadProtosets(context.Background(), []string{protosetPath}))
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := &App{}
-			if _, err := tc.first(a); err != nil {
+			e := NewEngine()
+			if _, err := tc.first(e); err != nil {
 				t.Fatalf("first load failed: %v", err)
 			}
-			names, err := tc.second(a)
+			names, err := tc.second(e)
 			if err != nil {
 				t.Fatalf("second load failed: %v", err)
 			}
@@ -161,15 +163,15 @@ func TestDescriptorSourcesAccumulateAcrossProtoAndProtosetLoads(t *testing.T) {
 }
 
 func TestLoadProtoFilesAutoResolvesModulePathImports(t *testing.T) {
-	moduleRoot, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport", "module"))
+	moduleRoot, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport", "module"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
 
 	protoFile := filepath.Join(moduleRoot, "service", "service.proto")
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{protoFile})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{protoFile})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -185,30 +187,31 @@ func TestLoadProtoFilesAutoResolvesModulePathImports(t *testing.T) {
 	}
 
 	// Virtual dirs should be tracked and cleaned up on clear.
-	a.mu.Lock()
-	vdCount := len(a.virtualImportDirs)
-	a.mu.Unlock()
+	e.mu.Lock()
+	vdCount := len(e.virtualImportDirs)
+	e.mu.Unlock()
 	if vdCount == 0 {
 		t.Fatal("expected at least one virtual import dir to be tracked")
 	}
-	a.ClearLoadedProtos()
-	a.mu.Lock()
-	vdCountAfter := len(a.virtualImportDirs)
-	a.mu.Unlock()
+	e.ClearLoadedProtos()
+	e.mu.Lock()
+	vdCountAfter := len(e.virtualImportDirs)
+	e.mu.Unlock()
 	if vdCountAfter != 0 {
 		t.Fatalf("expected virtual import dirs to be cleared, got %d", vdCountAfter)
 	}
 }
+
 func TestLoadProtoFilesAutoDiscoveryIgnoresVendorWhenMissing(t *testing.T) {
-	base, err := filepath.Abs(filepath.Join("internal", "rpc", "testdata", "protoimport"))
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
 	if err != nil {
 		t.Fatalf("resolve fixture root: %v", err)
 	}
 
 	protoFile := filepath.Join(base, "no_includes_needed.proto")
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{protoFile})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{protoFile})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -274,8 +277,8 @@ message ProcessResponse {
 		t.Fatalf("WriteFile service.proto: %v", err)
 	}
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{serviceProto})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{serviceProto})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v", err)
 	}
@@ -291,18 +294,6 @@ message ProcessResponse {
 	}
 }
 
-// TestLoadProtoFilesVendorWinsOverProtoParentDirWhenBothHaveFile verifies that
-// when the same logical import path exists in both the proto file's own source
-// tree and a sibling vendor directory, the vendor copy is resolved first.
-//
-// discoverImportPaths always prefers the explicit vendorRoot over any match
-// found by walking searchRoot, and LoadProtoFiles places discovered paths
-// (including vendor roots) before proto parent directories in the import-path
-// list. Together these ensure protoparse finds the vendored copy first.
-//
-// The two copies use distinct proto packages (types.local.v1 vs types.vendor.v1)
-// so the test actually fails if the wrong root is resolved, rather than silently
-// passing because both copies look identical.
 func TestLoadProtoFilesVendorWinsOverProtoParentDirWhenBothHaveFile(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -375,8 +366,8 @@ message GetDataResponse {
 		t.Fatalf("WriteFile service.proto: %v", err)
 	}
 
-	a := &App{}
-	services, err := a.LoadProtoFiles(nil, []string{filepath.Join(serviceDir, "service.proto")})
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{filepath.Join(serviceDir, "service.proto")})
 	if err != nil {
 		t.Fatalf("LoadProtoFiles: %v (vendor import root was not preferred)", err)
 	}
@@ -392,7 +383,7 @@ message GetDataResponse {
 func TestSearchImportRootInDirReturnsEmpty(t *testing.T) {
 	tmp := t.TempDir()
 
-	result := searchImportRootInDir(tmp, "notexists/file.proto", map[string]bool{})
+	result := protoresolver.SearchImportRootInDir(tmp, "notexists/file.proto", map[string]bool{})
 	if result != "" {
 		t.Fatalf("expected empty string for non-existent file, got %q", result)
 	}
@@ -418,7 +409,7 @@ func TestMatchingImportRootWithVendorFindsVendorMatch(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	result, ok := matchingImportRootWithVendor(mainDir, vendorDir, "some/pkg/service.proto", map[string]bool{})
+	result, ok := protoresolver.MatchingImportRootWithVendor(mainDir, vendorDir, "some/pkg/service.proto", map[string]bool{})
 	if !ok {
 		t.Fatal("expected to find match in vendor directory")
 	}
@@ -440,7 +431,7 @@ func TestMatchingImportRootWithVendorReturnsEmptyStringIfNoMatch(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	result, ok := matchingImportRootWithVendor(mainDir, vendorDir, "nonexistent/file.proto", map[string]bool{})
+	result, ok := protoresolver.MatchingImportRootWithVendor(mainDir, vendorDir, "nonexistent/file.proto", map[string]bool{})
 	if ok {
 		t.Fatalf("expected no match, got %q", result)
 	}
@@ -488,7 +479,7 @@ message ServiceMessage {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	discovered := discoverImportPaths([]string{serviceProto}, nil)
+	discovered := protoresolver.DiscoverImportPaths([]string{serviceProto}, nil)
 
 	// Should discover either the vendor/api directory or vendor directory
 	found := false
@@ -506,11 +497,6 @@ message ServiceMessage {
 	}
 }
 
-// TestFindGoModuleRootStripsInlineComment verifies that the go.mod parser
-// strips trailing // comments from the module directive. Without this fix,
-// "module example.com/foo // comment" would return the full string including
-// the comment, causing inferVirtualImportRootFromGoMod to never match any
-// import prefix that starts with "example.com/foo".
 func TestFindGoModuleRootStripsInlineComment(t *testing.T) {
 	tmp := t.TempDir()
 	goMod := filepath.Join(tmp, "go.mod")
@@ -524,7 +510,7 @@ func TestFindGoModuleRootStripsInlineComment(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	mod, root := findGoModuleRoot(subDir)
+	mod, root := protoresolver.FindGoModuleRoot(subDir)
 	if mod != "example.com/foo" {
 		t.Fatalf("expected module path %q, got %q (inline comment not stripped)", "example.com/foo", mod)
 	}
@@ -533,10 +519,6 @@ func TestFindGoModuleRootStripsInlineComment(t *testing.T) {
 	}
 }
 
-// TestMakeVirtualRootRejectsUnsafePaths verifies that makeVirtualRoot returns
-// (false, "") for any modulePathOnDisk that could escape the temp directory.
-// This prevents a malformed module path or import prefix from creating
-// symlinks outside the temp tree that would not be cleaned up correctly.
 func TestMakeVirtualRootRejectsUnsafePaths(t *testing.T) {
 	tmp := t.TempDir() // a real directory to use as actualRoot
 
@@ -551,7 +533,7 @@ func TestMakeVirtualRootRejectsUnsafePaths(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir, ok := makeVirtualRoot(tc.path, tmp)
+			dir, ok := protoresolver.MakeVirtualRoot(tc.path, tmp)
 			if ok || dir != "" {
 				// Clean up if something was created despite the guard.
 				if dir != "" {
@@ -579,7 +561,7 @@ func TestMakeVirtualRootFallsBackToCopyWhenSymlinkTargetExists(t *testing.T) {
 
 	dst := t.TempDir()
 	target := filepath.Join(dst, "copy")
-	if err := copyDirTree(src, target); err != nil {
+	if err := protoresolver.CopyDirTree(src, target); err != nil {
 		t.Fatalf("copyDirTree: %v", err)
 	}
 
@@ -621,4 +603,99 @@ func assertServiceSet(t *testing.T, names []string, expected ...string) {
 			t.Fatalf("expected service %q in %v", name, names)
 		}
 	}
+}
+
+func TestRemoveProtoPathWithVirtualImportRoots(t *testing.T) {
+	// 1. Create a module directory hierarchy:
+	// tmp/module/
+	//   go.mod (module example.com/testmod)
+	//   service/
+	//     service.proto (imports "example.com/testmod/common/common.proto")
+	//   common/
+	//     common.proto
+	tmp := t.TempDir()
+	moduleRoot := filepath.Join(tmp, "module")
+	serviceDir := filepath.Join(moduleRoot, "service")
+	commonDir := filepath.Join(moduleRoot, "common")
+
+	if err := os.MkdirAll(serviceDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(commonDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/testmod\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	commonProto := filepath.Join(commonDir, "common.proto")
+	if err := os.WriteFile(commonProto, []byte(`
+syntax = "proto3";
+package common;
+message Data {
+  string value = 1;
+}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	serviceProto := filepath.Join(serviceDir, "service.proto")
+	if err := os.WriteFile(serviceProto, []byte(`
+syntax = "proto3";
+package service;
+import "example.com/testmod/common/common.proto";
+service GreetService {
+  rpc Greet(GreetRequest) returns (GreetResponse);
+}
+message GreetRequest {
+  common.Data data = 1;
+}
+message GreetResponse {
+  string greeting = 1;
+}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// 2. Create another unrelated simple proto file
+	unrelatedDir := filepath.Join(tmp, "unrelated")
+	if err := os.MkdirAll(unrelatedDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	unrelatedProto := filepath.Join(unrelatedDir, "unrelated.proto")
+	if err := os.WriteFile(unrelatedProto, []byte(`
+syntax = "proto3";
+package unrelated;
+service UnrelatedService {
+  rpc DoSomething(UnrelatedRequest) returns (UnrelatedResponse);
+}
+message UnrelatedRequest {}
+message UnrelatedResponse {}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// 3. Load both into the Engine
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{serviceProto, unrelatedProto})
+	if err != nil {
+		t.Fatalf("LoadProtoFiles: %v", err)
+	}
+	names, err := serviceNames(services, nil)
+	if err != nil {
+		t.Fatalf("serviceNames: %v", err)
+	}
+	assertServiceSet(t, names, "service.GreetService", "unrelated.UnrelatedService")
+
+	// 4. Remove the unrelated proto path. This should succeed because virtual import paths are preserved.
+	servicesAfter, err := e.RemoveProtoPath(context.Background(), unrelatedProto)
+	if err != nil {
+		t.Fatalf("RemoveProtoPath: %v", err)
+	}
+	namesAfter, err := serviceNames(servicesAfter, nil)
+	if err != nil {
+		t.Fatalf("serviceNames after: %v", err)
+	}
+	assertServiceSet(t, namesAfter, "service.GreetService")
 }

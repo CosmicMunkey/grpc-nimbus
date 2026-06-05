@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fullstorydev/grpcurl"
 	"github.com/jhump/protoreflect/desc"
@@ -155,6 +156,8 @@ func LoadProtoFiles(importPaths, protoFiles []string) (*ProtosetDescriptor, erro
 
 // LoadViaReflection queries server reflection on the given connection.
 func LoadViaReflection(ctx context.Context, cc *grpc.ClientConn) (*ProtosetDescriptor, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	refClient := grpcreflect.NewClientAuto(ctx, cc)
 	// AllowMissingFileDescriptors lets us build descriptors even when
 	// some imported proto files are absent — this happens when a server's

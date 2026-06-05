@@ -2,289 +2,300 @@ package main
 
 import (
 	"context"
-	"os"
-	"sync"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/backend"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/logger"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App is the main Wails application struct. All exported methods are callable
-// from the frontend via generated TypeScript bindings.
+// App is the monolithic delegate that Wails binds to the frontend.
+// All logic has been migrated to internal/backend/Engine.
 type App struct {
-	ctx context.Context
-
-	mu        sync.Mutex
-	conn      *rpc.Connection
-	protoset  *rpc.ProtosetDescriptor
-	store     *storage.Store
-	envStore  *storage.EnvStore
-	histStore *storage.HistoryStore
-	settings  *storage.SettingsStore
-	activeEnv *storage.Environment
-
-	// defaultMetadata holds the global default request headers from settings.
-	// Protected by mu; updated synchronously when SaveUserSettings is called.
-	defaultMetadata []rpc.MetadataEntry
-	// allowShellCommands gates $(...) header interpolation at send time.
-	// Protected by mu; updated synchronously when SaveUserSettings is called.
-	allowShellCommands bool
-	// inheritShellEnv allows shell commands and env vars to access parent process environment.
-	// Protected by mu; updated synchronously when SaveUserSettings is called.
-	inheritShellEnv bool
-	// emitDefaults controls whether zero/default-value fields appear in response JSON.
-	// Protected by mu; updated synchronously when SaveUserSettings is called.
-	emitDefaults bool
-
-	// Loaded descriptor state is tracked by source family so proto files,
-	// protosets, and reflection can coexist.
-	loadedProtosetPaths []string
-	loadedProtoFiles    []string
-	loadImportPaths     []string
-	loadReflection      bool
-	// virtualImportDirs holds temp directories created for module-path import
-	// resolution (symlink trees bridging Go module paths to on-disk roots).
-	// These are not persisted to settings; they are re-created on each load.
-	virtualImportDirs []string
-
-	// connWatchCancel cancels the goroutine watching for connection state changes.
-	connWatchCancel context.CancelFunc
-
-	// streamCancel cancels the active streaming invocation, if any.
-	streamCancel    context.CancelFunc
-	streamCancelSeq uint64
-
-	// unaryCancel cancels the currently in-flight unary invocation, if any.
-	unaryCancel    context.CancelFunc
-	unaryCancelSeq uint64
-
-	// reflectionCancel cancels the currently in-flight reflection load, if any.
-	reflectionCancel    context.CancelFunc
-	reflectionCancelSeq uint64
-
+	ctx    context.Context
+	engine *backend.Engine
 }
 
-// NewApp creates the App instance. Called once at startup.
 func NewApp() *App {
-	return &App{}
+	return &App{
+		engine: backend.NewEngine(),
+	}
 }
 
-// startup is called by Wails when the application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-
 	logger.Default.OnEntry = func(entry logger.Entry) {
 		runtime.EventsEmit(a.ctx, "log:entry", entry)
 	}
-
-	var err error
-
-	a.store, err = storage.NewStore()
-	if err != nil {
-		logger.Default.Warnf("collection store unavailable: %v", err)
-	}
-	a.envStore, err = storage.NewEnvStore()
-	if err != nil {
-		logger.Default.Warnf("environment store unavailable: %v", err)
-	}
-	a.histStore, err = storage.NewHistoryStore()
-	if err != nil {
-		logger.Default.Warnf("history store unavailable: %v", err)
-	}
-	a.settings, err = storage.NewSettingsStore()
-	if err != nil {
-		logger.Default.Warnf("settings store unavailable: %v", err)
-		return
-	}
-
-	// Auto-restore last loaded proto/protoset descriptor sources.
-	saved, err := a.settings.Load()
-	if err != nil || saved == nil {
-		return
-	}
-	var parts []*rpc.ProtosetDescriptor
-	for _, path := range saved.ProtosetPaths {
-		pd, err := rpc.LoadProtosets([]string{path})
-		if err != nil {
-			logger.Default.Warnf("auto-restore protoset %q skipped: %v", path, err)
-			continue
-		}
-		parts = append(parts, pd)
-		a.loadedProtosetPaths = append(a.loadedProtosetPaths, path)
-	}
-	if len(saved.ProtoFilePaths) > 0 {
-		pd, _, virtualDirs, err := resolveProtoFiles(saved.ProtoImportPaths, saved.ProtoFilePaths)
-		if err != nil {
-			// Try each file individually so unrelated files still load.
-			for _, file := range saved.ProtoFilePaths {
-				pd, _, vd, err := resolveProtoFiles(saved.ProtoImportPaths, []string{file})
-				if err != nil {
-					logger.Default.Warnf("auto-restore proto file %q skipped: %v", file, err)
-					continue
-				}
-				parts = append(parts, pd)
-				a.loadedProtoFiles = append(a.loadedProtoFiles, file)
-				a.virtualImportDirs = append(a.virtualImportDirs, vd...)
-			}
-			if len(a.loadedProtoFiles) > 0 {
-				a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
-			}
-		} else {
-			parts = append(parts, pd)
-			a.loadedProtoFiles = append([]string(nil), saved.ProtoFilePaths...)
-			a.loadImportPaths = append([]string(nil), saved.ProtoImportPaths...)
-			a.virtualImportDirs = append(a.virtualImportDirs, virtualDirs...)
-		}
-	}
-	if merged := rpc.MergeDescriptors(parts...); merged != nil {
-		a.protoset = merged
-	}
-
-	// Apply persisted request/behaviour settings at startup.
-	if a.histStore != nil && saved.HistoryLimit != nil {
-		a.histStore.SetLimit(*saved.HistoryLimit)
-	}
-	a.mu.Lock()
-	if len(saved.DefaultMetadata) > 0 {
-		a.defaultMetadata = saved.DefaultMetadata
-	}
-	if saved.AllowShellCommands != nil {
-		a.allowShellCommands = *saved.AllowShellCommands
-	}
-	if saved.InheritShellEnv != nil {
-		a.inheritShellEnv = *saved.InheritShellEnv
-	}
-	if saved.EmitDefaults != nil {
-		a.emitDefaults = *saved.EmitDefaults
-	}
-	a.mu.Unlock()
-	if saved.AutoConnectOnStartup != nil && *saved.AutoConnectOnStartup && saved.LastTarget != "" {
-		tls := rpc.TLSModeNone
-		if saved.LastTLS != "" {
-			mode := rpc.TLSMode(saved.LastTLS)
-			if mode == rpc.TLSModeNone || mode == rpc.TLSModeSystem {
-				tls = mode
-			}
-		}
-		go func() {
-			if err := a.Connect(rpc.ConnectionConfig{Target: saved.LastTarget, TLS: tls}); err != nil {
-				logger.Default.Warnf("auto-connect failed: %v", err)
-			}
-		}()
+	if err := a.engine.Startup(ctx); err != nil {
+		logger.Default.Errorf("startup failed: %v", err)
 	}
 }
 
-// Connect dials the gRPC server with the given configuration.
-func (a *App) Connect(cfg rpc.ConnectionConfig) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.conn != nil {
-		_ = a.conn.Close()
-	}
-	if a.connWatchCancel != nil {
-		a.connWatchCancel()
-		a.connWatchCancel = nil
-	}
-	logger.Default.Infof("connecting to %s (TLS: %s)", cfg.Target, cfg.TLS)
-	conn, err := rpc.NewConnection(a.ctx, cfg)
-	if err != nil {
-		logger.Default.Errorf("connection to %s failed: %v", cfg.Target, err)
-		return err
-	}
-	a.conn = conn
-
-	// Watch for async connection failures (e.g. unreachable host) and log them.
-	watchCtx, watchCancel := context.WithCancel(a.ctx)
-	a.connWatchCancel = watchCancel
-	go a.watchConnectionState(watchCtx, conn, cfg.Target)
-
-	// Persist the connection target for next launch.
-	go a.saveSettings(func(s *storage.AppSettings) {
-		s.LastTarget = cfg.Target
-		s.LastTLS = string(cfg.TLS)
-	})
-	return nil
+func (a *App) shutdown(ctx context.Context) {
+	a.engine.Shutdown()
 }
 
-// Disconnect closes the current gRPC connection.
-func (a *App) Disconnect() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.connWatchCancel != nil {
-		a.connWatchCancel()
-		a.connWatchCancel = nil
-	}
-	if a.conn != nil {
-		logger.Default.Infof("disconnecting")
-		_ = a.conn.Close()
-		a.conn = nil
-	}
-}
+func (a *App) TriggerMenuImport() { runtime.EventsEmit(a.ctx, "menu:importCollection") }
+func (a *App) TriggerMenuExport() { runtime.EventsEmit(a.ctx, "menu:exportCollection") }
+func (a *App) TriggerMenuZoomIn() { runtime.EventsEmit(a.ctx, "menu:zoomIn") }
+func (a *App) TriggerMenuZoomOut() { runtime.EventsEmit(a.ctx, "menu:zoomOut") }
+func (a *App) TriggerMenuZoomReset() { runtime.EventsEmit(a.ctx, "menu:zoomReset") }
+func (a *App) TriggerMenuNewTab() { runtime.EventsEmit(a.ctx, "menu:newTab") }
+func (a *App) TriggerMenuCloseTab() { runtime.EventsEmit(a.ctx, "menu:closeTab") }
+func (a *App) TriggerMenuCloseAllTabs() { runtime.EventsEmit(a.ctx, "menu:closeAllTabs") }
+func (a *App) TriggerMenuNextTab() { runtime.EventsEmit(a.ctx, "menu:nextTab") }
+func (a *App) TriggerMenuPrevTab() { runtime.EventsEmit(a.ctx, "menu:prevTab") }
+func (a *App) TriggerMenuToggleDebugPane() { runtime.EventsEmit(a.ctx, "menu:toggleDebugPane") }
+func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu:help") }
+func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu:about") }
 
-// watchConnectionState logs a warning if the connection transitions to transient_failure.
-// It runs in a goroutine and exits when ctx is cancelled or the connection is shut down.
-func (a *App) watchConnectionState(ctx context.Context, conn *rpc.Connection, target string) {
-	warnLogged := false
-	for {
-		state := conn.GetState()
-		switch state {
-		case "ready":
-			logger.Default.Infof("connected to %s", target)
-			warnLogged = false
-		case "transient_failure":
-			if !warnLogged {
-				logger.Default.Warnf("connection to %s failed (transient_failure)", target)
-				warnLogged = true
-			}
-		case "shutdown":
-			return
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-conn.WaitForStateChange(ctx):
-		}
-	}
-}
-
-// GetConnectionState returns the live gRPC connectivity state.
-// Returns "disconnected" when no connection has been established, otherwise
-// one of: "idle", "connecting", "ready", "transient_failure", "shutdown".
-func (a *App) GetConnectionState() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.conn == nil {
-		return "disconnected"
-	}
-	return a.conn.GetState()
-}
-
-// SaveWindowState captures the current window size and position and persists them.
-// Called on application shutdown via the Wails BeforeClose hook.
 func (a *App) SaveWindowState(ctx context.Context) {
 	width, height := runtime.WindowGetSize(ctx)
 	x, y := runtime.WindowGetPosition(ctx)
-
-	a.saveSettings(func(s *storage.AppSettings) {
-		s.WindowWidth = &width
-		s.WindowHeight = &height
-		s.WindowX = &x
-		s.WindowY = &y
-	})
+	a.engine.SaveWindowState(width, height, x, y)
 }
 
-// shutdown is called by Wails on application close. It removes any temp
-// directories created for virtual import roots so they are not left behind
-// across app runs.
-func (a *App) shutdown(ctx context.Context) {
-	a.mu.Lock()
-	virtualDirs := a.virtualImportDirs
-	a.virtualImportDirs = nil
-	a.mu.Unlock()
-	for _, d := range virtualDirs {
-		os.RemoveAll(d)
+// PickProtosetFiles opens a native multi-file dialog filtered for .protoset files.
+func (a *App) PickProtosetFiles() ([]string, error) {
+	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Protoset Files",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Protoset Files (*.protoset;*.pb;*.bin)", Pattern: "*.protoset;*.pb;*.bin"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
+	return paths, nil
+}
+
+// PickProtoFiles opens a native multi-file dialog filtered for .proto files.
+func (a *App) PickProtoFiles() ([]string, error) {
+	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Select Proto Files",
+		Filters: []runtime.FileFilter{{DisplayName: "Proto Files (*.proto)", Pattern: "*.proto"}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return paths, nil
+}
+
+// PickImportFile opens a native file dialog to select a collection JSON file for import.
+func (a *App) PickImportFile() (string, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Import Collection",
+		Filters: []runtime.FileFilter{{DisplayName: "JSON Files (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// PickExportPath opens a native save dialog to choose a destination for exporting a collection.
+func (a *App) PickExportPath(defaultName string) (string, error) {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export Collection",
+		DefaultFilename: defaultName,
+		Filters:         []runtime.FileFilter{{DisplayName: "JSON Files (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// LoadedState bundles the currently loaded descriptor info for frontend restoration.
+type LoadedState struct {
+	Services            []rpc.ServiceInfo `json:"services"`
+	LoadedPaths         []string          `json:"loadedPaths"`
+	LoadedProtosets     []string          `json:"loadedProtosets"`
+	LoadedProtoFiles    []string          `json:"loadedProtoFiles"`
+	LoadMode            string            `json:"loadMode"`         // "protoset", "proto", "reflection", "mixed", or ""
+	ProtoImportPaths    []string          `json:"protoImportPaths"` // effective import paths for loaded .proto files
+	LastTarget          string            `json:"lastTarget"`       // last-used connection target
+	LastTLS             string            `json:"lastTLS"`
+	ActiveEnvironmentID string            `json:"activeEnvironmentId"` // active environment ID (empty = none)
+}
+
+func (a *App) GetLoadedState() (*LoadedState, error) {
+	saved, mode, paths, protosets, protoFiles, svcs, err := a.engine.GetLoadedState()
+	if err != nil {
+		return nil, err
+	}
+	state := &LoadedState{
+		LoadMode:         mode,
+		LoadedPaths:      paths,
+		LoadedProtosets:  protosets,
+		LoadedProtoFiles: protoFiles,
+		Services:         svcs,
+	}
+	if saved != nil {
+		state.ProtoImportPaths = saved.ProtoImportPaths
+		state.LastTarget = saved.LastTarget
+		state.LastTLS = saved.LastTLS
+		state.ActiveEnvironmentID = saved.ActiveEnvironmentID
+	}
+	return state, nil
+}
+
+func (a *App) Connect(cfg rpc.ConnectionConfig) error {
+	return a.engine.Connect(a.ctx, cfg)
+}
+
+func (a *App) Disconnect() {
+	a.engine.Disconnect()
+}
+
+func (a *App) GetConnectionState() string {
+	return a.engine.GetConnectionState()
+}
+
+func (a *App) ListCollections() ([]storage.Collection, error) {
+	return a.engine.ListCollections()
+}
+
+func (a *App) SaveCollection(col storage.Collection) error {
+	return a.engine.SaveCollection(col)
+}
+
+func (a *App) DeleteCollection(id string) error {
+	return a.engine.DeleteCollection(id)
+}
+
+func (a *App) GetCollection(id string) (*storage.Collection, error) {
+	return a.engine.GetCollection(id)
+}
+
+func (a *App) ExportCollection(id, destPath string) error {
+	return a.engine.ExportCollection(id, destPath)
+}
+
+func (a *App) ImportCollection(srcPath string) (*storage.Collection, error) {
+	return a.engine.ImportCollection(srcPath)
+}
+
+func (a *App) ListEnvironments() ([]storage.Environment, error) {
+	return a.engine.ListEnvironments()
+}
+
+func (a *App) SaveEnvironment(env storage.Environment) error {
+	return a.engine.SaveEnvironment(env)
+}
+
+func (a *App) DeleteEnvironment(id string) error {
+	return a.engine.DeleteEnvironment(id)
+}
+
+func (a *App) SetActiveEnvironment(id string) error {
+	return a.engine.SetActiveEnvironment(id)
+}
+
+func (a *App) GetHistory(methodPath string) ([]storage.HistoryEntry, error) {
+	return a.engine.GetHistory(methodPath)
+}
+
+func (a *App) ClearHistory(methodPath string) error {
+	return a.engine.ClearHistory(methodPath)
+}
+
+func (a *App) GetUserSettings() (*storage.AppSettings, error) {
+	return a.engine.GetUserSettings()
+}
+
+func (a *App) SaveUserSettings(s storage.AppSettings) error {
+	return a.engine.SaveUserSettings(s)
+}
+
+func (a *App) LoadProtosets(paths []string) ([]rpc.ServiceInfo, error) {
+	return a.engine.LoadProtosets(a.ctx, paths)
+}
+
+func (a *App) LoadProtoFiles(importPaths, protoFiles []string) ([]rpc.ServiceInfo, error) {
+	return a.engine.LoadProtoFiles(a.ctx, importPaths, protoFiles)
+}
+
+func (a *App) LoadViaReflection() ([]rpc.ServiceInfo, error) {
+	return a.engine.LoadViaReflection(a.ctx)
+}
+
+func (a *App) CancelReflection() {
+	a.engine.CancelReflection()
+}
+
+func (a *App) ClearLoadedProtos() {
+	a.engine.ClearLoadedProtos()
+}
+
+func (a *App) ReloadProtos() ([]rpc.ServiceInfo, error) {
+	return a.engine.ReloadProtos(a.ctx)
+}
+
+func (a *App) RemoveProtoPath(path string) ([]rpc.ServiceInfo, error) {
+	return a.engine.RemoveProtoPath(a.ctx, path)
+}
+
+func (a *App) GetRequestSchema(methodPath string) ([]rpc.FieldSchema, error) {
+	return a.engine.GetRequestSchema(methodPath)
+}
+
+func (a *App) InvokeUnary(req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
+	return a.engine.InvokeUnary(a.ctx, req)
+}
+
+func (a *App) CancelUnary() {
+	a.engine.CancelUnary()
+}
+
+func (a *App) CancelStream() {
+	a.engine.CancelStream()
+}
+
+// ClearLogs clears the in-memory log ring buffer.
+func (a *App) ClearLogs() {
+	logger.Default.Clear()
+}
+
+// GetLogs returns all log entries, optionally filtered by severity.
+func (a *App) GetLogs(severity string) []logger.Entry {
+	return logger.Default.GetLogs(severity)
+}
+
+// GetServices returns the current list of loaded services.
+func (a *App) GetServices() ([]rpc.ServiceInfo, error) {
+	state, err := a.GetLoadedState()
+	if err != nil {
+		return nil, err
+	}
+	return state.Services, nil
+}
+
+// PickDirectory opens a native file dialog to select a directory.
+func (a *App) PickDirectory() (string, error) {
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Directory",
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// InvokeStream executes a streaming RPC and emits messages asynchronously.
+func (a *App) InvokeStream(req rpc.InvokeRequest) error {
+	return a.engine.InvokeStream(a.ctx, req, func(evt rpc.StreamEvent) {
+		runtime.EventsEmit(a.ctx, "stream:event", evt)
+	}, func(err error) {
+		if err != nil {
+			runtime.EventsEmit(a.ctx, "stream:event", rpc.StreamEvent{
+				Type:  "error",
+				Error: err.Error(),
+			})
+		}
+		runtime.EventsEmit(a.ctx, "stream:done", nil)
+	})
 }
