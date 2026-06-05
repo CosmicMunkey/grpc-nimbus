@@ -604,3 +604,98 @@ func assertServiceSet(t *testing.T, names []string, expected ...string) {
 		}
 	}
 }
+
+func TestRemoveProtoPathWithVirtualImportRoots(t *testing.T) {
+	// 1. Create a module directory hierarchy:
+	// tmp/module/
+	//   go.mod (module example.com/testmod)
+	//   service/
+	//     service.proto (imports "example.com/testmod/common/common.proto")
+	//   common/
+	//     common.proto
+	tmp := t.TempDir()
+	moduleRoot := filepath.Join(tmp, "module")
+	serviceDir := filepath.Join(moduleRoot, "service")
+	commonDir := filepath.Join(moduleRoot, "common")
+
+	if err := os.MkdirAll(serviceDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(commonDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/testmod\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	commonProto := filepath.Join(commonDir, "common.proto")
+	if err := os.WriteFile(commonProto, []byte(`
+syntax = "proto3";
+package common;
+message Data {
+  string value = 1;
+}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	serviceProto := filepath.Join(serviceDir, "service.proto")
+	if err := os.WriteFile(serviceProto, []byte(`
+syntax = "proto3";
+package service;
+import "example.com/testmod/common/common.proto";
+service GreetService {
+  rpc Greet(GreetRequest) returns (GreetResponse);
+}
+message GreetRequest {
+  common.Data data = 1;
+}
+message GreetResponse {
+  string greeting = 1;
+}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// 2. Create another unrelated simple proto file
+	unrelatedDir := filepath.Join(tmp, "unrelated")
+	if err := os.MkdirAll(unrelatedDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	unrelatedProto := filepath.Join(unrelatedDir, "unrelated.proto")
+	if err := os.WriteFile(unrelatedProto, []byte(`
+syntax = "proto3";
+package unrelated;
+service UnrelatedService {
+  rpc DoSomething(UnrelatedRequest) returns (UnrelatedResponse);
+}
+message UnrelatedRequest {}
+message UnrelatedResponse {}
+`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// 3. Load both into the Engine
+	e := NewEngine()
+	services, err := e.LoadProtoFiles(context.Background(), nil, []string{serviceProto, unrelatedProto})
+	if err != nil {
+		t.Fatalf("LoadProtoFiles: %v", err)
+	}
+	names, err := serviceNames(services, nil)
+	if err != nil {
+		t.Fatalf("serviceNames: %v", err)
+	}
+	assertServiceSet(t, names, "service.GreetService", "unrelated.UnrelatedService")
+
+	// 4. Remove the unrelated proto path. This should succeed because virtual import paths are preserved.
+	servicesAfter, err := e.RemoveProtoPath(context.Background(), unrelatedProto)
+	if err != nil {
+		t.Fatalf("RemoveProtoPath: %v", err)
+	}
+	namesAfter, err := serviceNames(servicesAfter, nil)
+	if err != nil {
+		t.Fatalf("serviceNames after: %v", err)
+	}
+	assertServiceSet(t, namesAfter, "service.GreetService")
+}

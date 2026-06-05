@@ -707,6 +707,7 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 	importPaths := append([]string(nil), e.loadImportPaths...)
 	withReflection := e.loadReflection
 	conn := e.conn
+	virtualDirs := append([]string(nil), e.virtualImportDirs...)
 	e.mu.Unlock()
 
 	var (
@@ -747,7 +748,8 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 		return nil, nil
 	}
 
-	pd, err := e.rebuildDescriptor(ctx, newProtosets, importPaths, newProtoFiles, withReflection, conn)
+	effectivePaths := append(importPaths, virtualDirs...)
+	pd, err := e.rebuildDescriptor(ctx, newProtosets, effectivePaths, newProtoFiles, withReflection, conn)
 	if err != nil {
 		logger.Default.Errorf("removing proto path failed: %v", err)
 		return nil, err
