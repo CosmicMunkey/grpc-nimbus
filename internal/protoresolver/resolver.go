@@ -355,6 +355,12 @@ func InferVirtualImportRoot(importRef, sourcePath string) (string, bool) {
 // ResolveProtoFiles loads proto files with the same import-path inference and
 // virtual-root logic used by App.LoadProtoFiles, but operates on just the
 // rpc.LoadProtoFiles layer (no protosets, no reflection).
+//
+// Ownership of virtualDirs on return:
+//   - On success: the returned virtualDirs slice is handed to the caller, who
+//     must call os.RemoveAll on each entry when the descriptor is no longer needed.
+//   - On failure: this function cleans up any virtualDirs it created before
+//     returning (nil, importPaths, nil, err).
 func ResolveProtoFiles(importPaths, protoFiles []string) (*rpc.ProtosetDescriptor, []string, []string, error) {
 	allImportPaths := append([]string(nil), importPaths...)
 	var virtualDirs []string
@@ -366,6 +372,7 @@ func ResolveProtoFiles(importPaths, protoFiles []string) (*rpc.ProtosetDescripto
 		effectivePaths := append(allImportPaths, virtualDirs...)
 		pd, err = rpc.LoadProtoFiles(effectivePaths, protoFiles)
 		if err == nil {
+			// Success: return virtualDirs to caller; they are responsible for cleanup.
 			return pd, allImportPaths, virtualDirs, nil
 		}
 		inferred, ok := InferImportPath(err, protoFiles, effectivePaths)
@@ -383,6 +390,7 @@ func ResolveProtoFiles(importPaths, protoFiles []string) (*rpc.ProtosetDescripto
 		}
 		virtualDirs = append(virtualDirs, virtDir)
 	}
+	// Failure: clean up any virtual dirs we created.
 	for _, d := range virtualDirs {
 		os.RemoveAll(d)
 	}

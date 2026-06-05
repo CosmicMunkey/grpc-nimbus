@@ -10,8 +10,10 @@ type FieldSchema struct {
 	Name     string `json:"name"`
 	JSONName string `json:"jsonName"`
 	Number   int32  `json:"number"`
-	// Type is one of: "string","bytes","bool","int32","int64","uint32","uint64",
-	// "float","double","enum","message","map"
+	// Type is one of: "string", "bytes", "bool", "int32", "int64", "uint32", "uint64",
+	// "float", "double", "enum", "message", "map", "timestamp",
+	// "bool_value", "string_value", "bytes_value", "int32_value", "int64_value",
+	// "uint32_value", "uint64_value", "float_value", "double_value".
 	Type           string        `json:"type"`
 	IsRepeated     bool          `json:"isRepeated"` // true only for non-map repeated fields
 	IsMap          bool          `json:"isMap"`
@@ -130,11 +132,13 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 			fs.Type = "message"
 			fs.IsFieldMask = true
 			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
-		} else if mt := fd.GetMessageType(); mt != nil && isWrapperType(mt.GetFullyQualifiedName()) {
-			fs.Type = getWrapperTypeName(mt.GetFullyQualifiedName())
-		} else {
-			fs.Type = "message"
-			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
+		} else if mt := fd.GetMessageType(); mt != nil {
+			if wname, ok := wrapperTypeName(mt.GetFullyQualifiedName()); ok {
+				fs.Type = wname
+			} else {
+				fs.Type = "message"
+				fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
+			}
 		}
 	default:
 		fs.Type = "string"
@@ -142,44 +146,31 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 	return fs
 }
 
-func isWrapperType(fqn string) bool {
-	switch fqn {
-	case "google.protobuf.DoubleValue",
-		"google.protobuf.FloatValue",
-		"google.protobuf.Int64Value",
-		"google.protobuf.UInt64Value",
-		"google.protobuf.Int32Value",
-		"google.protobuf.UInt32Value",
-		"google.protobuf.BoolValue",
-		"google.protobuf.StringValue",
-		"google.protobuf.BytesValue":
-		return true
-	}
-	return false
-}
-
-func getWrapperTypeName(fqn string) string {
+// wrapperTypeName maps a fully-qualified well-known wrapper type name to its
+// schema type string, e.g. "google.protobuf.BoolValue" → "bool_value".
+// Returns ("", false) if fqn is not a well-known wrapper type.
+func wrapperTypeName(fqn string) (string, bool) {
 	switch fqn {
 	case "google.protobuf.DoubleValue":
-		return "double_value"
+		return "double_value", true
 	case "google.protobuf.FloatValue":
-		return "float_value"
+		return "float_value", true
 	case "google.protobuf.Int64Value":
-		return "int64_value"
+		return "int64_value", true
 	case "google.protobuf.UInt64Value":
-		return "uint64_value"
+		return "uint64_value", true
 	case "google.protobuf.Int32Value":
-		return "int32_value"
+		return "int32_value", true
 	case "google.protobuf.UInt32Value":
-		return "uint32_value"
+		return "uint32_value", true
 	case "google.protobuf.BoolValue":
-		return "bool_value"
+		return "bool_value", true
 	case "google.protobuf.StringValue":
-		return "string_value"
+		return "string_value", true
 	case "google.protobuf.BytesValue":
-		return "bytes_value"
+		return "bytes_value", true
 	}
-	return "string"
+	return "", false
 }
 
 func scalarTypeName(t descriptorpb.FieldDescriptorProto_Type) string {

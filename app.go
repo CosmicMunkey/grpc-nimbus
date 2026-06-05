@@ -50,7 +50,9 @@ func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu-help") }
 func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu-about") }
 
 func (a *App) SaveWindowState(ctx context.Context) {
-	// We do not save window state here anymore because it's done via Wails callbacks
+	width, height := runtime.WindowGetSize(ctx)
+	x, y := runtime.WindowGetPosition(ctx)
+	a.engine.SaveWindowState(width, height, x, y)
 }
 
 // PickProtosetFiles opens a native multi-file dialog filtered for .protoset files.

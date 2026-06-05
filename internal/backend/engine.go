@@ -448,6 +448,8 @@ func (e *Engine) LoadProtosets(ctx context.Context, paths []string) ([]rpc.Servi
 		return nil, err
 	}
 	e.storeDescriptorState(pd, allProtosets, importPaths, protoFiles, withReflection)
+	// Loading protosets doesn't create new virtual dirs; the existing ones
+	// (from any prior LoadProtoFiles call) remain valid for the merged descriptor.
 	svcs := pd.Services()
 	logger.Default.Infof("protosets loaded: %d service(s)", len(svcs))
 
@@ -604,28 +606,17 @@ func (e *Engine) CancelReflection() {
 func (e *Engine) GetLoadedState() (*storage.AppSettings, string, []string, []string, []string, []rpc.ServiceInfo, error) {
 	e.mu.Lock()
 	pd := e.protoset
-	
+
 	paths := append([]string(nil), e.loadedProtosetPaths...)
 	paths = append(paths, e.loadedProtoFiles...)
 	paths = util.DedupeStrings(paths)
-	
+
 	protosets := append([]string(nil), e.loadedProtosetPaths...)
 	protoFiles := append([]string(nil), e.loadedProtoFiles...)
-	
-	count := 0
-	if len(e.loadedProtosetPaths) > 0 { count++ }
-	if len(e.loadedProtoFiles) > 0 { count++ }
-	if e.loadReflection { count++ }
-	var mode string
-	switch {
-	case count == 0: mode = ""
-	case count > 1: mode = "mixed"
-	case e.loadReflection: mode = "reflection"
-	case len(e.loadedProtoFiles) > 0: mode = "proto"
-	default: mode = "protoset"
-	}
-	
 	e.mu.Unlock()
+
+	// Reuse the canonical load-mode computation rather than duplicating it.
+	mode := e.currentLoadMode()
 
 	var svcs []rpc.ServiceInfo
 	if pd != nil {
@@ -678,7 +669,7 @@ func (e *Engine) ReloadProtos(ctx context.Context) ([]rpc.ServiceInfo, error) {
 	importPaths := append([]string(nil), e.loadImportPaths...)
 	withReflection := e.loadReflection
 	conn := e.conn
-	virtualDirs := append([]string(nil), e.virtualImportDirs...)
+	oldVirtualDirs := append([]string(nil), e.virtualImportDirs...)
 	e.mu.Unlock()
 
 	if len(protosets) == 0 && len(protoFiles) == 0 && !withReflection {
@@ -686,13 +677,32 @@ func (e *Engine) ReloadProtos(ctx context.Context) ([]rpc.ServiceInfo, error) {
 		return nil, fmt.Errorf("nothing to reload")
 	}
 	logger.Default.Infof("reloading protos")
-	effectivePaths := append(importPaths, virtualDirs...)
+
+	// Re-resolve proto files to rebuild fresh virtual import dirs, then include
+	// them alongside any existing ones for the merged rebuild.
+	var newVirtualDirs []string
+	if len(protoFiles) > 0 {
+		_, _, newVirtualDirs, _ = protoresolver.ResolveProtoFiles(importPaths, protoFiles)
+	}
+	effectivePaths := util.DedupeStrings(append(importPaths, newVirtualDirs...))
 	pd, err := e.rebuildDescriptor(ctx, protosets, effectivePaths, protoFiles, withReflection, conn)
 	if err != nil {
+		for _, d := range newVirtualDirs {
+			os.RemoveAll(d)
+		}
 		logger.Default.Errorf("reload protos failed: %v", err)
 		return nil, err
 	}
 	e.storeDescriptorState(pd, protosets, importPaths, protoFiles, withReflection)
+
+	// Swap virtual dirs: clean up the old set and store the freshly resolved ones.
+	e.mu.Lock()
+	for _, d := range oldVirtualDirs {
+		os.RemoveAll(d)
+	}
+	e.virtualImportDirs = append([]string(nil), newVirtualDirs...)
+	e.mu.Unlock()
+
 	logger.Default.Infof("protos reloaded: %d service(s)", len(pd.Services()))
 	return pd.Services(), nil
 }
@@ -707,7 +717,7 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 	importPaths := append([]string(nil), e.loadImportPaths...)
 	withReflection := e.loadReflection
 	conn := e.conn
-	virtualDirs := append([]string(nil), e.virtualImportDirs...)
+	oldVirtualDirs := append([]string(nil), e.virtualImportDirs...)
 	e.mu.Unlock()
 
 	var (
@@ -748,14 +758,31 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 		return nil, nil
 	}
 
-	effectivePaths := append(importPaths, virtualDirs...)
+	// Re-resolve the remaining proto files to get a fresh set of virtual dirs.
+	var newVirtualDirs []string
+	if len(newProtoFiles) > 0 {
+		_, _, newVirtualDirs, _ = protoresolver.ResolveProtoFiles(importPaths, newProtoFiles)
+	}
+	effectivePaths := util.DedupeStrings(append(importPaths, newVirtualDirs...))
 	pd, err := e.rebuildDescriptor(ctx, newProtosets, effectivePaths, newProtoFiles, withReflection, conn)
 	if err != nil {
+		for _, d := range newVirtualDirs {
+			os.RemoveAll(d)
+		}
 		logger.Default.Errorf("removing proto path failed: %v", err)
 		return nil, err
 	}
 
 	e.storeDescriptorState(pd, newProtosets, importPaths, newProtoFiles, withReflection)
+
+	// Swap virtual dirs: clean up the old set and store the freshly resolved ones.
+	e.mu.Lock()
+	for _, d := range oldVirtualDirs {
+		os.RemoveAll(d)
+	}
+	e.virtualImportDirs = append([]string(nil), newVirtualDirs...)
+	e.mu.Unlock()
+
 	logger.Default.Infof("proto path %q removed; reloaded %d service(s)", path, len(pd.Services()))
 
 	e.saveSettings(func(s *storage.AppSettings) {

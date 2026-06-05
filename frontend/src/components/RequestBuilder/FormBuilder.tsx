@@ -1015,6 +1015,15 @@ function WrapperEditor({
   );
 }
 
+// WRAPPER_TYPES lists all schema type strings that correspond to well-known
+// google.protobuf.*Value wrapper types. Kept in sync with the backend's
+// wrapperTypeName function in internal/rpc/schema.go.
+const WRAPPER_TYPES = new Set([
+  'bool_value', 'string_value', 'bytes_value',
+  'int32_value', 'int64_value', 'uint32_value', 'uint64_value',
+  'float_value', 'double_value',
+]);
+
 // ─── Field editor ─────────────────────────────────────────────────────────────
 
 interface FieldEditorProps {
@@ -1041,7 +1050,7 @@ function FieldEditor({ schema, value, onChange, depth, onAutoFill, isCollectionE
     return <RepeatedEditor schema={schema} value={arr} onChange={onChange} depth={depth} />;
   }
 
-  if (isCollectionElement && schema.type.endsWith('_value')) {
+  if (isCollectionElement && WRAPPER_TYPES.has(schema.type)) {
     const primType = schema.type.replace('_value', '') as 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double';
     switch (primType) {
       case 'string':  return <StringEditor  value={value} onChange={onChange as (v: string) => void} />;
