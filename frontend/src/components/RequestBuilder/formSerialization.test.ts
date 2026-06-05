@@ -108,7 +108,7 @@ const requestSchema: FieldSchema[] = [
   },
 ];
 
-test('toJson serializes FieldMask objects as JSON objects with paths array', () => {
+test('toJson serializes FieldMask objects as comma-separated string (protobuf JSON)', () => {
   const form: FormVal = {
     book: { title: 'Dune' },
     updateMask: { paths: ['book.title', 'author'] },
@@ -116,11 +116,11 @@ test('toJson serializes FieldMask objects as JSON objects with paths array', () 
 
   assert.equal(
     toJson(form, requestSchema),
-    JSON.stringify({ book: { title: 'Dune' }, updateMask: { paths: ['book.title', 'author'] } }, null, 2),
+    JSON.stringify({ book: { title: 'Dune' }, updateMask: 'book.title,author' }, null, 2),
   );
 });
 
-test('toJson serializes FieldMask with rich fields correctly', () => {
+test('toJson serializes FieldMask with rich fields correctly as comma-separated string', () => {
   const form: FormVal = {
     book: {
       title: 'Dune',
@@ -161,17 +161,7 @@ test('toJson serializes FieldMask with rich fields correctly', () => {
           },
           tags: { 'sci-fi': 'classic' },
         },
-        updateMask: {
-          paths: [
-            'book.title',
-            'book.genre',
-            'book.inPrint',
-            'book.pageCount',
-            'book.publisher.name',
-            'book.publisher.country',
-            'book.tags',
-          ],
-        },
+        updateMask: 'book.title,book.genre,book.inPrint,book.pageCount,book.publisher.name,book.publisher.country,book.tags',
       },
       null,
       2,

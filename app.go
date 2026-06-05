@@ -28,26 +28,28 @@ func (a *App) startup(ctx context.Context) {
 	logger.Default.OnEntry = func(entry logger.Entry) {
 		runtime.EventsEmit(a.ctx, "log:entry", entry)
 	}
-	a.engine.Startup(ctx)
+	if err := a.engine.Startup(ctx); err != nil {
+		logger.Default.Errorf("startup failed: %v", err)
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
 	a.engine.Shutdown()
 }
 
-func (a *App) TriggerMenuImport() { runtime.EventsEmit(a.ctx, "menu-import") }
-func (a *App) TriggerMenuExport() { runtime.EventsEmit(a.ctx, "menu-export") }
-func (a *App) TriggerMenuZoomIn() { runtime.EventsEmit(a.ctx, "menu-zoom-in") }
-func (a *App) TriggerMenuZoomOut() { runtime.EventsEmit(a.ctx, "menu-zoom-out") }
-func (a *App) TriggerMenuZoomReset() { runtime.EventsEmit(a.ctx, "menu-zoom-reset") }
-func (a *App) TriggerMenuNewTab() { runtime.EventsEmit(a.ctx, "menu-new-tab") }
-func (a *App) TriggerMenuCloseTab() { runtime.EventsEmit(a.ctx, "menu-close-tab") }
-func (a *App) TriggerMenuCloseAllTabs() { runtime.EventsEmit(a.ctx, "menu-close-all-tabs") }
-func (a *App) TriggerMenuNextTab() { runtime.EventsEmit(a.ctx, "menu-next-tab") }
-func (a *App) TriggerMenuPrevTab() { runtime.EventsEmit(a.ctx, "menu-prev-tab") }
-func (a *App) TriggerMenuToggleDebugPane() { runtime.EventsEmit(a.ctx, "menu-toggle-debug-pane") }
-func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu-help") }
-func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu-about") }
+func (a *App) TriggerMenuImport() { runtime.EventsEmit(a.ctx, "menu:importCollection") }
+func (a *App) TriggerMenuExport() { runtime.EventsEmit(a.ctx, "menu:exportCollection") }
+func (a *App) TriggerMenuZoomIn() { runtime.EventsEmit(a.ctx, "menu:zoomIn") }
+func (a *App) TriggerMenuZoomOut() { runtime.EventsEmit(a.ctx, "menu:zoomOut") }
+func (a *App) TriggerMenuZoomReset() { runtime.EventsEmit(a.ctx, "menu:zoomReset") }
+func (a *App) TriggerMenuNewTab() { runtime.EventsEmit(a.ctx, "menu:newTab") }
+func (a *App) TriggerMenuCloseTab() { runtime.EventsEmit(a.ctx, "menu:closeTab") }
+func (a *App) TriggerMenuCloseAllTabs() { runtime.EventsEmit(a.ctx, "menu:closeAllTabs") }
+func (a *App) TriggerMenuNextTab() { runtime.EventsEmit(a.ctx, "menu:nextTab") }
+func (a *App) TriggerMenuPrevTab() { runtime.EventsEmit(a.ctx, "menu:prevTab") }
+func (a *App) TriggerMenuToggleDebugPane() { runtime.EventsEmit(a.ctx, "menu:toggleDebugPane") }
+func (a *App) TriggerMenuHelp() { runtime.EventsEmit(a.ctx, "menu:help") }
+func (a *App) TriggerMenuAbout() { runtime.EventsEmit(a.ctx, "menu:about") }
 
 func (a *App) SaveWindowState(ctx context.Context) {
 	width, height := runtime.WindowGetSize(ctx)

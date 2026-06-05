@@ -390,7 +390,84 @@ func (e *Engine) GetUserSettings() (*storage.AppSettings, error) {
 	if e.settings == nil {
 		return nil, fmt.Errorf("settings store unavailable")
 	}
-	return e.settings.Load()
+	s, err := e.settings.Load()
+	if err != nil {
+		return nil, err
+	}
+	// Materialize defaults for the frontend (nil fields mean "use default")
+	if s.ConfirmDeletes == nil {
+		confirmDeletes := true
+		s.ConfirmDeletes = &confirmDeletes
+	}
+	if s.TimestampInputLocal == nil {
+		timestampInputLocal := false
+		s.TimestampInputLocal = &timestampInputLocal
+	}
+	if s.ConfirmClearHistory == nil {
+		confirmClearHistory := false
+		s.ConfirmClearHistory = &confirmClearHistory
+	}
+	if s.EmitDefaults == nil {
+		emitDefaults := false
+		s.EmitDefaults = &emitDefaults
+	}
+	if s.FieldMaskIncludeDefaults == nil {
+		fieldMaskIncludeDefaults := false
+		s.FieldMaskIncludeDefaults = &fieldMaskIncludeDefaults
+	}
+	if s.EnvSortByCreated == nil {
+		envSortByCreated := false
+		s.EnvSortByCreated = &envSortByCreated
+	}
+	if s.FontSize == nil {
+		fontSize := 16
+		s.FontSize = &fontSize
+	}
+	if s.ResponseWordWrap == nil {
+		responseWordWrap := true
+		s.ResponseWordWrap = &responseWordWrap
+	}
+	if s.ResponseIndent == nil {
+		responseIndent := 2
+		s.ResponseIndent = &responseIndent
+	}
+	if s.SidebarWidth == nil {
+		sidebarWidth := 256.0
+		s.SidebarWidth = &sidebarWidth
+	}
+	if s.PanelSplit == nil {
+		panelSplit := 0.5
+		s.PanelSplit = &panelSplit
+	}
+	if s.DefaultTimeoutSeconds == nil {
+		defaultTimeoutSeconds := 0.0
+		s.DefaultTimeoutSeconds = &defaultTimeoutSeconds
+	}
+	if s.HistoryLimit == nil {
+		historyLimit := 50
+		s.HistoryLimit = &historyLimit
+	}
+	if s.AutoConnectOnStartup == nil {
+		autoConnectOnStartup := false
+		s.AutoConnectOnStartup = &autoConnectOnStartup
+	}
+	if s.AllowShellCommands == nil {
+		allowShellCommands := false
+		s.AllowShellCommands = &allowShellCommands
+	}
+	if s.InheritShellEnv == nil {
+		inheritShellEnv := false
+		s.InheritShellEnv = &inheritShellEnv
+	}
+	if s.MaxStreamMessages == nil {
+		maxStreamMessages := 200
+		s.MaxStreamMessages = &maxStreamMessages
+	}
+	if s.ShowDebugIndicator == nil {
+		showDebugIndicator := false
+		s.ShowDebugIndicator = &showDebugIndicator
+	}
+	return s, nil
 }
 
 func (e *Engine) SaveUserSettings(s storage.AppSettings) error {
