@@ -42,7 +42,7 @@ export function GetRequestSchema(arg1:string):Promise<Array<rpc.FieldSchema>>;
 
 export function GetServices():Promise<Array<rpc.ServiceInfo>>;
 
-export function GetUserSettings():Promise<main.UserSettings>;
+export function GetUserSettings():Promise<storage.AppSettings>;
 
 export function GetVersion():Promise<string>;
 
@@ -80,7 +80,7 @@ export function SaveCollection(arg1:storage.Collection):Promise<void>;
 
 export function SaveEnvironment(arg1:storage.Environment):Promise<void>;
 
-export function SaveUserSettings(arg1:main.UserSettings):Promise<void>;
+export function SaveUserSettings(arg1:storage.AppSettings):Promise<void>;
 
 export function SaveWindowState(arg1:context.Context):Promise<void>;
 

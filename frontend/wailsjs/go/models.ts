@@ -21,22 +21,6 @@ export namespace logger {
 
 export namespace main {
 	
-	export class CustomThemeEntry {
-	    id: string;
-	    name: string;
-	    tokens: Record<string, string>;
-	
-	    static createFrom(source: any = {}) {
-	        return new CustomThemeEntry(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.tokens = source["tokens"];
-	    }
-	}
 	export class LoadedState {
 	    services: rpc.ServiceInfo[];
 	    loadedPaths: string[];
@@ -63,88 +47,6 @@ export namespace main {
 	        this.lastTarget = source["lastTarget"];
 	        this.lastTLS = source["lastTLS"];
 	        this.activeEnvironmentId = source["activeEnvironmentId"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class UserSettings {
-	    confirmDeletes: boolean;
-	    timestampInputLocal: boolean;
-	    confirmClearHistory: boolean;
-	    themeBadge: string;
-	    theme: string;
-	    customThemes: CustomThemeEntry[];
-	    activeCustomThemeId: string;
-	    fontSize: number;
-	    responseWordWrap: boolean;
-	    responseIndent: number;
-	    emitDefaults: boolean;
-	    envSortByCreated: boolean;
-	    sidebarWidth: number;
-	    panelSplit: number;
-	    defaultTimeoutSeconds: number;
-	    historyLimit: number;
-	    autoConnectOnStartup: boolean;
-	    allowShellCommands: boolean;
-	    inheritShellEnv: boolean;
-	    maxStreamMessages: number;
-	    defaultMetadata: rpc.MetadataEntry[];
-	    showDebugIndicator: boolean;
-	    fieldMaskIncludeDefaults: boolean;
-	    windowWidth: number;
-	    windowHeight: number;
-	    windowX: number;
-	    windowY: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new UserSettings(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.confirmDeletes = source["confirmDeletes"];
-	        this.timestampInputLocal = source["timestampInputLocal"];
-	        this.confirmClearHistory = source["confirmClearHistory"];
-	        this.themeBadge = source["themeBadge"];
-	        this.theme = source["theme"];
-	        this.customThemes = this.convertValues(source["customThemes"], CustomThemeEntry);
-	        this.activeCustomThemeId = source["activeCustomThemeId"];
-	        this.fontSize = source["fontSize"];
-	        this.responseWordWrap = source["responseWordWrap"];
-	        this.responseIndent = source["responseIndent"];
-	        this.emitDefaults = source["emitDefaults"];
-	        this.envSortByCreated = source["envSortByCreated"];
-	        this.sidebarWidth = source["sidebarWidth"];
-	        this.panelSplit = source["panelSplit"];
-	        this.defaultTimeoutSeconds = source["defaultTimeoutSeconds"];
-	        this.historyLimit = source["historyLimit"];
-	        this.autoConnectOnStartup = source["autoConnectOnStartup"];
-	        this.allowShellCommands = source["allowShellCommands"];
-	        this.inheritShellEnv = source["inheritShellEnv"];
-	        this.maxStreamMessages = source["maxStreamMessages"];
-	        this.defaultMetadata = this.convertValues(source["defaultMetadata"], rpc.MetadataEntry);
-	        this.showDebugIndicator = source["showDebugIndicator"];
-	        this.fieldMaskIncludeDefaults = source["fieldMaskIncludeDefaults"];
-	        this.windowWidth = source["windowWidth"];
-	        this.windowHeight = source["windowHeight"];
-	        this.windowX = source["windowX"];
-	        this.windowY = source["windowY"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -422,6 +324,120 @@ export namespace rpc {
 
 export namespace storage {
 	
+	export class CustomThemeEntry {
+	    id: string;
+	    name: string;
+	    tokens: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomThemeEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.tokens = source["tokens"];
+	    }
+	}
+	export class AppSettings {
+	    protoLoadMode?: string;
+	    protosetPaths?: string[];
+	    protoImportPaths?: string[];
+	    protoFilePaths?: string[];
+	    lastTarget?: string;
+	    lastTLS?: string;
+	    activeEnvironmentId?: string;
+	    confirmDeletes?: boolean;
+	    timestampInputLocal?: boolean;
+	    confirmClearHistory?: boolean;
+	    emitDefaults?: boolean;
+	    fieldMaskIncludeDefaults?: boolean;
+	    envSortByCreated?: boolean;
+	    themeBadge?: string;
+	    theme?: string;
+	    customTheme?: Record<string, string>;
+	    customThemes?: CustomThemeEntry[];
+	    activeCustomThemeId?: string;
+	    fontSize?: number;
+	    responseWordWrap?: boolean;
+	    responseIndent?: number;
+	    sidebarWidth?: number;
+	    panelSplit?: number;
+	    defaultTimeoutSeconds?: number;
+	    historyLimit?: number;
+	    autoConnectOnStartup?: boolean;
+	    allowShellCommands?: boolean;
+	    inheritShellEnv?: boolean;
+	    maxStreamMessages?: number;
+	    defaultMetadata?: rpc.MetadataEntry[];
+	    showDebugIndicator?: boolean;
+	    windowWidth?: number;
+	    windowHeight?: number;
+	    windowX?: number;
+	    windowY?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.protoLoadMode = source["protoLoadMode"];
+	        this.protosetPaths = source["protosetPaths"];
+	        this.protoImportPaths = source["protoImportPaths"];
+	        this.protoFilePaths = source["protoFilePaths"];
+	        this.lastTarget = source["lastTarget"];
+	        this.lastTLS = source["lastTLS"];
+	        this.activeEnvironmentId = source["activeEnvironmentId"];
+	        this.confirmDeletes = source["confirmDeletes"];
+	        this.timestampInputLocal = source["timestampInputLocal"];
+	        this.confirmClearHistory = source["confirmClearHistory"];
+	        this.emitDefaults = source["emitDefaults"];
+	        this.fieldMaskIncludeDefaults = source["fieldMaskIncludeDefaults"];
+	        this.envSortByCreated = source["envSortByCreated"];
+	        this.themeBadge = source["themeBadge"];
+	        this.theme = source["theme"];
+	        this.customTheme = source["customTheme"];
+	        this.customThemes = this.convertValues(source["customThemes"], CustomThemeEntry);
+	        this.activeCustomThemeId = source["activeCustomThemeId"];
+	        this.fontSize = source["fontSize"];
+	        this.responseWordWrap = source["responseWordWrap"];
+	        this.responseIndent = source["responseIndent"];
+	        this.sidebarWidth = source["sidebarWidth"];
+	        this.panelSplit = source["panelSplit"];
+	        this.defaultTimeoutSeconds = source["defaultTimeoutSeconds"];
+	        this.historyLimit = source["historyLimit"];
+	        this.autoConnectOnStartup = source["autoConnectOnStartup"];
+	        this.allowShellCommands = source["allowShellCommands"];
+	        this.inheritShellEnv = source["inheritShellEnv"];
+	        this.maxStreamMessages = source["maxStreamMessages"];
+	        this.defaultMetadata = this.convertValues(source["defaultMetadata"], rpc.MetadataEntry);
+	        this.showDebugIndicator = source["showDebugIndicator"];
+	        this.windowWidth = source["windowWidth"];
+	        this.windowHeight = source["windowHeight"];
+	        this.windowX = source["windowX"];
+	        this.windowY = source["windowY"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SavedRequest {
 	    id: string;
 	    name: string;
@@ -514,6 +530,7 @@ export namespace storage {
 		    return a;
 		}
 	}
+	
 	export class EnvHeader {
 	    key: string;
 	    value: string;
