@@ -46,15 +46,17 @@ function serializeValue(v: unknown, fields?: FieldSchema[]): unknown {
   return v;
 }
 
-function serializeFieldMask(v: unknown): string | undefined {
+function serializeFieldMask(v: unknown): FormVal | undefined {
   if (typeof v === 'string') {
     const trimmed = v.trim();
-    return trimmed === '' ? undefined : trimmed;
+    if (trimmed === '') return undefined;
+    const paths = trimmed.split(',').map(path => path.trim()).filter(Boolean);
+    return paths.length === 0 ? undefined : { paths };
   }
   const paths = fieldMaskPathsFromValue(v);
 
   if (paths.length === 0) return undefined;
-  return paths.join(',');
+  return { paths };
 }
 
 export function toJson(form: FormVal, fields?: FieldSchema[]): string {
