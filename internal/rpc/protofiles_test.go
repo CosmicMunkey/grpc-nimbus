@@ -136,6 +136,12 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	if len(updateMask.Fields) != 1 || updateMask.Fields[0].Name != "paths" {
 		t.Fatal("expected update_mask to have a single 'paths' sub-field")
 	}
+
+	// Verify that google.protobuf.BoolValue is detected as bool_value
+	active := fieldNamed(t, updateSchema, "active")
+	if active.Type != "bool_value" {
+		t.Fatalf("expected active type bool_value, got %q", active.Type)
+	}
 }
 
 func TestLoadProtoFilesMissingSecondaryImportRoot(t *testing.T) {

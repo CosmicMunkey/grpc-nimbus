@@ -81,6 +81,16 @@ function defaultFor(schema: FieldSchema): unknown {
     case 'enum':   return schema.enumValues?.[0]?.name ?? '';
     case 'message': return null; // null = absent / not set
     case 'timestamp': return null; // null = absent / not set
+    case 'bool_value':
+    case 'string_value':
+    case 'bytes_value':
+    case 'int32_value':
+    case 'int64_value':
+    case 'uint32_value':
+    case 'uint64_value':
+    case 'float_value':
+    case 'double_value':
+      return null; // null = absent / not set
     case 'map':    return {};
     default:       return '';
   }
@@ -111,40 +121,81 @@ function TypeBadge({ schema }: { schema: FieldSchema }) {
     darkCls = 'text-cyan-400 bg-cyan-900/20';
     lightCls = 'text-cyan-700 bg-cyan-100';
   } else if (schema.isRepeated) {
-    label = `[]${schema.type}`;
+    const labelMap: Record<string, string> = {
+      double_value: 'DoubleValue',
+      float_value: 'FloatValue',
+      int64_value: 'Int64Value',
+      uint64_value: 'UInt64Value',
+      int32_value: 'Int32Value',
+      uint32_value: 'UInt32Value',
+      bool_value: 'BoolValue',
+      string_value: 'StringValue',
+      bytes_value: 'BytesValue',
+    };
+    const t = labelMap[schema.type] ?? schema.type;
+    label = `[]${t}`;
     darkCls = 'text-blue-300 bg-blue-900/20';
     lightCls = 'text-blue-700 bg-blue-100';
   } else {
-    label = schema.type;
+    const labelMap: Record<string, string> = {
+      double_value: 'DoubleValue',
+      float_value: 'FloatValue',
+      int64_value: 'Int64Value',
+      uint64_value: 'UInt64Value',
+      int32_value: 'Int32Value',
+      uint32_value: 'UInt32Value',
+      bool_value: 'BoolValue',
+      string_value: 'StringValue',
+      bytes_value: 'BytesValue',
+    };
+    label = labelMap[schema.type] ?? schema.type;
     const darkMap: Record<string, string> = {
-      string:    'text-sky-400 bg-sky-900/20',
-      bytes:     'text-yellow-400 bg-yellow-900/20',
-      bool:      'text-green-400 bg-green-900/20',
-      int32:     'text-violet-400 bg-violet-900/20',
-      int64:     'text-violet-400 bg-violet-900/20',
-      uint32:    'text-violet-400 bg-violet-900/20',
-      uint64:    'text-violet-400 bg-violet-900/20',
-      float:     'text-fuchsia-400 bg-fuchsia-900/20',
-      double:    'text-fuchsia-400 bg-fuchsia-900/20',
-      enum:      'text-orange-400 bg-orange-900/20',
-      message:   'text-slate-400 bg-slate-800/40',
-      map:       'text-cyan-400 bg-cyan-900/20',
-      timestamp: 'text-teal-400 bg-teal-900/20',
+      string:       'text-sky-400 bg-sky-900/20',
+      string_value: 'text-sky-400 bg-sky-900/20',
+      bytes:        'text-yellow-400 bg-yellow-900/20',
+      bytes_value:  'text-yellow-400 bg-yellow-900/20',
+      bool:         'text-green-400 bg-green-900/20',
+      bool_value:   'text-green-400 bg-green-900/20',
+      int32:        'text-violet-400 bg-violet-900/20',
+      int32_value:  'text-violet-400 bg-violet-900/20',
+      int64:        'text-violet-400 bg-violet-900/20',
+      int64_value:  'text-violet-400 bg-violet-900/20',
+      uint32:       'text-violet-400 bg-violet-900/20',
+      uint32_value: 'text-violet-400 bg-violet-900/20',
+      uint64:       'text-violet-400 bg-violet-900/20',
+      uint64_value: 'text-violet-400 bg-violet-900/20',
+      float:        'text-fuchsia-400 bg-fuchsia-900/20',
+      float_value:  'text-fuchsia-400 bg-fuchsia-900/20',
+      double:       'text-fuchsia-400 bg-fuchsia-900/20',
+      double_value: 'text-fuchsia-400 bg-fuchsia-900/20',
+      enum:         'text-orange-400 bg-orange-900/20',
+      message:      'text-slate-400 bg-slate-800/40',
+      map:          'text-cyan-400 bg-cyan-900/20',
+      timestamp:    'text-teal-400 bg-teal-900/20',
     };
     const lightMap: Record<string, string> = {
-      string:    'text-sky-700 bg-sky-100',
-      bytes:     'text-yellow-700 bg-yellow-100',
-      bool:      'text-green-700 bg-green-100',
-      int32:     'text-violet-700 bg-violet-100',
-      int64:     'text-violet-700 bg-violet-100',
-      uint32:    'text-violet-700 bg-violet-100',
-      uint64:    'text-violet-700 bg-violet-100',
-      float:     'text-fuchsia-700 bg-fuchsia-100',
-      double:    'text-fuchsia-700 bg-fuchsia-100',
-      enum:      'text-orange-700 bg-orange-100',
-      message:   'text-slate-600 bg-slate-200',
-      map:       'text-cyan-700 bg-cyan-100',
-      timestamp: 'text-teal-700 bg-teal-100',
+      string:       'text-sky-700 bg-sky-100',
+      string_value: 'text-sky-700 bg-sky-100',
+      bytes:        'text-yellow-700 bg-yellow-100',
+      bytes_value:  'text-yellow-700 bg-yellow-100',
+      bool:         'text-green-700 bg-green-100',
+      bool_value:   'text-green-700 bg-green-100',
+      int32:        'text-violet-700 bg-violet-100',
+      int32_value:  'text-violet-700 bg-violet-100',
+      int64:        'text-violet-700 bg-violet-100',
+      int64_value:  'text-violet-700 bg-violet-100',
+      uint32:       'text-violet-700 bg-violet-100',
+      uint32_value: 'text-violet-700 bg-violet-100',
+      uint64:       'text-violet-700 bg-violet-100',
+      uint64_value: 'text-violet-700 bg-violet-100',
+      float:        'text-fuchsia-700 bg-fuchsia-100',
+      float_value:  'text-fuchsia-700 bg-fuchsia-100',
+      double:       'text-fuchsia-700 bg-fuchsia-100',
+      double_value: 'text-fuchsia-700 bg-fuchsia-100',
+      enum:         'text-orange-700 bg-orange-100',
+      message:      'text-slate-600 bg-slate-200',
+      map:          'text-cyan-700 bg-cyan-100',
+      timestamp:    'text-teal-700 bg-teal-100',
     };
     darkCls  = darkMap[schema.type]  ?? 'text-slate-400 bg-slate-800/40';
     lightCls = lightMap[schema.type] ?? 'text-slate-600 bg-slate-200';
@@ -563,7 +614,15 @@ function RepeatedEditor({
   depth: number;
 }) {
   const elementSchema: FieldSchema = { ...schema, isRepeated: false };
-  const addItem = () => onChange([...value, defaultFor(elementSchema)]);
+  const addItem = () => {
+    let def = defaultFor(elementSchema);
+    if (def === null) {
+      if (elementSchema.type === 'bool_value') def = false;
+      else if (elementSchema.type === 'string_value' || elementSchema.type === 'bytes_value') def = '';
+      else if (['int32_value', 'int64_value', 'uint32_value', 'uint64_value', 'float_value', 'double_value'].includes(elementSchema.type)) def = 0;
+    }
+    onChange([...value, def]);
+  };
   const removeItem = (i: number) => onChange(value.filter((_, idx) => idx !== i));
   const updateItem = (i: number, v: unknown) => onChange(value.map((item, idx) => idx === i ? v : item));
 
@@ -578,6 +637,7 @@ function RepeatedEditor({
               value={item}
               onChange={v => updateItem(i, v)}
               depth={depth}
+              isCollectionElement
             />
           </div>
           <button
@@ -644,6 +704,7 @@ function MapEntryRow({ mapKey, mapValue, valueSchema, onKeyChange, onValueChange
           value={mapValue}
           onChange={nv => onValueChange(mapKey, nv)}
           depth={depth}
+          isCollectionElement
         />
       </div>
       <button
@@ -679,7 +740,13 @@ function MapEditor({
 
   const addEntry = () => {
     const key = `key${entries.length + 1}`;
-    onChange({ ...value, [key]: defaultFor(valueSchema) });
+    let def = defaultFor(valueSchema);
+    if (def === null) {
+      if (valueSchema.type === 'bool_value') def = false;
+      else if (valueSchema.type === 'string_value' || valueSchema.type === 'bytes_value') def = '';
+      else if (['int32_value', 'int64_value', 'uint32_value', 'uint64_value', 'float_value', 'double_value'].includes(valueSchema.type)) def = 0;
+    }
+    onChange({ ...value, [key]: def });
   };
 
   const removeEntry = (key: string) => {
@@ -885,6 +952,69 @@ function FieldMaskEditor({
   );
 }
 
+// ─── Wrapper editor ──────────────────────────────────────────────────────────
+
+function WrapperEditor({
+  schema, value, onChange, type
+}: {
+  schema: FieldSchema;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  type: 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double';
+}) {
+  const isSet = value !== null && value !== undefined;
+
+  const handleSet = () => {
+    switch (type) {
+      case 'bool': onChange(false); break;
+      case 'string': onChange(''); break;
+      case 'bytes': onChange(''); break;
+      case 'int32': case 'int64': case 'uint32': case 'uint64':
+      case 'float': case 'double': onChange(0); break;
+    }
+  };
+
+  if (!isSet) {
+    return (
+      <button
+        onClick={handleSet}
+        className="flex items-center gap-1 text-xs text-c-text2 hover:text-c-text px-2 py-0.5 rounded border border-dashed border-c-border hover:border-c-text3"
+      >
+        <Plus size={10} /> Set
+      </button>
+    );
+  }
+
+  let editor: React.ReactNode;
+  switch (type) {
+    case 'string':
+      editor = <StringEditor value={value} onChange={onChange as (v: string) => void} />;
+      break;
+    case 'bytes':
+      editor = <BytesEditor value={value} onChange={onChange as (v: string) => void} />;
+      break;
+    case 'bool':
+      editor = <BoolEditor value={value} onChange={onChange as (v: boolean) => void} />;
+      break;
+    default:
+      editor = <NumberEditor value={value} type={type} onChange={onChange as (v: number) => void} />;
+      break;
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 w-full">
+      {editor}
+      <button
+        onClick={() => onChange(null)}
+        className="shrink-0 text-c-text3 hover:text-c-accent p-0.5 rounded"
+        title="Remove field"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  );
+}
+
 // ─── Field editor ─────────────────────────────────────────────────────────────
 
 interface FieldEditorProps {
@@ -893,9 +1023,10 @@ interface FieldEditorProps {
   onChange: (v: unknown) => void;
   depth: number;
   onAutoFill?: () => string[];
+  isCollectionElement?: boolean;
 }
 
-function FieldEditor({ schema, value, onChange, depth, onAutoFill }: FieldEditorProps) {
+function FieldEditor({ schema, value, onChange, depth, onAutoFill, isCollectionElement }: FieldEditorProps) {
   if (schema.isFieldMask && onAutoFill) {
     return <FieldMaskEditor value={value} onChange={onChange} onAutoFill={onAutoFill} />;
   }
@@ -910,6 +1041,17 @@ function FieldEditor({ schema, value, onChange, depth, onAutoFill }: FieldEditor
     return <RepeatedEditor schema={schema} value={arr} onChange={onChange} depth={depth} />;
   }
 
+  if (isCollectionElement && schema.type.endsWith('_value')) {
+    const primType = schema.type.replace('_value', '') as 'string' | 'bytes' | 'bool' | 'int32' | 'int64' | 'uint32' | 'uint64' | 'float' | 'double';
+    switch (primType) {
+      case 'string':  return <StringEditor  value={value} onChange={onChange as (v: string) => void} />;
+      case 'bytes':   return <BytesEditor   value={value} onChange={onChange as (v: string) => void} />;
+      case 'bool':    return <BoolEditor    value={value} onChange={onChange as (v: boolean) => void} />;
+      case 'int32': case 'int64': case 'uint32': case 'uint64': case 'float': case 'double':
+        return <NumberEditor value={value} type={primType} onChange={onChange as (v: number) => void} />;
+    }
+  }
+
   switch (schema.type) {
     case 'string':  return <StringEditor  value={value} onChange={onChange as (v: string) => void} />;
     case 'bytes':   return <BytesEditor   value={value} onChange={onChange as (v: string) => void} />;
@@ -922,6 +1064,15 @@ function FieldEditor({ schema, value, onChange, depth, onAutoFill }: FieldEditor
       return <TimestampEditor value={value} onChange={onChange as (v: string | null) => void} />;
     case 'message':
       return <InlineMessageEditor schema={schema} value={value} onChange={onChange} depth={depth} />;
+    case 'double_value': return <WrapperEditor schema={schema} value={value} onChange={onChange} type="double" />;
+    case 'float_value':  return <WrapperEditor schema={schema} value={value} onChange={onChange} type="float" />;
+    case 'int64_value':  return <WrapperEditor schema={schema} value={value} onChange={onChange} type="int64" />;
+    case 'uint64_value': return <WrapperEditor schema={schema} value={value} onChange={onChange} type="uint64" />;
+    case 'int32_value':  return <WrapperEditor schema={schema} value={value} onChange={onChange} type="int32" />;
+    case 'uint32_value': return <WrapperEditor schema={schema} value={value} onChange={onChange} type="uint32" />;
+    case 'bool_value':   return <WrapperEditor schema={schema} value={value} onChange={onChange} type="bool" />;
+    case 'string_value': return <WrapperEditor schema={schema} value={value} onChange={onChange} type="string" />;
+    case 'bytes_value':  return <WrapperEditor schema={schema} value={value} onChange={onChange} type="bytes" />;
     default:
       return <StringEditor value={value} onChange={onChange as (v: string) => void} />;
   }

@@ -202,3 +202,43 @@ test('fieldMaskPathsFromValue parses protobuf JSON FieldMask strings for the edi
   assert.deepEqual(fieldMaskPathsFromValue('book.title, author'), ['book.title', 'author']);
 });
 
+test('toJson maps wrapper types to their primitive values', () => {
+  const wrapperSchema: FieldSchema[] = [
+    {
+      name: 'active',
+      jsonName: 'active',
+      number: 1,
+      type: 'bool_value',
+      isRepeated: false,
+      isMap: false,
+    },
+    {
+      name: 'title',
+      jsonName: 'title',
+      number: 2,
+      type: 'string_value',
+      isRepeated: false,
+      isMap: false,
+    },
+    {
+      name: 'count',
+      jsonName: 'count',
+      number: 3,
+      type: 'int32_value',
+      isRepeated: false,
+      isMap: false,
+    }
+  ];
+
+  const form: FormVal = {
+    active: true,
+    title: 'Hello',
+    count: 123,
+  };
+
+  assert.equal(
+    toJson(form, wrapperSchema),
+    JSON.stringify({ active: true, title: 'Hello', count: 123 }, null, 2),
+  );
+});
+

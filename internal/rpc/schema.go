@@ -130,6 +130,8 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 			fs.Type = "message"
 			fs.IsFieldMask = true
 			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
+		} else if mt := fd.GetMessageType(); mt != nil && isWrapperType(mt.GetFullyQualifiedName()) {
+			fs.Type = getWrapperTypeName(mt.GetFullyQualifiedName())
 		} else {
 			fs.Type = "message"
 			fs.Fields = buildMessageFields(fd.GetMessageType(), visited, depth)
@@ -138,6 +140,46 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 		fs.Type = "string"
 	}
 	return fs
+}
+
+func isWrapperType(fqn string) bool {
+	switch fqn {
+	case "google.protobuf.DoubleValue",
+		"google.protobuf.FloatValue",
+		"google.protobuf.Int64Value",
+		"google.protobuf.UInt64Value",
+		"google.protobuf.Int32Value",
+		"google.protobuf.UInt32Value",
+		"google.protobuf.BoolValue",
+		"google.protobuf.StringValue",
+		"google.protobuf.BytesValue":
+		return true
+	}
+	return false
+}
+
+func getWrapperTypeName(fqn string) string {
+	switch fqn {
+	case "google.protobuf.DoubleValue":
+		return "double_value"
+	case "google.protobuf.FloatValue":
+		return "float_value"
+	case "google.protobuf.Int64Value":
+		return "int64_value"
+	case "google.protobuf.UInt64Value":
+		return "uint64_value"
+	case "google.protobuf.Int32Value":
+		return "int32_value"
+	case "google.protobuf.UInt32Value":
+		return "uint32_value"
+	case "google.protobuf.BoolValue":
+		return "bool_value"
+	case "google.protobuf.StringValue":
+		return "string_value"
+	case "google.protobuf.BytesValue":
+		return "bytes_value"
+	}
+	return "string"
 }
 
 func scalarTypeName(t descriptorpb.FieldDescriptorProto_Type) string {
