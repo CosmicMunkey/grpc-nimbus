@@ -1237,7 +1237,16 @@ func runShellCommand(cmd string, inheritEnv bool) (string, error) {
 	if runtime.GOOS == "windows" {
 		c = exec.CommandContext(ctx, "cmd", "/c", cmd)
 	} else {
-		c = exec.CommandContext(ctx, "sh", "-c", cmd)
+		if inheritEnv {
+			shell := os.Getenv("SHELL")
+			if shell == "" {
+				shell = "sh"
+			}
+			// Use an interactive login shell so the user's profile (e.g., ~/.zshrc) is evaluated
+			c = exec.CommandContext(ctx, shell, "-l", "-c", cmd)
+		} else {
+			c = exec.CommandContext(ctx, "sh", "-c", cmd)
+		}
 	}
 
 	// If inheritEnv is true, inherit the parent process environment.
