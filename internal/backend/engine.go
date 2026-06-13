@@ -1227,10 +1227,11 @@ func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
 }
 
 // runShellCommand executes cmd via the platform shell and returns trimmed stdout.
-// A 5-second context deadline prevents hangs.
-// When inheritEnv is true, the command has access to the parent process environment.
+// A 15-second context deadline prevents hangs.
+// When inheritEnv is true, the command inherits the parent process environment
+// (including $PATH), so a login shell is not needed.
 func runShellCommand(cmd string, inheritEnv bool) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	var c *exec.Cmd
@@ -1242,8 +1243,11 @@ func runShellCommand(cmd string, inheritEnv bool) (string, error) {
 			if shell == "" {
 				shell = "sh"
 			}
-			// Use an interactive login shell so the user's profile (e.g., ~/.zshrc) is evaluated
-			c = exec.CommandContext(ctx, shell, "-l", "-c", cmd)
+			// Use a non-login, non-interactive shell. The parent environment
+			// (os.Environ below) already supplies $PATH and other variables,
+			// so there is no need for -l which would source the full user
+			// profile (oh-my-zsh, etc.) and risk exceeding the timeout.
+			c = exec.CommandContext(ctx, shell, "-c", cmd)
 		} else {
 			c = exec.CommandContext(ctx, "sh", "-c", cmd)
 		}
