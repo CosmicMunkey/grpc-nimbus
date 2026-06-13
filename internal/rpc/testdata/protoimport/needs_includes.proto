@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package library.v1;
+
+import "vendor/common/v1/paging.proto";
+import "vendor/library/v1/types.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/wrappers.proto";
+
+service Library {
+  rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
+  rpc WatchShelves(WatchShelvesRequest) returns (stream ShelfEvent);
+  rpc UpdateBook(UpdateBookRequest) returns (Book);
+}
+
+message ListBooksRequest {
+  common.v1.PageRequest page = 1;
+  LibraryFilter filter = 2;
+}
+
+message ListBooksResponse {
+  repeated Book books = 1;
+  common.v1.PageResponse page = 2;
+}
+
+message WatchShelvesRequest {
+  repeated string shelf_ids = 1;
+}
+
+message ShelfEvent {
+  Shelf shelf = 1;
+  string event_type = 2;
+}
+
+message UpdateBookRequest {
+  Book book = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  google.protobuf.BoolValue active = 3;
+}

@@ -395,6 +395,18 @@ export default function ResponsePanel() {
   if (!selectedMethod) return null;
   const isStreamingMethod = selectedMethod.serverStreaming || selectedMethod.clientStreaming;
 
+  const streamHeaders = streamMessages
+    ? streamMessages
+        .filter((m) => m.type === 'header' && m.metadata)
+        .flatMap((m) => m.metadata || [])
+    : [];
+
+  const streamTrailers = streamMessages
+    ? streamMessages
+        .filter((m) => m.type === 'trailer' && m.metadata)
+        .flatMap((m) => m.metadata || [])
+    : [];
+
   // Show streaming panel if streaming is active or we have stream messages
   if (isStreaming || (isStreamingMethod && streamMessages.length > 0)) {
     return (
@@ -407,10 +419,20 @@ export default function ResponsePanel() {
             </button>
           ))}
         </div>
-        <div className="flex-1 min-h-0">
-          {tab === 'response' ? <StreamPanel /> : tab === 'history' ? <HistoryPanel /> : (
-            <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
-              No headers yet
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {tab === 'response' ? (
+            <StreamPanel />
+          ) : tab === 'history' ? (
+            <HistoryPanel />
+          ) : (
+            <div className="p-3 space-y-2 h-full">
+              <MetadataSection key="stream-headers" title="Response Headers" entries={streamHeaders} />
+              <MetadataSection key="stream-trailers" title="Trailers" entries={streamTrailers} />
+              {streamHeaders.length === 0 && streamTrailers.length === 0 && (
+                <div className="flex h-full items-center justify-center text-c-text3 text-sm select-none">
+                  No headers yet
+                </div>
+              )}
             </div>
           )}
         </div>

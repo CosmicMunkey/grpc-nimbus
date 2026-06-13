@@ -1,0 +1,17 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "InventoryService",
+  "method": "UpdateStock",
+  "input": {
+    "equals": {
+      "id": "itm_01HABC9876WXYZ"
+    }
+  },
+  "output": {
+    "data": {
+      "id": "itm_01HABC9876WXYZ",
+      "previous_qty": 42,
+      "new_qty": 46
+    }
+  }
+}

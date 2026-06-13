@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package service.v1;
+
+import "test.local/example/types/types.proto";
+
+service ModuleService {
+  rpc Greet(types.v1.GreetRequest) returns (types.v1.GreetResponse);
+}

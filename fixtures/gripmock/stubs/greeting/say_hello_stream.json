@@ -9,10 +9,23 @@
     }
   },
   "output": {
-    "data": {
-      "greeting": "Hello, Stream! (message 1 of 3)",
-      "from": "nimbus-mock",
-      "sent_at": "2024-01-15T12:00:00Z"
-    }
+    "delay": "1s",
+    "stream": [
+      {
+        "greeting": "Hello, Stream! (message 1 of 3)",
+        "from": "nimbus-mock",
+        "sent_at": "2024-01-15T12:00:00Z"
+      },
+      {
+        "greeting": "Hello, Stream! (message 2 of 3)",
+        "from": "nimbus-mock",
+        "sent_at": "2024-01-15T12:00:01Z"
+      },
+      {
+        "greeting": "Hello, Stream! (message 3 of 3)",
+        "from": "nimbus-mock",
+        "sent_at": "2024-01-15T12:00:02Z"
+      }
+    ]
   }
 }

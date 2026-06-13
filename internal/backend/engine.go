@@ -1168,6 +1168,38 @@ func (e *Engine) InvokeStream(
 	req.EmitDefaults = emitDefaults
 
 	go func() {
+		var (
+			mu           sync.Mutex
+			headers      []rpc.MetadataEntry
+			trailers     []rpc.MetadataEntry
+			responses    []string
+			statusCode   int
+			statusStr    string
+			statusMsg    string
+			streamErr    error
+		)
+
+		start := time.Now()
+
+		wrappedCb := func(evt rpc.StreamEvent) {
+			mu.Lock()
+			switch evt.Type {
+			case "header":
+				headers = append(headers, evt.Metadata...)
+			case "message":
+				responses = append(responses, evt.JSON)
+			case "trailer":
+				trailers = append(trailers, evt.Metadata...)
+				statusCode = evt.StatusCode
+				statusStr = evt.Status
+			case "error":
+				statusMsg = evt.Error
+			}
+			mu.Unlock()
+
+			cb(evt)
+		}
+
 		defer func() {
 			cancel()
 			e.mu.Lock()
@@ -1175,8 +1207,52 @@ func (e *Engine) InvokeStream(
 				e.streamCancel = nil
 			}
 			e.mu.Unlock()
+
+			elapsed := time.Since(start)
+			mu.Lock()
+			respJSON := ""
+			if len(responses) > 0 {
+				respJSON = "[" + strings.Join(responses, ",") + "]"
+			}
+
+			resp := &rpc.InvokeResponse{
+				Status:        statusStr,
+				StatusCode:    statusCode,
+				StatusMessage: statusMsg,
+				DurationMs:    elapsed.Milliseconds(),
+				ResponseJSON:  respJSON,
+				Headers:       headers,
+				Trailers:      trailers,
+				Streaming:     true,
+			}
+			if streamErr != nil {
+				resp.Error = streamErr.Error()
+				if resp.StatusMessage == "" {
+					resp.StatusMessage = streamErr.Error()
+				}
+			}
+			mu.Unlock()
+
+			if e.histStore != nil {
+				if err := e.histStore.Add(storage.HistoryEntry{
+					ID:          fmt.Sprintf("%d", time.Now().UnixNano()),
+					MethodPath:  req.MethodPath,
+					RequestJSON: req.RequestJSON,
+					Metadata:    req.Metadata,
+					Response:    resp,
+					InvokedAt:   time.Now().Format(time.RFC3339Nano),
+				}); err != nil {
+					logger.Default.Warnf("recording history for streaming %s failed: %v", req.MethodPath, err)
+				}
+			}
 		}()
-		err := rpc.InvokeStream(ctx, conn, pd, req, cb)
+
+		err := rpc.InvokeStream(ctx, conn, pd, req, wrappedCb)
+		if err != nil {
+			mu.Lock()
+			streamErr = err
+			mu.Unlock()
+		}
 		done(err)
 	}()
 	return nil

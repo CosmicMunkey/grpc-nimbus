@@ -1,0 +1,39 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "HealthService",
+  "method": "Watch",
+  "input": {
+    "equals": {
+      "service": ""
+    }
+  },
+  "output": {
+    "delay": "1.5s",
+    "stream": [
+      {
+        "status": "SERVING_STATUS_SERVING",
+        "message": "All services healthy",
+        "components": {
+          "database": "SERVING_STATUS_SERVING",
+          "cache": "SERVING_STATUS_SERVING"
+        }
+      },
+      {
+        "status": "SERVING_STATUS_NOT_SERVING",
+        "message": "Cache service degraded",
+        "components": {
+          "database": "SERVING_STATUS_SERVING",
+          "cache": "SERVING_STATUS_NOT_SERVING"
+        }
+      },
+      {
+        "status": "SERVING_STATUS_SERVING",
+        "message": "All systems recovered",
+        "components": {
+          "database": "SERVING_STATUS_SERVING",
+          "cache": "SERVING_STATUS_SERVING"
+        }
+      }
+    ]
+  }
+}
