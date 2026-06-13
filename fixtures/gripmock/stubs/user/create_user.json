@@ -1,0 +1,39 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "UserService",
+  "method": "CreateUser",
+  "input": {
+    "equals": {
+      "email": "jane.doe@example.com",
+      "display_name": "Jane Doe",
+      "role": "USER_ROLE_EDITOR",
+      "tags": ["beta-tester", "internal"],
+      "address": {
+        "street": "123 Main St",
+        "city": "Denver",
+        "state": "CO",
+        "zip": "80202",
+        "country": "US"
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "id": "usr_01HXYZ1234ABCDEF",
+      "email": "jane.doe@example.com",
+      "display_name": "Jane Doe",
+      "role": "USER_ROLE_EDITOR",
+      "status": "STATUS_ACTIVE",
+      "tags": ["beta-tester", "internal"],
+      "address": {
+        "street": "123 Main St",
+        "city": "Denver",
+        "state": "CO",
+        "zip": "80202",
+        "country": "US"
+      },
+      "created_at": "2024-01-15T12:00:00Z",
+      "updated_at": "2024-01-15T12:00:00Z"
+    }
+  }
+}

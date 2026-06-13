@@ -1,0 +1,56 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "InventoryService",
+  "method": "SearchItems",
+  "input": {
+    "equals": {
+      "query": "headphones",
+      "category": "ITEM_CATEGORY_ELECTRONICS",
+      "min_price": 0.0,
+      "max_price": 500.0,
+      "in_stock_only": true,
+      "page": {
+        "page_size": 10,
+        "page_token": ""
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "items": [
+        {
+          "id": "itm_01HABC9876WXYZ",
+          "sku": "ELEC-HDN-BLU-001",
+          "name": "Wireless Noise-Cancelling Headphones",
+          "category": "ITEM_CATEGORY_ELECTRONICS",
+          "price": 299.99,
+          "stock_qty": 42,
+          "specs": {
+            "color": "Midnight Blue",
+            "connectivity": "Bluetooth 5.3"
+          },
+          "active": true,
+          "created_at": "2023-11-01T00:00:00Z"
+        },
+        {
+          "id": "itm_02HDEF3210MNOP",
+          "sku": "ELEC-HDN-BLK-002",
+          "name": "Studio Monitor Headphones",
+          "category": "ITEM_CATEGORY_ELECTRONICS",
+          "price": 149.00,
+          "stock_qty": 17,
+          "specs": {
+            "color": "Matte Black",
+            "type": "Wired"
+          },
+          "active": true,
+          "created_at": "2023-09-15T00:00:00Z"
+        }
+      ],
+      "page": {
+        "next_page_token": "",
+        "total_count": 2
+      }
+    }
+  }
+}

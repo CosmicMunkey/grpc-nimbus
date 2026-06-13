@@ -1,0 +1,286 @@
+syntax = "proto3";
+
+package nimbus.v1;
+
+option go_package = "github.com/CosmicMunkey/grpc-nimbus/test/gripmock/proto;nimbusv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared enums & messages
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE      = 1;
+  STATUS_INACTIVE    = 2;
+  STATUS_PENDING     = 3;
+  STATUS_DELETED     = 4;
+}
+
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_ADMIN       = 1;
+  USER_ROLE_EDITOR      = 2;
+  USER_ROLE_VIEWER      = 3;
+}
+
+message PageRequest {
+  int32  page_size  = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  string next_page_token = 1;
+  int32  total_count     = 2;
+}
+
+message ErrorDetail {
+  string code    = 1;
+  string message = 2;
+  map<string, string> metadata = 3;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GreetingService — simple unary + server-streaming
+// ─────────────────────────────────────────────────────────────────────────────
+
+service GreetingService {
+  // Unary: single request → single response
+  rpc SayHello(HelloRequest) returns (HelloResponse);
+
+  // Server-streaming: single request → stream of responses
+  rpc SayHelloStream(HelloRequest) returns (stream HelloResponse);
+}
+
+message HelloRequest {
+  string name   = 1;
+  string locale = 2; // e.g. "en-US", "fr-FR"
+}
+
+message HelloResponse {
+  string greeting   = 1;
+  string from       = 2;
+  google.protobuf.Timestamp sent_at = 3;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UserService — CRUD + client-streaming + bidirectional streaming
+// ─────────────────────────────────────────────────────────────────────────────
+
+service UserService {
+  // Unary RPCs
+  rpc CreateUser(CreateUserRequest) returns (User);
+  rpc GetUser(GetUserRequest)       returns (User);
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+
+  // Server-streaming: watch a user for real-time updates
+  rpc WatchUser(WatchUserRequest) returns (stream UserEvent);
+
+  // Client-streaming: bulk-import users, get a summary back
+  rpc BatchCreateUsers(stream CreateUserRequest) returns (BatchCreateUsersResponse);
+
+  // Bidirectional streaming: interactive chat channel
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+
+  // Paged list
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+message User {
+  string   id           = 1;
+  string   email        = 2;
+  string   display_name = 3;
+  UserRole role         = 4;
+  Status   status       = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  map<string, string> attributes       = 8; // arbitrary key-value metadata
+  repeated string     tags             = 9;
+  Address             address          = 10;
+
+  // oneof: optional identity verification
+  oneof identity {
+    string oauth_sub   = 11;
+    string saml_name_id = 12;
+    string api_key_id  = 13;
+  }
+}
+
+message Address {
+  string street  = 1;
+  string city    = 2;
+  string state   = 3;
+  string zip     = 4;
+  string country = 5;
+}
+
+message CreateUserRequest {
+  string   email        = 1;
+  string   display_name = 2;
+  UserRole role         = 3;
+  Address  address      = 4;
+  repeated string tags  = 5;
+  map<string, string> attributes = 6;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message UpdateUserRequest {
+  string   id           = 1;
+  string   display_name = 2;
+  UserRole role         = 3;
+  Status   status       = 4;
+  Address  address      = 5;
+  repeated string tags  = 6;
+}
+
+message DeleteUserRequest {
+  string id = 1;
+  bool   hard_delete = 2;
+}
+
+message DeleteUserResponse {
+  bool   success  = 1;
+  string message  = 2;
+}
+
+message ListUsersRequest {
+  PageRequest page   = 1;
+  UserRole    role   = 2;   // filter by role (optional)
+  Status      status = 3;   // filter by status (optional)
+  string      query  = 4;   // freetext search
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  PageResponse  page  = 2;
+}
+
+message WatchUserRequest {
+  string id = 1;
+}
+
+message UserEvent {
+  enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    EVENT_TYPE_CREATED     = 1;
+    EVENT_TYPE_UPDATED     = 2;
+    EVENT_TYPE_DELETED     = 3;
+  }
+  EventType event_type = 1;
+  User      user       = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message BatchCreateUsersResponse {
+  int32          created_count = 1;
+  int32          failed_count  = 2;
+  repeated ErrorDetail errors  = 3;
+}
+
+message ChatMessage {
+  string   user_id   = 1;
+  string   room_id   = 2;
+  string   content   = 3;
+  google.protobuf.Timestamp sent_at = 4;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// InventoryService — demonstrates nested messages, enums, and maps
+// ─────────────────────────────────────────────────────────────────────────────
+
+service InventoryService {
+  rpc GetItem(GetItemRequest)         returns (Item);
+  rpc SearchItems(SearchItemsRequest) returns (SearchItemsResponse);
+  rpc UpdateStock(UpdateStockRequest) returns (UpdateStockResponse);
+}
+
+enum ItemCategory {
+  ITEM_CATEGORY_UNSPECIFIED  = 0;
+  ITEM_CATEGORY_ELECTRONICS  = 1;
+  ITEM_CATEGORY_CLOTHING     = 2;
+  ITEM_CATEGORY_FOOD         = 3;
+  ITEM_CATEGORY_BOOKS        = 4;
+  ITEM_CATEGORY_TOYS         = 5;
+}
+
+message Item {
+  string       id          = 1;
+  string       sku         = 2;
+  string       name        = 3;
+  string       description = 4;
+  ItemCategory category    = 5;
+  double       price       = 6;
+  int32        stock_qty   = 7;
+  repeated string image_urls = 8;
+  map<string, string> specs  = 9;  // e.g. "color" → "red", "size" → "M"
+  Dimensions   dimensions  = 10;
+  bool         active      = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+message Dimensions {
+  double width_cm  = 1;
+  double height_cm = 2;
+  double depth_cm  = 3;
+  double weight_kg = 4;
+}
+
+message GetItemRequest {
+  string id = 1;
+}
+
+message SearchItemsRequest {
+  string       query    = 1;
+  ItemCategory category = 2;
+  double       min_price = 3;
+  double       max_price = 4;
+  bool         in_stock_only = 5;
+  PageRequest  page     = 6;
+}
+
+message SearchItemsResponse {
+  repeated Item items = 1;
+  PageResponse  page  = 2;
+}
+
+message UpdateStockRequest {
+  string id    = 1;
+  int32  delta = 2; // positive = restock, negative = sold
+}
+
+message UpdateStockResponse {
+  string id            = 1;
+  int32  previous_qty  = 2;
+  int32  new_qty       = 3;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HealthService — standard health-check pattern
+// ─────────────────────────────────────────────────────────────────────────────
+
+service HealthService {
+  rpc Check(HealthCheckRequest)  returns (HealthCheckResponse);
+  rpc Watch(HealthCheckRequest)  returns (stream HealthCheckResponse);
+}
+
+message HealthCheckRequest {
+  string service = 1; // empty string = overall health
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    SERVING_STATUS_UNKNOWN     = 0;
+    SERVING_STATUS_SERVING     = 1;
+    SERVING_STATUS_NOT_SERVING = 2;
+    SERVING_STATUS_SERVICE_UNKNOWN = 3;
+  }
+  ServingStatus status  = 1;
+  string        message = 2;
+  map<string, ServingStatus> components = 3;
+}

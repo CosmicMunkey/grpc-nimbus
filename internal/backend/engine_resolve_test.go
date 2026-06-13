@@ -14,19 +14,21 @@ func TestResolveHeaderValue_Plain(t *testing.T) {
 }
 
 func TestResolveHeaderValue_EnvVar(t *testing.T) {
+	// ${VAR} always expands from os.Getenv regardless of inheritEnv.
 	t.Setenv("NIMBUS_TEST_TOKEN", "secret123")
-	got := resolveHeaderValue("Bearer ${NIMBUS_TEST_TOKEN}", false, false)
-	want := "Bearer secret123"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+	for _, inherit := range []bool{true, false} {
+		if got := resolveHeaderValue("Bearer ${NIMBUS_TEST_TOKEN}", false, inherit); got != "Bearer secret123" {
+			t.Errorf("inheritEnv=%v: got %q, want %q", inherit, got, "Bearer secret123")
+		}
 	}
 }
 
 func TestResolveHeaderValue_EnvVar_Unset(t *testing.T) {
 	os.Unsetenv("NIMBUS_UNSET_VAR")
-	got := resolveHeaderValue("${NIMBUS_UNSET_VAR}", false, false)
-	if got != "" {
-		t.Errorf("expected empty string for unset var, got %q", got)
+	for _, inherit := range []bool{true, false} {
+		if got := resolveHeaderValue("${NIMBUS_UNSET_VAR}", false, inherit); got != "" {
+			t.Errorf("inheritEnv=%v: expected empty string for unset var, got %q", inherit, got)
+		}
 	}
 }
 
@@ -56,18 +58,22 @@ func TestResolveHeaderValue_ShellCmd_Error(t *testing.T) {
 }
 
 func TestResolveHeaderValue_Combined(t *testing.T) {
+	// ${VAR} always expands from os.Getenv regardless of inheritEnv.
 	t.Setenv("NIMBUS_SUFFIX", "world")
-	got := resolveHeaderValue("hello-${NIMBUS_SUFFIX}", false, false)
-	if got != "hello-world" {
-		t.Errorf("got %q, want %q", got, "hello-world")
+	for _, inherit := range []bool{true, false} {
+		if got := resolveHeaderValue("hello-${NIMBUS_SUFFIX}", false, inherit); got != "hello-world" {
+			t.Errorf("inheritEnv=%v: got %q, want %q", inherit, got, "hello-world")
+		}
 	}
 }
 
 func TestResolveHeaderValue_ShellDisabled(t *testing.T) {
+	// Shell disabled: $(…) literal is preserved, ${VAR} always expands.
 	t.Setenv("NIMBUS_SUFFIX", "world")
-	got := resolveHeaderValue("token=$(echo nope)-${NIMBUS_SUFFIX}", false, false)
-	if got != "token=$(echo nope)-world" {
-		t.Errorf("got %q, want %q", got, "token=$(echo nope)-world")
+	for _, inherit := range []bool{true, false} {
+		if got := resolveHeaderValue("token=$(echo nope)-${NIMBUS_SUFFIX}", false, inherit); got != "token=$(echo nope)-world" {
+			t.Errorf("inheritEnv=%v: got %q, want %q", inherit, got, "token=$(echo nope)-world")
+		}
 	}
 }
 
@@ -95,13 +101,37 @@ func TestResolveHeaderValue_NoInheritEnv_ShellCommand(t *testing.T) {
 }
 
 func TestResolveHeaderValue_InheritEnv_EnvVar(t *testing.T) {
-	// ${VAR} syntax should work regardless of inheritEnv flag
-	// because it uses os.Getenv which always reads from the process environment
+	// ${VAR} always expands. When inheritEnv=true the value comes from the
+	// login-shell env (computeLoginShellEnv); in tests that environment
+	// includes whatever the test process has, so the result should match
+	// os.Getenv for any var set via t.Setenv.
 	t.Setenv("TEST_VAR", "test_value")
-	got := resolveHeaderValue("value=${TEST_VAR}", false, true)
-	if got != "value=test_value" {
-		t.Errorf("got %q, want %q", got, "value=test_value")
+	for _, inherit := range []bool{true, false} {
+		if got := resolveHeaderValue("value=${TEST_VAR}", false, inherit); got != "value=test_value" {
+			t.Errorf("inheritEnv=%v: got %q, want %q", inherit, got, "value=test_value")
+		}
 	}
+}
+
+func TestResolveHeaderValue_PATH_Consistency(t *testing.T) {
+	// With inheritEnv=false ${PATH} returns the startup process PATH.
+	// With inheritEnv=true it returns the login-shell PATH, which should be
+	// at least as long (login shell can only add entries, not remove them).
+	if runtime.GOOS == "windows" {
+		t.Skip("login shell probe is not implemented for windows")
+	}
+	pathFalse := resolveHeaderValue("${PATH}", false, false)
+	pathTrue := resolveHeaderValue("${PATH}", false, true)
+	if pathFalse == "" {
+		t.Error("${PATH} with inheritEnv=false returned empty string")
+	}
+	if pathTrue == "" {
+		t.Error("${PATH} with inheritEnv=true returned empty string")
+	}
+	// The two values can be the same (e.g. in dev/terminal mode) or different
+	// (in production Finder mode). Both must be non-empty valid PATH strings.
+	t.Logf("inheritEnv=false PATH: %s", pathFalse)
+	t.Logf("inheritEnv=true  PATH: %s", pathTrue)
 }
 
 func TestResolveHeaderValue_InheritEnv_Combined(t *testing.T) {

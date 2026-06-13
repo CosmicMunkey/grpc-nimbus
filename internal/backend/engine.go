@@ -25,7 +25,67 @@ var (
 	reEnvVar = regexp.MustCompile(`\$\{([^}]+)\}`)
 	// $(command) — shell command substitution.
 	reShellCmd = regexp.MustCompile(`\$\(([^)]+)\)`)
+
+	// startupEnv captures os.Environ() once when the process starts.
+	// Used as the child-process environment when inheritEnv is false —
+	// no login-shell augmentation, just what the OS handed to us at launch.
+	startupEnv = os.Environ()
+
+	// loginShellEnvOnce / loginShellEnvMap hold the lazily-computed result of
+	// running `shell -l -c env`. This gives us the full login-profile environment
+	// (Homebrew, ~/go/bin, nvm, etc.) so that ${PATH} with inheritEnv=true
+	// matches what $(command) actually sees. Computed at most once.
+	loginShellEnvOnce sync.Once
+	loginShellEnvMap  map[string]string
 )
+
+// computeLoginShellEnv runs `shell -l -c env` once and caches the result.
+// Subsequent calls return the cached map immediately. On Windows or if the
+// shell fails, the map is empty and lookupEnv falls back to os.Getenv.
+func computeLoginShellEnv() map[string]string {
+	loginShellEnvOnce.Do(func() {
+		loginShellEnvMap = make(map[string]string)
+		if runtime.GOOS == "windows" {
+			return
+		}
+		shell := os.Getenv("SHELL")
+		if shell == "" {
+			shell = "sh"
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, shell, "-l", "-c", "env").Output()
+		if err != nil {
+			logger.Default.Warnf("login-shell env probe failed: %v", err)
+			return
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			// Use IndexByte so values that contain '=' are handled correctly.
+			if idx := strings.IndexByte(line, '='); idx > 0 {
+				loginShellEnvMap[line[:idx]] = line[idx+1:]
+			}
+		}
+	})
+	return loginShellEnvMap
+}
+
+// lookupEnv resolves an environment variable name according to the inheritEnv
+// setting, ensuring that ${PATH} is consistent with what $(command) sees:
+//   - inheritEnv=true: returns the login-shell-computed value so Homebrew,
+//     ~/go/bin, etc. are visible — same env the child process gets via -l.
+//   - inheritEnv=false: returns the startup process value (os.Getenv), which
+//     in production is the minimal macOS GUI PATH.
+func lookupEnv(name string, inheritEnv bool) string {
+	if inheritEnv {
+		if v, ok := computeLoginShellEnv()[name]; ok {
+			return v
+		}
+		// Fall back to the process env (covers edge cases like vars only set
+		// via the system rather than the user profile).
+		return os.Getenv(name)
+	}
+	return os.Getenv(name)
+}
 
 // Engine manages all application business logic, storage operations,
 // and gRPC connections. It is UI-agnostic and Wails-independent.
@@ -1215,11 +1275,13 @@ func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
 		})
 	}
 
-	// Resolve ${VAR_NAME}.
+	// Resolve ${VAR_NAME} via lookupEnv so the value is consistent with what
+	// $(command) actually sees: login-shell env when inheritEnv=true, startup
+	// process env when false.
 	if hasEnvVar {
 		val = reEnvVar.ReplaceAllStringFunc(val, func(match string) string {
 			name := reEnvVar.FindStringSubmatch(match)[1]
-			return os.Getenv(strings.TrimSpace(name))
+			return lookupEnv(strings.TrimSpace(name), inheritEnv)
 		})
 	}
 
@@ -1228,8 +1290,15 @@ func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
 
 // runShellCommand executes cmd via the platform shell and returns trimmed stdout.
 // A 15-second context deadline prevents hangs.
-// When inheritEnv is true, the command inherits the parent process environment
-// (including $PATH), so a login shell is not needed.
+//
+// When inheritEnv is true on Unix, the user's shell is invoked as a login shell
+// (-l) so that ~/.zprofile / ~/.bash_profile / etc. are sourced. This is
+// necessary because macOS (and some Linux desktop environments) launch GUI apps
+// with a stripped PATH (/usr/bin:/bin:/usr/sbin:/sbin), omitting Homebrew,
+// nvm, pyenv, and any other user-installed tools. The login shell restores the
+// full user PATH without requiring -i (interactive mode), so prompts and
+// readline are never triggered. The 15-second timeout guards against slow
+// profile scripts.
 func runShellCommand(cmd string, inheritEnv bool) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -1238,24 +1307,32 @@ func runShellCommand(cmd string, inheritEnv bool) (string, error) {
 	if runtime.GOOS == "windows" {
 		c = exec.CommandContext(ctx, "cmd", "/c", cmd)
 	} else {
+		shell := os.Getenv("SHELL")
+		if shell == "" {
+			shell = "sh"
+		}
 		if inheritEnv {
-			shell := os.Getenv("SHELL")
-			if shell == "" {
-				shell = "sh"
-			}
-			// Use a non-login, non-interactive shell. The parent environment
-			// (os.Environ below) already supplies $PATH and other variables,
-			// so there is no need for -l which would source the full user
-			// profile (oh-my-zsh, etc.) and risk exceeding the timeout.
-			c = exec.CommandContext(ctx, shell, "-c", cmd)
+			// Run as a login shell so the user's profile is sourced and the
+			// full PATH (Homebrew, nvm, pyenv, etc.) is available. This is
+			// the same technique used by VS Code and other GUI dev tools on
+			// macOS/Linux to work around the OS-stripped environment.
+			c = exec.CommandContext(ctx, shell, "-l", "-c", cmd)
 		} else {
 			c = exec.CommandContext(ctx, "sh", "-c", cmd)
 		}
 	}
 
-	// If inheritEnv is true, inherit the parent process environment.
+	// Always set c.Env explicitly — a nil Env would silently inherit the
+	// parent process environment and defeat the inheritEnv=false case.
 	if inheritEnv {
+		// Full user environment, augmented by the login shell above.
 		c.Env = os.Environ()
+	} else {
+		// Use the environment snapshot captured at process start. In
+		// production this is the minimal macOS GUI PATH; in dev it is
+		// whatever the launching terminal provided. Either way, no login-
+		// shell augmentation — commands only see what the OS gave the app.
+		c.Env = startupEnv
 	}
 
 	var stdout, stderr bytes.Buffer

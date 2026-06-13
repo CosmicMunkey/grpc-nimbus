@@ -1,0 +1,24 @@
+services:
+  gripmock:
+    image: bavix/gripmock:latest
+    container_name: grpc-nimbus-mock
+    ports:
+      - "4770:4770" # gRPC server
+      - "4771:4771" # Admin UI / stub browser
+    volumes:
+      - ./gripmock/proto:/proto:ro
+      - ./gripmock/stubs:/stubs:ro
+    # --imports lets gripmock resolve well-known proto imports (google/protobuf/*)
+    # --stub points to the directory of JSON stub files
+    # The final argument is the entry-point proto file
+    command: >
+      --imports=/proto
+      --stub=/stubs
+      /proto/nimbus.proto
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4771/api/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped

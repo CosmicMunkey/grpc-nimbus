@@ -1,0 +1,17 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "UserService",
+  "method": "DeleteUser",
+  "input": {
+    "equals": {
+      "id": "usr_01HXYZ1234ABCDEF",
+      "hard_delete": false
+    }
+  },
+  "output": {
+    "data": {
+      "success": true,
+      "message": "User usr_01HXYZ1234ABCDEF soft-deleted successfully"
+    }
+  }
+}

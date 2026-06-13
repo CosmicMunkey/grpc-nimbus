@@ -1,0 +1,39 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "InventoryService",
+  "method": "GetItem",
+  "input": {
+    "equals": {
+      "id": "itm_01HABC9876WXYZ"
+    }
+  },
+  "output": {
+    "data": {
+      "id": "itm_01HABC9876WXYZ",
+      "sku": "ELEC-HDN-BLU-001",
+      "name": "Wireless Noise-Cancelling Headphones",
+      "description": "Premium over-ear headphones with 40-hour battery life.",
+      "category": "ITEM_CATEGORY_ELECTRONICS",
+      "price": 299.99,
+      "stock_qty": 42,
+      "image_urls": [
+        "https://cdn.example.com/items/hdphones-front.jpg",
+        "https://cdn.example.com/items/hdphones-side.jpg"
+      ],
+      "specs": {
+        "color": "Midnight Blue",
+        "connectivity": "Bluetooth 5.3",
+        "battery_hours": "40",
+        "driver_size_mm": "40"
+      },
+      "dimensions": {
+        "width_cm": 19.5,
+        "height_cm": 22.0,
+        "depth_cm": 8.5,
+        "weight_kg": 0.29
+      },
+      "active": true,
+      "created_at": "2023-11-01T00:00:00Z"
+    }
+  }
+}

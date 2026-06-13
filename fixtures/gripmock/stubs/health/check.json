@@ -1,0 +1,22 @@
+{
+  "$schema": "https://bavix.github.io/gripmock/schema/stub.json",
+  "service": "HealthService",
+  "method": "Check",
+  "input": {
+    "equals": {
+      "service": ""
+    }
+  },
+  "output": {
+    "data": {
+      "status": "SERVING_STATUS_SERVING",
+      "message": "All systems operational",
+      "components": {
+        "database":    "SERVING_STATUS_SERVING",
+        "cache":       "SERVING_STATUS_SERVING",
+        "queue":       "SERVING_STATUS_SERVING",
+        "storage":     "SERVING_STATUS_SERVING"
+      }
+    }
+  }
+}
