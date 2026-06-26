@@ -2,69 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { FieldSchema } from '../../types';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
+import { collectPopulatedPaths, fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
 
-// Walk the form value tree and collect all populated field paths for field masks.
-// Emits only the populated leaf paths (or top-level repeated/map paths) using camelCase JSON names.
-// Skips fields that are at their default proto3 values (e.g. false, 0, default enum) unless includeDefaults is true.
-function collectPopulatedPaths(
-  formValue: Record<string, unknown>,
-  fields: FieldSchema[],
-  prefix = '',
-  visited = new Set<string>(),
-  includeDefaults = false,
-): string[] {
-  const paths: string[] = [];
-  for (const f of fields) {
-    if (f.isFieldMask) continue;
-    const val = formValue[f.jsonName];
-    if (val === null || val === undefined) continue;
-
-    const isFilled = (() => {
-      if (f.isRepeated) return Array.isArray(val) && val.length > 0;
-      if (f.isMap) return typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
-
-      if (includeDefaults) {
-        return typeof val === 'string' ? val !== ''
-          : Array.isArray(val) ? val.length > 0
-          : typeof val === 'object' && !Array.isArray(val) ? Object.keys(val).length > 0
-          : true;
-      }
-
-      switch (f.type) {
-        case 'bool':
-          return val === true;
-        case 'string':
-        case 'bytes':
-          return val !== '';
-        case 'int32':
-        case 'int64':
-        case 'uint32':
-        case 'uint64':
-        case 'float':
-        case 'double':
-          return val !== 0 && val !== '0';
-        case 'enum':
-          const defaultEnum = f.enumValues?.[0]?.name;
-          return val !== '' && val !== defaultEnum;
-        case 'message':
-          return typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0;
-        default:
-          return true;
-      }
-    })();
-
-    if (!isFilled) continue;
-    const path = prefix ? `${prefix}.${f.jsonName}` : f.jsonName;
-    if (f.type === 'message' && f.fields && val && typeof val === 'object' && !Array.isArray(val) && !visited.has(path)) {
-      visited.add(path);
-      paths.push(...collectPopulatedPaths(val as Record<string, unknown>, f.fields, path, visited, includeDefaults));
-    } else {
-      paths.push(path);
-    }
-  }
-  return [...new Set(paths)];
-}
 function isNumericType(t: string) {
   return ['int32', 'int64', 'uint32', 'uint64', 'float', 'double'].includes(t);
 }
