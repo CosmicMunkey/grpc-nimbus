@@ -2,6 +2,12 @@
 
 This document provides comprehensive context for working on gRPC Nimbus, designed for AI agents and developers doing feature enhancements, bug fixes, or refactoring.
 
+## Agent Tooling & Search Guidelines
+
+When searching or exploring the codebase, agents must follow these guidelines:
+1. **CodeGraph First**: Always try CodeGraph first using `codegraph query <search>` (for symbol lookups) or `codegraph context "<task>"` (to build context for a task) before using generic search tools.
+2. **Ripgrep for Text Searches**: If a search is not symbol-based (e.g., finding raw text patterns, logs, or configurations), use ripgrep (`rg`) rather than standard `grep`.
+
 ---
 
 ## Architecture Overview
