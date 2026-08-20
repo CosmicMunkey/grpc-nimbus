@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.18.0
 	github.com/mark3labs/mcp-go v0.48.0
 	github.com/wailsapp/wails/v2 v2.15.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 )
 
