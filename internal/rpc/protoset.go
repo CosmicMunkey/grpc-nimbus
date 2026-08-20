@@ -111,6 +111,48 @@ func LoadProtosets(paths []string) (*ProtosetDescriptor, error) {
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("no protoset files provided")
 	}
+	if len(paths) == 1 {
+		src, err := grpcurl.DescriptorSourceFromProtoSets(paths[0])
+		if err != nil {
+			return nil, fmt.Errorf("loading protoset file %q: %w", paths[0], err)
+		}
+		pd, err := newDescriptor(src, nil)
+		if err != nil {
+			return nil, err
+		}
+		pd.svcFiles = make(map[string]string)
+		svcNames, err := src.ListServices()
+		if err == nil {
+			for _, svcName := range svcNames {
+				pd.svcFiles[svcName] = paths[0]
+			}
+		}
+		if len(pd.Services()) == 0 {
+			return nil, fmt.Errorf("no services found in loaded protoset file")
+		}
+		return pd, nil
+	}
+
+	// For multiple paths, first attempt combined loading so that cross-file
+	// type references across separate protoset files (e.g. types.protoset + service.protoset) resolve.
+	if combinedSrc, err := grpcurl.DescriptorSourceFromProtoSets(paths...); err == nil {
+		if pd, err := newDescriptor(combinedSrc, nil); err == nil && len(pd.Services()) > 0 {
+			pd.svcFiles = make(map[string]string)
+			for _, path := range paths {
+				if singleSrc, err := grpcurl.DescriptorSourceFromProtoSets(path); err == nil {
+					if svcNames, err := singleSrc.ListServices(); err == nil {
+						for _, svcName := range svcNames {
+							pd.svcFiles[svcName] = path
+						}
+					}
+				}
+			}
+			return pd, nil
+		}
+	}
+
+	// Fall back to isolated loading if combined loading failed (e.g. identically-named
+	// conflicting files in different protosets).
 	var parts []*ProtosetDescriptor
 	for _, path := range paths {
 		src, err := grpcurl.DescriptorSourceFromProtoSets(path)

@@ -130,22 +130,30 @@ func NewEngine() *Engine {
 // Startup initializes stores and restores last saved state.
 func (e *Engine) Startup(ctx context.Context) error {
 	var err error
-	e.store, err = storage.NewStore()
-	if err != nil {
-		logger.Default.Warnf("collection store unavailable: %v", err)
+	if e.store == nil {
+		e.store, err = storage.NewStore()
+		if err != nil {
+			logger.Default.Warnf("collection store unavailable: %v", err)
+		}
 	}
-	e.envStore, err = storage.NewEnvStore()
-	if err != nil {
-		logger.Default.Warnf("environment store unavailable: %v", err)
+	if e.envStore == nil {
+		e.envStore, err = storage.NewEnvStore()
+		if err != nil {
+			logger.Default.Warnf("environment store unavailable: %v", err)
+		}
 	}
-	e.histStore, err = storage.NewHistoryStore()
-	if err != nil {
-		logger.Default.Warnf("history store unavailable: %v", err)
+	if e.histStore == nil {
+		e.histStore, err = storage.NewHistoryStore()
+		if err != nil {
+			logger.Default.Warnf("history store unavailable: %v", err)
+		}
 	}
-	e.settings, err = storage.NewSettingsStore()
-	if err != nil {
-		logger.Default.Warnf("settings store unavailable: %v", err)
-		return err
+	if e.settings == nil {
+		e.settings, err = storage.NewSettingsStore()
+		if err != nil {
+			logger.Default.Warnf("settings store unavailable: %v", err)
+			return err
+		}
 	}
 
 	// Auto-restore descriptors
@@ -155,14 +163,22 @@ func (e *Engine) Startup(ctx context.Context) error {
 	}
 
 	var parts []*rpc.ProtosetDescriptor
-	for _, path := range saved.ProtosetPaths {
-		pd, err := rpc.LoadProtosets([]string{path})
-		if err != nil {
-			logger.Default.Warnf("auto-restore protoset %q skipped: %v", path, err)
-			continue
+	if len(saved.ProtosetPaths) > 0 {
+		pd, err := rpc.LoadProtosets(saved.ProtosetPaths)
+		if err == nil && len(pd.Services()) > 0 {
+			parts = append(parts, pd)
+			e.loadedProtosetPaths = append([]string(nil), saved.ProtosetPaths...)
+		} else {
+			for _, path := range saved.ProtosetPaths {
+				pd, err := rpc.LoadProtosets([]string{path})
+				if err != nil {
+					logger.Default.Warnf("auto-restore protoset %q skipped: %v", path, err)
+					continue
+				}
+				parts = append(parts, pd)
+				e.loadedProtosetPaths = append(e.loadedProtosetPaths, path)
+			}
 		}
-		parts = append(parts, pd)
-		e.loadedProtosetPaths = append(e.loadedProtosetPaths, path)
 	}
 
 	if len(saved.ProtoFilePaths) > 0 {
@@ -534,7 +550,72 @@ func (e *Engine) SaveUserSettings(s storage.AppSettings) error {
 	if e.settings == nil {
 		return fmt.Errorf("settings store unavailable")
 	}
-	if err := e.settings.Save(&s); err != nil {
+	err := e.settings.Update(func(current *storage.AppSettings) {
+		if s.ConfirmDeletes != nil {
+			current.ConfirmDeletes = s.ConfirmDeletes
+		}
+		if s.TimestampInputLocal != nil {
+			current.TimestampInputLocal = s.TimestampInputLocal
+		}
+		if s.ConfirmClearHistory != nil {
+			current.ConfirmClearHistory = s.ConfirmClearHistory
+		}
+		if s.EmitDefaults != nil {
+			current.EmitDefaults = s.EmitDefaults
+		}
+		if s.FieldMaskIncludeDefaults != nil {
+			current.FieldMaskIncludeDefaults = s.FieldMaskIncludeDefaults
+		}
+		if s.EnvSortByCreated != nil {
+			current.EnvSortByCreated = s.EnvSortByCreated
+		}
+		current.ThemeBadge = s.ThemeBadge
+		if s.Theme != "" {
+			current.Theme = s.Theme
+		}
+		if s.CustomThemes != nil {
+			current.CustomThemes = s.CustomThemes
+		}
+		current.ActiveCustomThemeID = s.ActiveCustomThemeID
+		if s.FontSize != nil {
+			current.FontSize = s.FontSize
+		}
+		if s.ResponseWordWrap != nil {
+			current.ResponseWordWrap = s.ResponseWordWrap
+		}
+		if s.ResponseIndent != nil {
+			current.ResponseIndent = s.ResponseIndent
+		}
+		if s.SidebarWidth != nil {
+			current.SidebarWidth = s.SidebarWidth
+		}
+		if s.PanelSplit != nil {
+			current.PanelSplit = s.PanelSplit
+		}
+		if s.DefaultTimeoutSeconds != nil {
+			current.DefaultTimeoutSeconds = s.DefaultTimeoutSeconds
+		}
+		if s.HistoryLimit != nil {
+			current.HistoryLimit = s.HistoryLimit
+		}
+		if s.AutoConnectOnStartup != nil {
+			current.AutoConnectOnStartup = s.AutoConnectOnStartup
+		}
+		if s.AllowShellCommands != nil {
+			current.AllowShellCommands = s.AllowShellCommands
+		}
+		if s.InheritShellEnv != nil {
+			current.InheritShellEnv = s.InheritShellEnv
+		}
+		if s.MaxStreamMessages != nil {
+			current.MaxStreamMessages = s.MaxStreamMessages
+		}
+		current.DefaultMetadata = s.DefaultMetadata
+		if s.ShowDebugIndicator != nil {
+			current.ShowDebugIndicator = s.ShowDebugIndicator
+		}
+	})
+	if err != nil {
 		return err
 	}
 	if e.histStore != nil && s.HistoryLimit != nil {

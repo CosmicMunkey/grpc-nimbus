@@ -9,6 +9,7 @@ import (
 
 	"github.com/CosmicMunkey/grpc-nimbus/internal/protoresolver"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
+	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"google.golang.org/protobuf/proto"
@@ -698,4 +699,89 @@ message UnrelatedResponse {}
 		t.Fatalf("serviceNames after: %v", err)
 	}
 	assertServiceSet(t, namesAfter, "service.GreetService")
+}
+
+func TestSaveUserSettingsPreservesProtosetPaths(t *testing.T) {
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
+	if err != nil {
+		t.Fatalf("resolve fixture root: %v", err)
+	}
+	protosetPath := writeProtosetFixture(t, []string{base}, "no_includes_needed.proto")
+
+	settingsStore, err := storage.NewSettingsStoreAt(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatalf("NewSettingsStoreAt: %v", err)
+	}
+
+	e := NewEngine()
+	e.settings = settingsStore
+
+	if _, err := e.LoadProtosets(context.Background(), []string{protosetPath}); err != nil {
+		t.Fatalf("LoadProtosets: %v", err)
+	}
+
+	saved, err := settingsStore.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(saved.ProtosetPaths) != 1 || saved.ProtosetPaths[0] != protosetPath {
+		t.Fatalf("expected ProtosetPaths to contain %q, got %v", protosetPath, saved.ProtosetPaths)
+	}
+
+	// Now simulate the frontend calling SaveUserSettings with only UI preferences
+	fontSize := 18
+	if err := e.SaveUserSettings(storage.AppSettings{
+		FontSize: &fontSize,
+		Theme:    "dark",
+	}); err != nil {
+		t.Fatalf("SaveUserSettings: %v", err)
+	}
+
+	// Verify that ProtosetPaths and ProtoLoadMode were NOT wiped out
+	after, err := settingsStore.Load()
+	if err != nil {
+		t.Fatalf("Load after SaveUserSettings: %v", err)
+	}
+	if len(after.ProtosetPaths) != 1 || after.ProtosetPaths[0] != protosetPath {
+		t.Fatalf("expected ProtosetPaths to still contain %q, got %v", protosetPath, after.ProtosetPaths)
+	}
+	if after.ProtoLoadMode != "protoset" {
+		t.Fatalf("expected ProtoLoadMode to be 'protoset', got %q", after.ProtoLoadMode)
+	}
+	if after.FontSize == nil || *after.FontSize != 18 {
+		t.Fatalf("expected FontSize=18, got %v", after.FontSize)
+	}
+}
+
+func TestStartupBatchAutoRestoresProtosets(t *testing.T) {
+	base, err := filepath.Abs(filepath.Join("..", "rpc", "testdata", "protoimport"))
+	if err != nil {
+		t.Fatalf("resolve fixture root: %v", err)
+	}
+	protosetPath := writeProtosetFixture(t, []string{base}, "no_includes_needed.proto")
+
+	settingsStore, err := storage.NewSettingsStoreAt(filepath.Join(t.TempDir(), "settings.json"))
+	if err != nil {
+		t.Fatalf("NewSettingsStoreAt: %v", err)
+	}
+	if err := settingsStore.Update(func(s *storage.AppSettings) {
+		s.ProtoLoadMode = "protoset"
+		s.ProtosetPaths = []string{protosetPath}
+	}); err != nil {
+		t.Fatalf("settings Update: %v", err)
+	}
+
+	e := NewEngine()
+	e.settings = settingsStore
+
+	if err := e.Startup(context.Background()); err != nil {
+		t.Fatalf("Startup: %v", err)
+	}
+
+	if len(e.loadedProtosetPaths) != 1 || e.loadedProtosetPaths[0] != protosetPath {
+		t.Fatalf("expected loadedProtosetPaths to contain %q, got %v", protosetPath, e.loadedProtosetPaths)
+	}
+	if e.protoset == nil || len(e.protoset.Services()) == 0 {
+		t.Fatal("expected protoset services to be restored on Startup")
+	}
 }
