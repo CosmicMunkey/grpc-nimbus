@@ -18,7 +18,7 @@ enum BookGenre {
   BOOK_GENRE_UNSPECIFIED = 0;
   BOOK_GENRE_FICTION = 1;
   BOOK_GENRE_NON_FICTION = 2;
-  BOOK_GENRE_BIOGRAPHY = 3;
+  BOOK_GENRE_BIOGRAPHY = 3 [deprecated = true];
 }
 
 message Publisher {

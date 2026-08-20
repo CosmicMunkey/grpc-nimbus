@@ -9,7 +9,9 @@ import "google/protobuf/wrappers.proto";
 
 service Library {
   rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
-  rpc WatchShelves(WatchShelvesRequest) returns (stream ShelfEvent);
+  rpc WatchShelves(WatchShelvesRequest) returns (stream ShelfEvent) {
+    option deprecated = true;
+  }
   rpc UpdateBook(UpdateBookRequest) returns (Book);
 }
 
@@ -35,5 +37,6 @@ message ShelfEvent {
 message UpdateBookRequest {
   Book book = 1;
   google.protobuf.FieldMask update_mask = 2;
-  google.protobuf.BoolValue active = 3;
+  google.protobuf.BoolValue active = 3 [deprecated = true];
+  bool new_active = 4;
 }

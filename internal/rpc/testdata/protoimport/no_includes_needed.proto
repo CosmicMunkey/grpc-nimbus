@@ -5,6 +5,7 @@ package sample.v1;
 import "google/protobuf/wrappers.proto";
 
 service PingService {
+  option deprecated = true;
   rpc Ping(PingRequest) returns (PingResponse);
 }
 

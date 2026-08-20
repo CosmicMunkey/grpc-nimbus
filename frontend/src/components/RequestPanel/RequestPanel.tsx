@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useCallback, useState } from 'react';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check } from 'lucide-react';
+import { Play, Square, Save, Plus, X, LayoutList, Code, Terminal, Copy, Check, TriangleAlert } from 'lucide-react';
 import { MetadataEntry } from '../../types';
 import FormBuilder from '../RequestBuilder/FormBuilder';
 
@@ -324,7 +324,7 @@ export default function RequestPanel() {
     savedRequestId,
     savedRequestName,
   } = useActiveTab();
-  const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest, streamingTabId } = useAppStore();
+  const { setRequestJson, setTimeoutSeconds, invoke, cancelInvoke, updateSavedRequest, streamingTabId, isDark } = useAppStore();
   const hasOtherActiveStream = streamingTabId !== null && streamingTabId !== tabId;
   const showCancel = isInvoking || isStreaming;
 
@@ -359,9 +359,16 @@ export default function RequestPanel() {
       {/* Method header bar */}
       <div className="flex flex-col border-b border-c-border bg-c-panel">
         <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-          <span className="text-xs font-semibold text-c-text truncate flex-1">
-            {selectedMethod.methodName}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className={`text-xs font-semibold text-c-text truncate ${selectedMethod.deprecated ? 'line-through opacity-70' : ''}`}>
+              {selectedMethod.methodName}
+            </span>
+            {selectedMethod.deprecated && (
+              <span title="Deprecated" className="shrink-0">
+                <TriangleAlert size={12} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+              </span>
+            )}
+          </div>
           {/* Timeout */}
           <div className="flex items-center gap-1 text-xs text-c-text2">
             <span>Timeout</span>

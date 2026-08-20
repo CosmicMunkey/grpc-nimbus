@@ -56,6 +56,9 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	if service.Name != "library.v1.Library" {
 		t.Fatalf("expected service library.v1.Library, got %q", service.Name)
 	}
+	if service.Deprecated {
+		t.Fatal("expected Library service to not be marked deprecated")
+	}
 	if len(service.Methods) != 3 {
 		t.Fatalf("expected 3 methods, got %d", len(service.Methods))
 	}
@@ -69,6 +72,9 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ListBooks method to be present")
 	}
+	if listBooks.Deprecated {
+		t.Fatal("expected ListBooks method to not be marked deprecated")
+	}
 	if listBooks.InputType != "library.v1.ListBooksRequest" {
 		t.Fatalf("expected ListBooks input type library.v1.ListBooksRequest, got %q", listBooks.InputType)
 	}
@@ -79,6 +85,9 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	watchShelves, ok := methods["WatchShelves"]
 	if !ok {
 		t.Fatal("expected WatchShelves method to be present")
+	}
+	if !watchShelves.Deprecated {
+		t.Fatal("expected WatchShelves method to be marked deprecated")
 	}
 	if !watchShelves.ServerStreaming {
 		t.Fatal("expected WatchShelves to be server streaming")
@@ -142,6 +151,42 @@ func TestLoadProtoFilesWithMultipleImportRoots(t *testing.T) {
 	if active.Type != "bool_value" {
 		t.Fatalf("expected active type bool_value, got %q", active.Type)
 	}
+	if !active.Deprecated {
+		t.Fatal("expected active field to be marked deprecated")
+	}
+
+	newActive := fieldNamed(t, updateSchema, "new_active")
+	if newActive.Type != "bool" {
+		t.Fatalf("expected new_active type bool, got %q", newActive.Type)
+	}
+	if newActive.Deprecated {
+		t.Fatal("expected new_active field to not be marked deprecated")
+	}
+
+	bookField := fieldNamed(t, updateSchema, "book")
+	genreField := fieldNamed(t, bookField.Fields, "genre")
+	if genreField.Type != "enum" {
+		t.Fatalf("expected genre field type enum, got %q", genreField.Type)
+	}
+	foundBio := false
+	foundFiction := false
+	for _, ev := range genreField.EnumValues {
+		if ev.Name == "BOOK_GENRE_BIOGRAPHY" {
+			foundBio = true
+			if !ev.Deprecated {
+				t.Fatal("expected BOOK_GENRE_BIOGRAPHY enum value to be marked deprecated")
+			}
+		}
+		if ev.Name == "BOOK_GENRE_FICTION" {
+			foundFiction = true
+			if ev.Deprecated {
+				t.Fatal("expected BOOK_GENRE_FICTION enum value to not be marked deprecated")
+			}
+		}
+	}
+	if !foundBio || !foundFiction {
+		t.Fatalf("missing expected enum values, found: %+v", genreField.EnumValues)
+	}
 }
 
 func TestLoadProtoFilesMissingSecondaryImportRoot(t *testing.T) {
@@ -195,6 +240,9 @@ func TestLoadProtoFilesWithoutExtraImportPaths(t *testing.T) {
 	}
 	if services[0].Name != "sample.v1.PingService" {
 		t.Fatalf("expected service sample.v1.PingService, got %q", services[0].Name)
+	}
+	if !services[0].Deprecated {
+		t.Fatal("expected PingService to be marked deprecated")
 	}
 	if len(services[0].Methods) != 1 || services[0].Methods[0].MethodName != "Ping" {
 		t.Fatalf("expected Ping method, got %+v", services[0].Methods)
