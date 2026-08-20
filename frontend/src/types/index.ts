@@ -21,6 +21,7 @@ export interface MethodInfo {
   inputType: string;
   outputType: string;
   requestSchema: string;
+  deprecated?: boolean;
 }
 
 export interface ServiceInfo {
@@ -28,6 +29,7 @@ export interface ServiceInfo {
   methods: MethodInfo[];
   sourceFile?: string;
   unresolvable?: boolean;
+  deprecated?: boolean;
 }
 
 export interface InvokeRequest {
@@ -104,6 +106,7 @@ export interface HistoryEntry {
 export interface EnumValue {
   name: string;
   number: number;
+  deprecated?: boolean;
 }
 
 export interface FieldSchema {
@@ -121,6 +124,7 @@ export interface FieldSchema {
   mapValueType?: string;
   mapValueFields?: FieldSchema[];
   isFieldMask?: boolean;
+  deprecated?: boolean;
 }
 
 export interface LoadedState {

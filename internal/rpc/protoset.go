@@ -25,6 +25,7 @@ type MethodInfo struct {
 	InputType       string `json:"inputType"`
 	OutputType      string `json:"outputType"`
 	RequestSchema   string `json:"requestSchema"`
+	Deprecated      bool   `json:"deprecated,omitempty"` // true when the method has `option deprecated = true`
 }
 
 // ServiceInfo groups methods under a service.
@@ -33,6 +34,7 @@ type ServiceInfo struct {
 	Methods      []MethodInfo `json:"methods"`
 	SourceFile   string       `json:"sourceFile,omitempty"`   // set when loaded from a protoset file
 	Unresolvable bool         `json:"unresolvable,omitempty"` // true when server reflection listed the service but could not supply its descriptor
+	Deprecated   bool         `json:"deprecated,omitempty"`   // true when the service has `option deprecated = true`
 }
 
 // ProtosetDescriptor holds the parsed descriptor source from any loading strategy.
@@ -304,7 +306,10 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 	for _, m := range pd.methods {
 		svcName := m.GetService().GetFullyQualifiedName()
 		if _, ok := byService[svcName]; !ok {
-			byService[svcName] = &ServiceInfo{Name: svcName}
+			byService[svcName] = &ServiceInfo{
+				Name:       svcName,
+				Deprecated: m.GetService().GetServiceOptions().GetDeprecated(),
+			}
 			order = append(order, svcName)
 		}
 		mi := MethodInfo{
@@ -315,6 +320,7 @@ func (pd *ProtosetDescriptor) Services() []ServiceInfo {
 			ServerStreaming: m.IsServerStreaming(),
 			InputType:       m.GetInputType().GetFullyQualifiedName(),
 			OutputType:      m.GetOutputType().GetFullyQualifiedName(),
+			Deprecated:      m.GetMethodOptions().GetDeprecated(),
 		}
 		byService[svcName].Methods = append(byService[svcName].Methods, mi)
 	}

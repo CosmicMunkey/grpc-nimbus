@@ -24,12 +24,14 @@ type FieldSchema struct {
 	MapValueType   string        `json:"mapValueType,omitempty"`   // for map type
 	MapValueFields []FieldSchema `json:"mapValueFields,omitempty"` // when map value is message
 	IsFieldMask    bool          `json:"isFieldMask,omitempty"`    // true for google.protobuf.FieldMask
+	Deprecated     bool          `json:"deprecated,omitempty"`     // true when the field has `[deprecated = true]`
 }
 
 // EnumValue is a single enum name/number pair.
 type EnumValue struct {
-	Name   string `json:"name"`
-	Number int32  `json:"number"`
+	Name       string `json:"name"`
+	Number     int32  `json:"number"`
+	Deprecated bool   `json:"deprecated,omitempty"` // true when the enum value has `[deprecated = true]`
 }
 
 // GetRequestSchema returns the ordered list of field schemas for a method's input message.
@@ -70,6 +72,7 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 		Number:     fd.GetNumber(),
 		IsRepeated: fd.IsRepeated() && !fd.IsMap(),
 		IsMap:      fd.IsMap(),
+		Deprecated: fd.GetFieldOptions().GetDeprecated(),
 	}
 	if oo := fd.GetOneOf(); oo != nil {
 		fs.OneofName = oo.GetName()
@@ -105,8 +108,9 @@ func buildFieldSchema(fd *desc.FieldDescriptor, visited map[string]bool, depth i
 		if et := fd.GetEnumType(); et != nil {
 			for _, ev := range et.GetValues() {
 				fs.EnumValues = append(fs.EnumValues, EnumValue{
-					Name:   ev.GetName(),
-					Number: ev.GetNumber(),
+					Name:       ev.GetName(),
+					Number:     ev.GetNumber(),
+					Deprecated: ev.GetEnumValueOptions().GetDeprecated(),
 				})
 			}
 		}

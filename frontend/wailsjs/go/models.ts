@@ -93,6 +93,7 @@ export namespace rpc {
 	export class EnumValue {
 	    name: string;
 	    number: number;
+	    deprecated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new EnumValue(source);
@@ -102,6 +103,7 @@ export namespace rpc {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.number = source["number"];
+	        this.deprecated = source["deprecated"];
 	    }
 	}
 	export class FieldSchema {
@@ -118,6 +120,7 @@ export namespace rpc {
 	    mapValueType?: string;
 	    mapValueFields?: FieldSchema[];
 	    isFieldMask?: boolean;
+	    deprecated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FieldSchema(source);
@@ -138,6 +141,7 @@ export namespace rpc {
 	        this.mapValueType = source["mapValueType"];
 	        this.mapValueFields = this.convertValues(source["mapValueFields"], FieldSchema);
 	        this.isFieldMask = source["isFieldMask"];
+	        this.deprecated = source["deprecated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -266,6 +270,7 @@ export namespace rpc {
 	    inputType: string;
 	    outputType: string;
 	    requestSchema: string;
+	    deprecated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new MethodInfo(source);
@@ -281,6 +286,7 @@ export namespace rpc {
 	        this.inputType = source["inputType"];
 	        this.outputType = source["outputType"];
 	        this.requestSchema = source["requestSchema"];
+	        this.deprecated = source["deprecated"];
 	    }
 	}
 	export class ServiceInfo {
@@ -288,6 +294,7 @@ export namespace rpc {
 	    methods: MethodInfo[];
 	    sourceFile?: string;
 	    unresolvable?: boolean;
+	    deprecated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServiceInfo(source);
@@ -299,6 +306,7 @@ export namespace rpc {
 	        this.methods = this.convertValues(source["methods"], MethodInfo);
 	        this.sourceFile = source["sourceFile"];
 	        this.unresolvable = source["unresolvable"];
+	        this.deprecated = source["deprecated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

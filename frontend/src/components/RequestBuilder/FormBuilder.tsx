@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, X, TriangleAlert } from 'lucide-react';
 import { FieldSchema } from '../../types';
 import { useAppStore, useActiveTab } from '../../store/appStore';
 import { collectPopulatedPaths, fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
@@ -250,7 +250,7 @@ function EnumEditor({ schema, value, onChange }: { schema: FieldSchema; value: u
       className="flex-1 min-w-0 bg-c-input border border-c-border rounded pl-2 pr-6 py-0.5 text-xs text-c-text outline-none focus:border-c-accent"
     >
       {(schema.enumValues ?? []).map(ev => (
-        <option key={ev.name} value={ev.name}>{ev.name} ({ev.number})</option>
+        <option key={ev.name} value={ev.name}>{ev.name} ({ev.number}){ev.deprecated ? ' (deprecated)' : ''}</option>
       ))}
     </select>
   );
@@ -517,7 +517,7 @@ function OneofGroup({
           className="ml-auto bg-c-input border border-c-border rounded pl-1 pr-5 py-px text-[0.625rem] text-c-text outline-none focus:border-c-accent"
         >
           {fields.map(f => (
-            <option key={f.jsonName} value={f.jsonName}>{f.name}</option>
+            <option key={f.jsonName} value={f.jsonName}>{f.name}{f.deprecated ? ' (deprecated)' : ''}</option>
           ))}
         </select>
       </div>
@@ -1026,6 +1026,17 @@ function FieldEditor({ schema, value, onChange, depth, onAutoFill, isCollectionE
   }
 }
 
+// ─── Deprecated badge ────────────────────────────────────────────────────────
+
+function DeprecatedBadge() {
+  const isDark = useAppStore(s => s.isDark);
+  return (
+    <span title="Deprecated" className="shrink-0">
+      <TriangleAlert size={12} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+    </span>
+  );
+}
+
 // ─── Field row ────────────────────────────────────────────────────────────────
 
 function FieldRow({
@@ -1045,8 +1056,9 @@ function FieldRow({
       <div className="py-0.5">
         {!hideLabel && (
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs font-mono text-c-text">{schema.name}</span>
+            <span className={`text-xs font-mono text-c-text ${schema.deprecated ? 'line-through opacity-70' : ''}`}>{schema.name}</span>
             <TypeBadge schema={schema} />
+            {schema.deprecated && <DeprecatedBadge />}
             {schema.oneofName && (
               <span className="text-[0.5625rem] text-c-text3">oneof:{schema.oneofName}</span>
             )}
@@ -1063,8 +1075,9 @@ function FieldRow({
     <div className="flex items-center gap-2 py-0.5 min-h-[28px]">
       {!hideLabel && (
         <div className="flex items-center gap-1.5 w-40 shrink-0">
-          <span className="text-xs font-mono text-c-text truncate" title={schema.name}>{schema.name}</span>
+          <span className={`text-xs font-mono text-c-text truncate ${schema.deprecated ? 'line-through opacity-70' : ''}`} title={schema.name}>{schema.name}</span>
           <TypeBadge schema={schema} />
+          {schema.deprecated && <DeprecatedBadge />}
         </div>
       )}
       <FieldEditor schema={schema} value={value} onChange={onChange} depth={depth} onAutoFill={onAutoFill} />

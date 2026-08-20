@@ -4,7 +4,7 @@ import { useAppStore, useActiveTab } from '../../store/appStore';
 import { Collection, MethodInfo, SavedRequest, ServiceInfo } from '../../types';
 import {
   ChevronRight, ChevronDown, Zap, ArrowLeftRight, ArrowDown, ArrowUp,
-  Trash2, Book, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle, Pencil,
+  Trash2, Book, BookOpen, Download, Upload, MoreVertical, X, AlertTriangle, Pencil, TriangleAlert,
 } from 'lucide-react';
 import ProtosetLoader from '../ProtosetLoader/ProtosetLoader';
 import { usePortalMenu } from '../../hooks/usePortalMenu';
@@ -18,6 +18,15 @@ function StreamBadge({ method }: { method: MethodInfo }) {
   if (method.serverStreaming)
     return <span title="Server streaming"><ArrowDown size={11} className={isDark ? 'text-green-400 shrink-0' : 'text-green-600 shrink-0'} /></span>;
   return <span title="Unary"><Zap size={11} className={isDark ? 'text-yellow-400 shrink-0' : 'text-yellow-600 shrink-0'} /></span>;
+}
+
+function DeprecatedTag() {
+  const isDark = useAppStore(s => s.isDark);
+  return (
+    <span title="Deprecated" className="shrink-0">
+      <TriangleAlert size={11} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+    </span>
+  );
 }
 
 function ServiceNode({ svc }: { svc: ServiceInfo }) {
@@ -46,7 +55,8 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
         className="flex items-center gap-1 w-full px-2 py-1 text-xs text-c-text2 hover:text-c-text hover:bg-c-hover rounded transition-colors"
       >
         {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        <span className="font-semibold truncate" title={svc.name}>{shortName}</span>
+        <span className={`font-semibold truncate ${svc.deprecated ? 'line-through opacity-70' : ''}`} title={svc.name}>{shortName}</span>
+        {svc.deprecated && <DeprecatedTag />}
         <span className="ml-auto text-c-text3 text-[0.625rem]">{svc.methods.length}</span>
       </button>
       {expanded && (
@@ -63,7 +73,8 @@ function ServiceNode({ svc }: { svc: ServiceInfo }) {
                 }`}
               >
                 <StreamBadge method={m} />
-                <span className="truncate">{m.methodName}</span>
+                <span className={`truncate ${m.deprecated ? 'line-through opacity-70' : ''}`}>{m.methodName}</span>
+                {m.deprecated && <DeprecatedTag />}
               </button>
             );
           })}
