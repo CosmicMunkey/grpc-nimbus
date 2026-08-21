@@ -155,6 +155,90 @@ func TestInterpolateRequestRequestMetadataOverridesEnvHeadersCaseInsensitive(t *
 	}
 }
 
+func TestHandleLoadProtoFiles(t *testing.T) {
+	t.Parallel()
+
+	engine := &MCPEngine{
+		ctx:   context.Background(),
+		descs: &trackedDescriptor{},
+	}
+	handler := handleLoadProtoFiles(engine)
+
+	protoPath, err := filepath.Abs("../../internal/rpc/testdata/protoimport/no_includes_needed.proto")
+	if err != nil {
+		t.Fatalf("abs path: %v", err)
+	}
+
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]any{
+				"proto_files": []any{protoPath},
+			},
+		},
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected success, got error: %q", firstResultText(t, result))
+	}
+	text := firstResultText(t, result)
+	if !strings.Contains(text, "Loaded 1 service(s)") {
+		t.Fatalf("unexpected output: %q", text)
+	}
+}
+
+func TestHandleInvokeSavedRequestRejectsInvalidTimeout(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	colStore, err := storage.NewStoreAt(filepath.Join(tmpDir, "collections"))
+	if err != nil {
+		t.Fatalf("creating col store: %v", err)
+	}
+
+	col := storage.Collection{
+		ID:   "col-1",
+		Name: "test-col",
+		Requests: []storage.SavedRequest{
+			{ID: "req-1", Name: "test-req", MethodPath: "svc/method"},
+		},
+	}
+	if err := colStore.SaveCollection(col); err != nil {
+		t.Fatalf("saving collection: %v", err)
+	}
+
+	engine := &MCPEngine{
+		ctx:   context.Background(),
+		store: colStore,
+		descs: &trackedDescriptor{},
+	}
+	handler := handleInvokeSavedRequest(engine)
+
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]any{
+				"collection_id":   col.ID,
+				"request_id":      "req-1",
+				"timeout_seconds": -5,
+			},
+		},
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected handler err: %v", err)
+	}
+	if !result.IsError {
+		t.Fatalf("expected tool error")
+	}
+	if got := firstResultText(t, result); !strings.Contains(got, "timeout_seconds must be greater than 0") {
+		t.Fatalf("unexpected error message: %q", got)
+	}
+}
+
 func firstResultText(t *testing.T, result *mcp.CallToolResult) string {
 	t.Helper()
 	if len(result.Content) == 0 {

@@ -138,3 +138,43 @@ export function fromJson(json: string): FormVal {
   }
   return {};
 }
+
+export function defaultFor(schema: FieldSchema): unknown {
+  if (schema.isMap) return {};
+  if (schema.isRepeated) return [];
+  switch (schema.type) {
+    case 'bool':   return false;
+    case 'bytes':
+    case 'string': return '';
+    case 'int32': case 'int64': case 'uint32': case 'uint64':
+    case 'float':  case 'double': return 0;
+    case 'enum':   return schema.enumValues?.[0]?.name ?? '';
+    case 'message': return null; // null = absent / not set
+    case 'timestamp': return null; // null = absent / not set
+    case 'bool_value':
+    case 'string_value':
+    case 'bytes_value':
+    case 'int32_value':
+    case 'int64_value':
+    case 'uint32_value':
+    case 'uint64_value':
+    case 'float_value':
+    case 'double_value':
+      return null; // null = absent / not set
+    case 'map':    return {};
+    default:       return '';
+  }
+}
+
+export function initForm(fields: FieldSchema[], parsed: FormVal = {}): FormVal {
+  const v: FormVal = {};
+  for (const f of fields) {
+    const pv = parsed[f.jsonName];
+    if (pv !== undefined) {
+      v[f.jsonName] = f.isFieldMask ? { paths: fieldMaskPathsFromValue(pv) } : pv;
+    } else {
+      v[f.jsonName] = defaultFor(f);
+    }
+  }
+  return v;
+}

@@ -213,6 +213,25 @@ func handleLoadProtoset(e *MCPEngine) func(context.Context, mcp.CallToolRequest)
 	}
 }
 
+func handleLoadProtoFiles(e *MCPEngine) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		protoFiles := req.GetStringSlice("proto_files", nil)
+		if len(protoFiles) == 0 {
+			return toolError("proto_files is required")
+		}
+		importPaths := req.GetStringSlice("import_paths", nil)
+		services, err := e.LoadProtoFiles(ctx, importPaths, protoFiles)
+		if err != nil {
+			return toolError("loading proto files: %v", err)
+		}
+		names := make([]string, len(services))
+		for i, svc := range services {
+			names[i] = svc.Name
+		}
+		return toolText(fmt.Sprintf("Loaded %d service(s): %s", len(services), strings.Join(names, ", ")))
+	}
+}
+
 func handleLoadViaReflection(e *MCPEngine) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		services, err := e.LoadViaReflection(ctx)
@@ -417,11 +436,16 @@ func handleInvokeSavedRequest(e *MCPEngine) func(context.Context, mcp.CallToolRe
 			return toolError("%v", err)
 		}
 
+		timeoutSeconds := req.GetFloat("timeout_seconds", defaultInvokeTimeoutSeconds)
+		if err := validateTimeoutSeconds(timeoutSeconds); err != nil {
+			return toolError("%v", err)
+		}
+
 		invokeReq := rpc.InvokeRequest{
 			MethodPath:     saved.MethodPath,
 			RequestJSON:    saved.RequestJSON,
 			Metadata:       saved.Metadata,
-			TimeoutSeconds: defaultInvokeTimeoutSeconds,
+			TimeoutSeconds: timeoutSeconds,
 		}
 
 		resp, err := e.InvokeUnary(ctx, invokeReq)
@@ -461,6 +485,10 @@ func handleRunCollection(e *MCPEngine) func(context.Context, mcp.CallToolRequest
 		collectionName := req.GetString("collection_name", "")
 		collectionID := req.GetString("collection_id", "")
 		stopOnFailure := req.GetBool("stop_on_failure", false)
+		timeoutSeconds := req.GetFloat("timeout_seconds", defaultInvokeTimeoutSeconds)
+		if err := validateTimeoutSeconds(timeoutSeconds); err != nil {
+			return toolError("%v", err)
+		}
 
 		var col *storage.Collection
 		if collectionID != "" {
@@ -512,7 +540,7 @@ func handleRunCollection(e *MCPEngine) func(context.Context, mcp.CallToolRequest
 				MethodPath:     saved.MethodPath,
 				RequestJSON:    saved.RequestJSON,
 				Metadata:       saved.Metadata,
-				TimeoutSeconds: defaultInvokeTimeoutSeconds,
+				TimeoutSeconds: timeoutSeconds,
 			}
 
 			resp, err := e.InvokeUnary(ctx, invokeReq)

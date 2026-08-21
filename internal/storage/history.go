@@ -140,61 +140,10 @@ func (s *HistoryStore) writeLocked(methodPath string, entries []HistoryEntry) er
 }
 
 func (s *HistoryStore) filePath(methodPath string) string {
-	// Canonical new format: "b64_" prefix + base64 RawURLEncoding.
-	// The prefix ensures new-format names are never confused with legacy names.
-	newSafe := sanitizeNew(methodPath)
-	newPath := filepath.Join(s.dir, newSafe+".json")
-
-	
-	if _, err := os.Stat(newPath); err == nil {
-		return newPath
-	}
-	
-	// Next try the intermediate prefixless base64 RawURLEncoding format
-	midSafe := base64.RawURLEncoding.EncodeToString([]byte(methodPath))
-	midPath := filepath.Join(s.dir, midSafe+".json")
-	if _, err := os.Stat(midPath); err == nil {
-		// Attempt to migrate intermediate file to new format
-		if err := os.Rename(midPath, newPath); err == nil {
-			return newPath
-		}
-		return midPath
-	}
-	
-	// Fall back to old underscore-based format for backward compatibility
-	oldSafe := sanitizeOld(methodPath)
-	oldPath := filepath.Join(s.dir, oldSafe+".json")
-	
-	if _, err := os.Stat(oldPath); err == nil {
-		// Attempt to migrate old file to new format
-		if err := os.Rename(oldPath, newPath); err == nil {
-			return newPath
-		}
-		// If migration fails, use the old path
-		return oldPath
-	}
-	
-	// Neither exists, use new format as the default
-	return newPath
+	return filepath.Join(s.dir, sanitize(methodPath)+".json")
 }
 
-// sanitizeNew uses base64 RawURLEncoding prefixed with b64_ to encode the method path.
-// The b64_ prefix ensures the filename is unambiguously recognized as new-format.
-func sanitizeNew(s string) string {
+// sanitize uses base64 RawURLEncoding prefixed with b64_ to encode the method path.
+func sanitize(s string) string {
 	return "b64_" + base64.RawURLEncoding.EncodeToString([]byte(s))
-}
-
-// sanitizeOld was the previous sanitization method: replacing /, ., and spaces with _
-// It's kept for backward compatibility when looking up existing history files
-func sanitizeOld(s string) string {
-	out := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == '/' || c == '.' || c == ' ' {
-			out[i] = '_'
-		} else {
-			out[i] = c
-		}
-	}
-	return string(out)
 }

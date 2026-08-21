@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/CosmicMunkey/grpc-nimbus/internal/protoresolver"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/rpc"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/storage"
 	"github.com/CosmicMunkey/grpc-nimbus/internal/util"
@@ -268,6 +270,53 @@ func (e *MCPEngine) LoadProtosets(ctx context.Context, paths []string) ([]rpc.Se
 		return nil, err
 	}
 	e.storeDescriptorState(pd, allProtosets, bundle.importPaths, bundle.protoFiles, bundle.reflection)
+	return pd.Services(), nil
+}
+
+// LoadProtoFiles loads one or more raw .proto files, discovering import roots or using provided import_paths.
+func (e *MCPEngine) LoadProtoFiles(ctx context.Context, importPaths, protoFiles []string) ([]rpc.ServiceInfo, error) {
+	seen := map[string]bool{}
+	userPaths := make([]string, 0, len(importPaths))
+	for _, dir := range importPaths {
+		if dir != "" && !seen[dir] {
+			seen[dir] = true
+			userPaths = append(userPaths, dir)
+		}
+	}
+
+	var protoParentDirs []string
+	for _, f := range protoFiles {
+		if filepath.IsAbs(f) {
+			dir := filepath.Dir(f)
+			if !seen[dir] {
+				seen[dir] = true
+				protoParentDirs = append(protoParentDirs, dir)
+			}
+		}
+	}
+
+	discovered := protoresolver.DiscoverImportPaths(protoFiles, userPaths)
+	effectiveImportPaths := util.DedupeStrings(append(append(userPaths, discovered...), protoParentDirs...))
+
+	snap := e.acquireSnapshot()
+	var conn *rpc.Connection
+	if snap.tc != nil {
+		conn = snap.tc.conn
+	}
+	var bundle descriptorBundle
+	if snap.td != nil {
+		bundle = snap.td.bundle
+	}
+
+	allProtoFiles := util.DedupeStrings(append(bundle.protoFiles, protoFiles...))
+	allImportPaths := util.DedupeStrings(append(bundle.importPaths, effectiveImportPaths...))
+
+	pd, err := e.rebuildDescriptor(ctx, bundle.protosetPaths, allImportPaths, allProtoFiles, bundle.reflection, conn)
+	snap.Release()
+	if err != nil {
+		return nil, err
+	}
+	e.storeDescriptorState(pd, bundle.protosetPaths, allImportPaths, allProtoFiles, bundle.reflection)
 	return pd.Services(), nil
 }
 

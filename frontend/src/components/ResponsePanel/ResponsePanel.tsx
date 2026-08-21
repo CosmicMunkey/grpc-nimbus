@@ -370,27 +370,12 @@ function HistoryPanel() {
 
 export default function ResponsePanel() {
   const { response, isInvoking, invokeError, selectedMethod, streamMessages, isStreaming } = useActiveTab();
-  const { appendStreamEvent } = useAppStore();
   const responseIndent = useAppStore(s => s.responseIndent);
   const [tab, setTab] = useState<'response' | 'headers' | 'history'>('response');
 
   // Snap back to Response tab when a request fires or method changes
   useEffect(() => { if (isInvoking || isStreaming) setTab('response'); }, [isInvoking, isStreaming]);
   useEffect(() => { setTab('response'); }, [selectedMethod?.fullName]);
-
-  // Subscribe to Wails stream events
-  useEffect(() => {
-    const runtime = window.runtime;
-    if (!runtime) return;
-    const offEvent = runtime.EventsOn('stream:event', (raw) => {
-      appendStreamEvent(raw);
-    });
-    const offDone = runtime.EventsOn('stream:done', () => {});
-    return () => {
-      if (typeof offEvent === 'function') offEvent();
-      if (typeof offDone === 'function') offDone();
-    };
-  }, [appendStreamEvent]);
 
   if (!selectedMethod) return null;
   const isStreamingMethod = selectedMethod.serverStreaming || selectedMethod.clientStreaming;

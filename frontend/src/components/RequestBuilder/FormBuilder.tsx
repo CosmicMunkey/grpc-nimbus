@@ -2,50 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, X, TriangleAlert } from 'lucide-react';
 import { FieldSchema } from '../../types';
 import { useAppStore, useActiveTab } from '../../store/appStore';
-import { collectPopulatedPaths, fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
+import { collectPopulatedPaths, defaultFor, fieldMaskPathsFromValue, FormVal, fromJson, initForm, toJson } from './formSerialization';
 
 function isNumericType(t: string) {
   return ['int32', 'int64', 'uint32', 'uint64', 'float', 'double'].includes(t);
-}
-
-function defaultFor(schema: FieldSchema): unknown {
-  if (schema.isMap) return {};
-  if (schema.isRepeated) return [];
-  switch (schema.type) {
-    case 'bool':   return false;
-    case 'bytes':
-    case 'string': return '';
-    case 'int32': case 'int64': case 'uint32': case 'uint64':
-    case 'float':  case 'double': return 0;
-    case 'enum':   return schema.enumValues?.[0]?.name ?? '';
-    case 'message': return null; // null = absent / not set
-    case 'timestamp': return null; // null = absent / not set
-    case 'bool_value':
-    case 'string_value':
-    case 'bytes_value':
-    case 'int32_value':
-    case 'int64_value':
-    case 'uint32_value':
-    case 'uint64_value':
-    case 'float_value':
-    case 'double_value':
-      return null; // null = absent / not set
-    case 'map':    return {};
-    default:       return '';
-  }
-}
-
-function initForm(fields: FieldSchema[], parsed: FormVal = {}): FormVal {
-  const v: FormVal = {};
-  for (const f of fields) {
-    const pv = parsed[f.jsonName];
-    if (pv !== undefined) {
-      v[f.jsonName] = f.isFieldMask ? { paths: fieldMaskPathsFromValue(pv) } : pv;
-    } else {
-      v[f.jsonName] = defaultFor(f);
-    }
-  }
-  return v;
 }
 
 // ─── Type badge ──────────────────────────────────────────────────────────────
@@ -428,26 +388,6 @@ function MessageEditor({ fields, value, onChange, depth = 0 }: MessageEditorProp
     onChange({ ...value, [jsonName]: newVal });
   };
 
-  const handleOneofChange = (groupName: string, chosenField: FieldSchema, newVal: unknown) => {
-    const group = oneofGroups[groupName];
-    const updates: FormVal = {};
-    for (const f of group) {
-      updates[f.jsonName] = f.jsonName === chosenField.jsonName ? newVal : null;
-    }
-    onChange({ ...value, ...updates });
-  };
-
-  // Which oneof names we've already rendered (to avoid duplication)
-  const renderedOneofs = new Set<string>();
-
-  const allToRender = [...regularFields];
-  for (const f of fields) {
-    if (f.oneofName && !renderedOneofs.has(f.oneofName)) {
-      renderedOneofs.add(f.oneofName);
-      allToRender.push({ ...f, _oneofGroup: f.oneofName } as FieldSchema & { _oneofGroup: string });
-    }
-  }
-
   return (
     <div className="space-y-1">
       {regularFields.map(f => (
@@ -556,7 +496,8 @@ function RepeatedEditor({
   const addItem = () => {
     let def = defaultFor(elementSchema);
     if (def === null) {
-      if (elementSchema.type === 'bool_value') def = false;
+      if (elementSchema.type === 'message') def = initForm(elementSchema.fields ?? [], {});
+      else if (elementSchema.type === 'bool_value') def = false;
       else if (elementSchema.type === 'string_value' || elementSchema.type === 'bytes_value') def = '';
       else if (['int32_value', 'int64_value', 'uint32_value', 'uint64_value', 'float_value', 'double_value'].includes(elementSchema.type)) def = 0;
     }
@@ -681,7 +622,8 @@ function MapEditor({
     const key = `key${entries.length + 1}`;
     let def = defaultFor(valueSchema);
     if (def === null) {
-      if (valueSchema.type === 'bool_value') def = false;
+      if (valueSchema.type === 'message') def = initForm(valueSchema.fields ?? [], {});
+      else if (valueSchema.type === 'bool_value') def = false;
       else if (valueSchema.type === 'string_value' || valueSchema.type === 'bytes_value') def = '';
       else if (['int32_value', 'int64_value', 'uint32_value', 'uint64_value', 'float_value', 'double_value'].includes(valueSchema.type)) def = 0;
     }

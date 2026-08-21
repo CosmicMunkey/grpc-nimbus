@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -21,11 +20,6 @@ import (
 )
 
 var (
-	// ${VAR_NAME} — OS environment variable substitution.
-	reEnvVar = regexp.MustCompile(`\$\{([^}]+)\}`)
-	// $(command) — shell command substitution.
-	reShellCmd = regexp.MustCompile(`\$\(([^)]+)\)`)
-
 	// startupEnv captures os.Environ() once when the process starts.
 	// Used as the child-process environment when inheritEnv is false —
 	// no login-shell augmentation, just what the OS handed to us at launch.
@@ -87,12 +81,24 @@ func lookupEnv(name string, inheritEnv bool) string {
 	return os.Getenv(name)
 }
 
+type trackedDescriptor struct {
+	protoset *rpc.ProtosetDescriptor
+	inFlight sync.WaitGroup
+}
+
+func (td *trackedDescriptor) Services() []rpc.ServiceInfo {
+	if td == nil || td.protoset == nil {
+		return nil
+	}
+	return td.protoset.Services()
+}
+
 // Engine manages all application business logic, storage operations,
 // and gRPC connections. It is UI-agnostic and Wails-independent.
 type Engine struct {
 	mu        sync.Mutex
 	conn      *rpc.Connection
-	protoset  *rpc.ProtosetDescriptor
+	protoset  *trackedDescriptor
 	store     *storage.Store
 	envStore  *storage.EnvStore
 	histStore *storage.HistoryStore
@@ -206,7 +212,7 @@ func (e *Engine) Startup(ctx context.Context) error {
 	}
 
 	if merged := rpc.MergeDescriptors(parts...); merged != nil {
-		e.protoset = merged
+		e.protoset = &trackedDescriptor{protoset: merged}
 	}
 
 	// Apply settings
@@ -823,7 +829,7 @@ func (e *Engine) CancelReflection() {
 
 func (e *Engine) GetLoadedState() (*storage.AppSettings, string, []string, []string, []string, []rpc.ServiceInfo, error) {
 	e.mu.Lock()
-	pd := e.protoset
+	td := e.protoset
 
 	paths := append([]string(nil), e.loadedProtosetPaths...)
 	paths = append(paths, e.loadedProtoFiles...)
@@ -837,8 +843,8 @@ func (e *Engine) GetLoadedState() (*storage.AppSettings, string, []string, []str
 	mode := e.currentLoadMode()
 
 	var svcs []rpc.ServiceInfo
-	if pd != nil {
-		svcs = pd.Services()
+	if td != nil && td.protoset != nil {
+		svcs = td.protoset.Services()
 	}
 
 	var saved *storage.AppSettings
@@ -867,8 +873,10 @@ func (e *Engine) ClearLoadedProtos() {
 
 	if old != nil {
 		go func() {
-			time.Sleep(5 * time.Second)
-			old.Close()
+			old.inFlight.Wait()
+			if old.protoset != nil {
+				old.protoset.Close()
+			}
 		}()
 	}
 
@@ -963,10 +971,10 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 	if !removed {
 		logger.Default.Warnf("remove proto path %q: not loaded", path)
 		e.mu.Lock()
-		pd := e.protoset
+		td := e.protoset
 		e.mu.Unlock()
-		if pd != nil {
-			return pd.Services(), nil
+		if td != nil && td.protoset != nil {
+			return td.protoset.Services(), nil
 		}
 		return nil, nil
 	}
@@ -1014,13 +1022,17 @@ func (e *Engine) RemoveProtoPath(ctx context.Context, path string) ([]rpc.Servic
 
 func (e *Engine) GetRequestSchema(methodPath string) ([]rpc.FieldSchema, error) {
 	e.mu.Lock()
-	pd := e.protoset
+	td := e.protoset
+	if td != nil {
+		td.inFlight.Add(1)
+	}
 	e.mu.Unlock()
 
-	if pd == nil {
+	if td == nil || td.protoset == nil {
 		return nil, fmt.Errorf("no descriptor loaded")
 	}
-	return pd.GetRequestSchema(methodPath)
+	defer td.inFlight.Done()
+	return td.protoset.GetRequestSchema(methodPath)
 }
 
 func (e *Engine) rebuildDescriptor(
@@ -1081,9 +1093,14 @@ func (e *Engine) storeDescriptorState(
 		}
 	}
 
+	var newTD *trackedDescriptor
+	if pd != nil {
+		newTD = &trackedDescriptor{protoset: pd}
+	}
+
 	e.mu.Lock()
 	old := e.protoset
-	e.protoset = pd
+	e.protoset = newTD
 	e.loadedProtosetPaths = cleanedProtosets
 	e.loadedProtoFiles = cleanedProtoFiles
 	e.loadImportPaths = append([]string(nil), importPaths...)
@@ -1092,8 +1109,10 @@ func (e *Engine) storeDescriptorState(
 
 	if old != nil {
 		go func() {
-			time.Sleep(5 * time.Second)
-			old.Close()
+			old.inFlight.Wait()
+			if old.protoset != nil {
+				old.protoset.Close()
+			}
 		}()
 	}
 }
@@ -1138,7 +1157,10 @@ func (e *Engine) combinedLoadedPaths() []string {
 func (e *Engine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.InvokeResponse, error) {
 	e.mu.Lock()
 	conn := e.conn
-	pd := e.protoset
+	td := e.protoset
+	if td != nil {
+		td.inFlight.Add(1)
+	}
 	env := e.activeEnv
 	defaultMeta := e.defaultMetadata
 	allowShell := e.allowShellCommands
@@ -1152,6 +1174,9 @@ func (e *Engine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.I
 
 	defer func() {
 		cancel()
+		if td != nil {
+			td.inFlight.Done()
+		}
 		e.mu.Lock()
 		if e.unaryCancelSeq == cancelSeq {
 			e.unaryCancel = nil
@@ -1163,7 +1188,7 @@ func (e *Engine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.I
 		logger.Default.Errorf("invoke unary %s failed: not connected", req.MethodPath)
 		return nil, fmt.Errorf("not connected — call Connect first")
 	}
-	if pd == nil {
+	if td == nil || td.protoset == nil {
 		logger.Default.Errorf("invoke unary %s failed: no descriptor loaded", req.MethodPath)
 		return nil, fmt.Errorf("no descriptor loaded — load a protoset or use reflection")
 	}
@@ -1172,7 +1197,7 @@ func (e *Engine) InvokeUnary(ctx context.Context, req rpc.InvokeRequest) (*rpc.I
 	req = interpolateRequest(req, defaultMeta, env, allowShell, inheritEnv)
 	req.EmitDefaults = emitDefaults
 
-	resp, err := rpc.InvokeUnary(ctx, conn, pd, req)
+	resp, err := rpc.InvokeUnary(ctx, conn, td.protoset, req)
 	if err != nil {
 		logger.Default.Errorf("invoke unary %s failed: %v", req.MethodPath, err)
 		return nil, err
@@ -1216,7 +1241,10 @@ func (e *Engine) InvokeStream(
 ) error {
 	e.mu.Lock()
 	conn := e.conn
-	pd := e.protoset
+	td := e.protoset
+	if td != nil {
+		td.inFlight.Add(1)
+	}
 	env := e.activeEnv
 	defaultMeta := e.defaultMetadata
 	allowShell := e.allowShellCommands
@@ -1234,11 +1262,17 @@ func (e *Engine) InvokeStream(
 	}
 
 	if conn == nil {
+		if td != nil {
+			td.inFlight.Done()
+		}
 		cancel()
 		logger.Default.Errorf("invoke stream %s failed: not connected", req.MethodPath)
 		return fmt.Errorf("not connected")
 	}
-	if pd == nil {
+	if td == nil || td.protoset == nil {
+		if td != nil {
+			td.inFlight.Done()
+		}
 		cancel()
 		logger.Default.Errorf("invoke stream %s failed: no descriptor loaded", req.MethodPath)
 		return fmt.Errorf("no descriptor loaded")
@@ -1283,6 +1317,9 @@ func (e *Engine) InvokeStream(
 
 		defer func() {
 			cancel()
+			if td != nil {
+				td.inFlight.Done()
+			}
 			e.mu.Lock()
 			if e.streamCancelSeq == cancelSeq {
 				e.streamCancel = nil
@@ -1328,7 +1365,7 @@ func (e *Engine) InvokeStream(
 			}
 		}()
 
-		err := rpc.InvokeStream(ctx, conn, pd, req, wrappedCb)
+		err := rpc.InvokeStream(ctx, conn, td.protoset, req, wrappedCb)
 		if err != nil {
 			mu.Lock()
 			streamErr = err
@@ -1411,38 +1448,67 @@ func interpolateRequest(req rpc.InvokeRequest, defaultMeta []rpc.MetadataEntry, 
 //
 // Resolution failures are logged and replaced with an empty string so the
 // request still proceeds. Values without either syntax are returned unchanged.
+// Single-pass replacement ensures command stdout is inserted literally and never
+// re-scanned for nested variable substitution.
 func resolveHeaderValue(val string, allowShell bool, inheritEnv bool) string {
-	hasEnvVar := strings.Contains(val, "${")
-	hasShellCmd := strings.Contains(val, "$(")
-	if !hasEnvVar && !hasShellCmd {
+	if !strings.Contains(val, "${") && !strings.Contains(val, "$(") {
 		return val
 	}
 
-	if allowShell && hasShellCmd {
-		// Resolve $(command) first. Note: env-var substitution below will run on the full
-		// result, so any ${VAR} in command output will be evaluated in the second pass.
-		val = reShellCmd.ReplaceAllStringFunc(val, func(match string) string {
-			cmd := reShellCmd.FindStringSubmatch(match)[1]
-			out, err := runShellCommand(cmd, inheritEnv)
-			if err != nil {
-				logger.Default.Warnf("header command %q failed: %v", cmd, err)
-				return ""
+	var sb strings.Builder
+	for i := 0; i < len(val); {
+		if val[i] == '$' && i+1 < len(val) {
+			if val[i+1] == '(' && allowShell {
+				depth := 1
+				j := i + 2
+				for j < len(val) && depth > 0 {
+					if val[j] == '(' {
+						depth++
+					} else if val[j] == ')' {
+						depth--
+					}
+					if depth == 0 {
+						break
+					}
+					j++
+				}
+				if depth == 0 {
+					cmd := val[i+2 : j]
+					out, err := runShellCommand(cmd, inheritEnv)
+					if err != nil {
+						logger.Default.Warnf("header command %q failed: %v", cmd, err)
+					} else {
+						sb.WriteString(out)
+					}
+					i = j + 1
+					continue
+				}
+			} else if val[i+1] == '{' {
+				depth := 1
+				j := i + 2
+				for j < len(val) && depth > 0 {
+					if val[j] == '{' {
+						depth++
+					} else if val[j] == '}' {
+						depth--
+					}
+					if depth == 0 {
+						break
+					}
+					j++
+				}
+				if depth == 0 {
+					name := val[i+2 : j]
+					sb.WriteString(lookupEnv(strings.TrimSpace(name), inheritEnv))
+					i = j + 1
+					continue
+				}
 			}
-			return out
-		})
+		}
+		sb.WriteByte(val[i])
+		i++
 	}
-
-	// Resolve ${VAR_NAME} via lookupEnv so the value is consistent with what
-	// $(command) actually sees: login-shell env when inheritEnv=true, startup
-	// process env when false.
-	if hasEnvVar {
-		val = reEnvVar.ReplaceAllStringFunc(val, func(match string) string {
-			name := reEnvVar.FindStringSubmatch(match)[1]
-			return lookupEnv(strings.TrimSpace(name), inheritEnv)
-		})
-	}
-
-	return val
+	return sb.String()
 }
 
 // runShellCommand executes cmd via the platform shell and returns trimmed stdout.

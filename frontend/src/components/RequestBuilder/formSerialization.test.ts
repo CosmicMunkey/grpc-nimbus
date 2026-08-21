@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { FieldSchema } from '../../types';
-import { collectPopulatedPaths, fieldMaskPathsFromValue, FormVal, fromJson, toJson } from './formSerialization';
+import { collectPopulatedPaths, defaultFor, fieldMaskPathsFromValue, FormVal, fromJson, initForm, toJson } from './formSerialization';
 
 
 const requestSchema: FieldSchema[] = [
@@ -371,4 +371,28 @@ test('collectPopulatedPaths includes zero/default values when includeDefaults=tr
 
   const paths = collectPopulatedPaths(form, updateBookSchema, '', new Set(), true);
   assert.deepEqual(paths, ['book.title', 'book.page_count', 'book.in_print']);
+});
+
+test('initForm initializes message fields with default values', () => {
+  const form = initForm(requestSchema);
+  assert.deepEqual(form, {
+    book: null,
+    updateMask: null,
+  });
+
+  const parsedForm = initForm(requestSchema, { updateMask: 'book.title' });
+  assert.deepEqual(parsedForm, {
+    book: null,
+    updateMask: { paths: ['book.title'] },
+  });
+
+  const innerForm = initForm(requestSchema[0].fields ?? []);
+  assert.deepEqual(innerForm, {
+    title: '',
+    genre: 'BOOK_GENRE_UNSPECIFIED',
+    inPrint: false,
+    pageCount: 0,
+    publisher: null,
+    tags: {},
+  });
 });

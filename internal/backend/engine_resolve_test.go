@@ -144,3 +144,20 @@ func TestResolveHeaderValue_InheritEnv_Combined(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestResolveHeaderValue_NoDoubleExpansion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("printf/escaping syntax is not portable to cmd.exe")
+	}
+	t.Setenv("NIMBUS_SECRET_PASS", "SUPER_SECRET_VALUE")
+	t.Setenv("NIMBUS_PREFIX", "Bearer")
+
+	// Command outputs a literal "${NIMBUS_SECRET_PASS}" string.
+	// Single-pass replacement must NOT expand this into "SUPER_SECRET_VALUE".
+	input := "${NIMBUS_PREFIX} $(printf '%s' '${NIMBUS_SECRET_PASS}')"
+	got := resolveHeaderValue(input, true, false)
+	want := "Bearer ${NIMBUS_SECRET_PASS}"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

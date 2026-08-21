@@ -53,7 +53,11 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("locating config dir: %w", err)
 	}
-	dir := filepath.Join(configDir, appDirName, "collections")
+	return NewStoreAt(filepath.Join(configDir, appDirName, "collections"))
+}
+
+// NewStoreAt creates a Store using the given directory path.
+func NewStoreAt(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating collections dir %s: %w", dir, err)
 	}

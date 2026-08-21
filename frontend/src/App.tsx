@@ -265,11 +265,17 @@ export default function App() {
     const offCloseAllTabs = rt.EventsOn('menu:closeAllTabs', () => getState().closeAllTabs());
     const offToggleDebugPane = rt.EventsOn('menu:toggleDebugPane', () => getState().toggleDebugPane());
 
+    const offStreamEvent = rt.EventsOn('stream:event', (raw) => {
+      getState().appendStreamEvent(raw as Parameters<ReturnType<typeof useAppStore.getState>['appendStreamEvent']>[0]);
+    });
+    const offStreamDone = rt.EventsOn('stream:done', () => {});
+
     return () => {
       offImport(); offExport();
       offZoomIn(); offZoomOut(); offZoomReset();
       offNewTab(); offCloseTab(); offNextTab(); offPrevTab();
       offAbout(); offHelp(); offCloseAllTabs(); offToggleDebugPane();
+      offStreamEvent(); offStreamDone();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

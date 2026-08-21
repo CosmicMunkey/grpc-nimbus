@@ -73,6 +73,19 @@ func main() {
 		),
 	), handleLoadProtoset(engine))
 
+	s.AddTool(mcp.NewTool("load_proto_files",
+		mcp.WithDescription("Load one or more raw .proto source files to discover available services and methods. Automatically discovers import paths or uses provided import_paths."),
+		mcp.WithArray("proto_files",
+			mcp.Description("Array of absolute paths to .proto files"),
+			mcp.Required(),
+			mcp.WithStringItems(),
+		),
+		mcp.WithArray("import_paths",
+			mcp.Description("Optional additional import root directories to search for imported proto files"),
+			mcp.WithStringItems(),
+		),
+	), handleLoadProtoFiles(engine))
+
 	s.AddTool(mcp.NewTool("load_via_reflection",
 		mcp.WithDescription("Discover services and methods by querying the connected server's gRPC reflection API. Requires an active connection."),
 	), handleLoadViaReflection(engine))
@@ -133,6 +146,9 @@ func main() {
 		mcp.WithString("request_id",
 			mcp.Description("ID of the saved request (alternative to request_name)"),
 		),
+		mcp.WithNumber("timeout_seconds",
+			mcp.Description("Request timeout in seconds (default: 30)"),
+		),
 	), handleInvokeSavedRequest(engine))
 
 	// ── Regression testing ────────────────────────────────────────────────────
@@ -146,6 +162,9 @@ func main() {
 		),
 		mcp.WithBoolean("stop_on_failure",
 			mcp.Description("Stop running after the first failed request (default: false)"),
+		),
+		mcp.WithNumber("timeout_seconds",
+			mcp.Description("Per-request timeout in seconds (default: 30)"),
 		),
 	), handleRunCollection(engine))
 
